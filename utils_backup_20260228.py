@@ -1,0 +1,105 @@
+# =========================================
+# utils.py
+# Funciones compartidas del sistema
+# RSI, EMA y deteccion de fase
+# UN SOLO CALCULO. TODOS IMPORTAN DE AQUI.
+# Fase detectada por precio vs EMA50 y EMA200
+# Ventana reducida a 100 velas para mas flexibilidad
+# Sin librerias externas. Constitucion RESPETADA
+# =========================================
+
+import urllib.request
+import urllib.parse
+import json
+
+RSI_PERIODO = 14
+EMA_CORTA = 20
+EMA_LARGA = 50
+
+def fetch_velas(symbol, intervalo="4h", limite=100):
+    params = urllib.parse.urlencode({
+        "symbol": symbol,
+        "interval": intervalo,
+        "limit": limite
+    })
+    url = f"https://api.binance.com/api/v3/klines?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        return [float(k[4]) for k in data]
+    except:
+        return []
+
+def calcular_rsi(cierres, periodo=RSI_PERIODO):
+    if len(cierres) < periodo + 1:
+        return None
+    ganancias, perdidas = [], []
+    for i in range(1, periodo + 1):
+        diff = cierres[i] - cierres[i-1]
+        if diff >= 0:
+            ganancias.append(diff)
+            perdidas.append(0)
+        else:
+            ganancias.append(0)
+            perdidas.append(abs(diff))
+    avg_gan = sum(ganancias) / periodo
+    avg_per = sum(perdidas) / periodo
+    if avg_per == 0:
+        return 100.0
+    rs = avg_gan / avg_per
+    return round(100 - (100 / (1 + rs)), 2)
+
+def calcular_ema(cierres, periodo):
+    if len(cierres) < periodo:
+        return None
+    k = 2 / (periodo + 1)
+    ema = sum(cierres[:periodo]) / periodo
+    for precio in cierres[periodo:]:
+        ema = precio * k + ema * (1 - k)
+    return round(ema, 2)
+
+def detectar_fase(cierres, ventana=30):
+    if len(cierres) < 55:
+        return "DESCONOCIDA"
+
+    precio = cierres[-1]
+    ema50 = calcular_ema(cierres, 50)
+    ema200 = calcular_ema(cierres, 200) if len(cierres) >= 200 else None
+
+    if ema50 is None:
+        return "DESCONOCIDA"
+
+    inicio = cierres[-ventana]
+    cambio = ((precio - inicio) / inicio) * 100
+
+    if ema200 is not None:
+        if precio > ema50 and precio > ema200 and cambio > 1.0:
+            return "ALCISTA"
+        elif precio < ema50 and precio < ema200 and cambio < -1.0:
+            return "BAJISTA"
+        else:
+            return "LATERAL"
+    else:
+        if precio > ema50 and cambio > 1.0:
+            return "ALCISTA"
+        elif precio < ema50 and cambio < -1.0:
+            return "BAJISTA"
+        else:
+            return "LATERAL"
+
+if __name__ == "__main__":
+    print("=== PRUEBA UTILS ===")
+    cierres = fetch_velas("BTCUSDT", limite=210)
+    if cierres:
+        rsi = calcular_rsi(cierres)
+        ema20 = calcular_ema(cierres, EMA_CORTA)
+        ema50 = calcular_ema(cierres, EMA_LARGA)
+        ema200 = calcular_ema(cierres, 200)
+        fase = detectar_fase(cierres)
+        print(f"BTC Precio : ${cierres[-1]}")
+        print(f"BTC RSI    : {rsi}")
+        print(f"BTC EMA20  : {ema20}")
+        print(f"BTC EMA50  : {ema50}")
+        print(f"BTC EMA200 : {ema200}")
+        print(f"BTC Fase   : {fase}")
+        print("✅ Utils funcionando correctamente.")

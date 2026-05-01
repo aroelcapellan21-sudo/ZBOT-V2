@@ -1,0 +1,8 @@
+# 6. Mostrar filtros que están bloqueando AHORA (según tu diagnóstico)
+print("\n🚫 FILTROS ACTIVOS QUE BLOQUEAN (según diagnóstico)")
+print("-" * 50)
+print("   ❌ Guardian riesgo: ACTIVADO")
+print("   ❌ Calidad señal: VOLUMEN BAJO (0.16x)")
+print("\n💡 Para desbloquear:")
+print("   → guardian_riesgo.py: cambiar return False temporalmente")
+print("   → filtro_calidad.py: reducir umbral de volumen a 0.15x")

@@ -1,0 +1,134 @@
+📊 REPORTE SEMANAL Z-BOT
+2026-03-29 08:20:01
+
+=============================================
+  V2 — V2 — Original
+=============================================
+CAPITAL  : $998.95  |  DD: 0.1%
+
+PERFORMANCE (7 dias)
+  Trades  : 2 cerrados | 0 abiertos
+  Ganados : 0 TP  |  Perdidos: 2 SL
+  Win Rate: 0.0%
+
+TRADES DETALLADOS
+  🛑 BTCUSDT | $70873.22 | SL | 2026-03-25 23:11:50
+  🛑 ETHUSDT | $2150.39 | SL | 2026-03-25 23:11:53
+
+TOP RECHAZOS
+  Sin datos
+
+LO QUE HARIA
+  0 señales detectadas
+
+EVALUACION: ⚠️ WR bajo | ✅ Capital protegido
+=============================================
+  V3 — V3 — Demo Copia
+=============================================
+CAPITAL  : $999.40  |  DD: 0.06%
+
+PERFORMANCE (7 dias)
+  Trades  : 0 cerrados | 1 abiertos
+  Ganados : 0 TP  |  Perdidos: 0 SL
+  Win Rate: 0%
+
+TRADES DETALLADOS
+  Sin trades cerrados esta semana
+
+TOP RECHAZOS
+  • HORARIO: 2
+
+LO QUE HARIA
+  4 señales detectadas
+  Ultima: [PADRE_LATERAL] BNBUSDT: SEÑAL LATERAL DETECTADA...
+
+EVALUACION: ✅ WR OK | ✅ Capital protegido
+=============================================
+  V4 — V4 — Candidato
+=============================================
+CAPITAL  : $1000.00  |  DD: 0.0%
+
+PERFORMANCE (7 dias)
+  Trades  : 0 cerrados | 0 abiertos
+  Ganados : 0 TP  |  Perdidos: 0 SL
+  Win Rate: 0%
+
+TRADES DETALLADOS
+  Sin trades cerrados esta semana
+
+TOP RECHAZOS
+  Sin datos
+
+LO QUE HARIA
+  0 señales detectadas
+
+EVALUACION: ✅ WR OK | ✅ Capital protegido
+=============================================
+  V5 — V5 — Estabilizador
+=============================================
+CAPITAL  : $1000.40  |  DD: 0.0%
+
+PERFORMANCE (7 dias)
+  Trades  : 2 cerrados | 0 abiertos
+  Ganados : 0 TP  |  Perdidos: 2 SL
+  Win Rate: 0.0%
+
+TRADES DETALLADOS
+  🛑 ETHUSDT | $2128.95 | SL | 2026-03-23 08:22:20
+  🛑 ETHUSDT | $2128.73 | SL | 2026-03-23 08:34:29
+
+TOP RECHAZOS
+  • MATRIX_PAUSA: 1606
+  • EMAS_JUNTAS: 544
+  • CORRELACION: 459
+
+LO QUE HARIA
+  0 señales detectadas
+
+EVALUACION: ⚠️ WR bajo | ✅ Capital protegido
+=============================================
+  V6 — V6 — Respaldo
+=============================================
+CAPITAL  : $1000.00  |  DD: 0.0%
+
+PERFORMANCE (7 dias)
+  Trades  : 0 cerrados | 0 abiertos
+  Ganados : 0 TP  |  Perdidos: 0 SL
+  Win Rate: 0%
+
+TRADES DETALLADOS
+  Sin trades cerrados esta semana
+
+TOP RECHAZOS
+  Sin datos
+
+LO QUE HARIA
+  0 señales detectadas
+
+EVALUACION: ✅ WR OK | ✅ Capital protegido
+=============================================
+  V8 — V8 — Principal
+=============================================
+CAPITAL  : $1000.00  |  DD: 0.0%
+
+PERFORMANCE (7 dias)
+  Trades  : 0 cerrados | 0 abiertos
+  Ganados : 0 TP  |  Perdidos: 0 SL
+  Win Rate: 0%
+
+TRADES DETALLADOS
+  Sin trades cerrados esta semana
+
+TOP RECHAZOS
+  • FASE_LATERAL: 205
+  • EVENTO_MACRO: 26
+  • HORARIO: 15
+
+LO QUE HARIA
+  0 señales detectadas
+
+EVALUACION: ✅ WR OK | ✅ Capital protegido
+
+=============================================
+Fin del reporte — Próximo domingo 8:20 AM
+=============================================

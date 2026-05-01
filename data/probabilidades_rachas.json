@@ -1,0 +1,153 @@
+{
+  "activo": "BTCUSDT",
+  "timeframe": "4h",
+  "velas": 18677,
+  "generado": "2026-04-04",
+  "frecuencias": {
+    "total_velas": 18677,
+    "pct_verdes": 51.44,
+    "pct_rojos": 48.55,
+    "subidas_fuertes_total": 1704,
+    "bajadas_fuertes_total": 1624,
+    "avg_velas_entre_subidas": 11.0,
+    "avg_velas_entre_bajadas": 11.5,
+    "mediana_entre_subidas": 5,
+    "mediana_entre_bajadas": 5
+  },
+  "rachas": {
+    "racha_2_rojos": {
+      "reversion": 0.579,
+      "continuacion": 0.421,
+      "muestras": 2294,
+      "confianza": "alta"
+    },
+    "racha_2_verdes": {
+      "reversion": 0.54,
+      "continuacion": 0.46,
+      "muestras": 2490,
+      "confianza": "alta"
+    },
+    "racha_3_rojos": {
+      "reversion": 0.578,
+      "continuacion": 0.422,
+      "muestras": 965,
+      "confianza": "alta"
+    },
+    "racha_3_verdes": {
+      "reversion": 0.57,
+      "continuacion": 0.43,
+      "muestras": 1145,
+      "confianza": "alta"
+    },
+    "racha_4_rojos": {
+      "reversion": 0.587,
+      "continuacion": 0.413,
+      "muestras": 407,
+      "confianza": "alta"
+    },
+    "racha_4_verdes": {
+      "reversion": 0.561,
+      "continuacion": 0.439,
+      "muestras": 492,
+      "confianza": "alta"
+    },
+    "racha_5_rojos": {
+      "reversion": 0.5,
+      "continuacion": 0.5,
+      "muestras": 168,
+      "confianza": "alta"
+    },
+    "racha_5_verdes": {
+      "reversion": 0.498,
+      "continuacion": 0.502,
+      "muestras": 215,
+      "confianza": "alta"
+    },
+    "racha_6_rojos": {
+      "reversion": 0.595,
+      "continuacion": 0.405,
+      "muestras": 84,
+      "confianza": "media"
+    },
+    "racha_6_verdes": {
+      "reversion": 0.602,
+      "continuacion": 0.398,
+      "muestras": 108,
+      "confianza": "alta"
+    }
+  },
+  "escenarios_avanzados": {
+    "racha_2_rojos_rsi_bajo_confirmado": {
+      "reversion": 0.567,
+      "continuacion": 0.433,
+      "muestras": 772,
+      "confianza": "alta"
+    },
+    "racha_2_rojos_rsi_bajo_no_confirmado": {
+      "reversion": 0.586,
+      "continuacion": 0.414,
+      "muestras": 1520,
+      "confianza": "alta"
+    },
+    "racha_2_verdes_rsi_alto_confirmado": {
+      "reversion": 0.529,
+      "continuacion": 0.471,
+      "muestras": 960,
+      "confianza": "alta"
+    },
+    "racha_2_verdes_rsi_alto_no_confirmado": {
+      "reversion": 0.547,
+      "continuacion": 0.453,
+      "muestras": 1529,
+      "confianza": "alta"
+    },
+    "racha_3_rojos_rsi_bajo_confirmado": {
+      "reversion": 0.575,
+      "continuacion": 0.425,
+      "muestras": 433,
+      "confianza": "alta"
+    },
+    "racha_3_rojos_rsi_bajo_no_confirmado": {
+      "reversion": 0.579,
+      "continuacion": 0.421,
+      "muestras": 530,
+      "confianza": "alta"
+    },
+    "racha_3_verdes_rsi_alto_confirmado": {
+      "reversion": 0.551,
+      "continuacion": 0.449,
+      "muestras": 535,
+      "confianza": "alta"
+    },
+    "racha_3_verdes_rsi_alto_no_confirmado": {
+      "reversion": 0.586,
+      "continuacion": 0.414,
+      "muestras": 609,
+      "confianza": "alta"
+    },
+    "racha_4_rojos_rsi_bajo_confirmado": {
+      "reversion": 0.597,
+      "continuacion": 0.403,
+      "muestras": 216,
+      "confianza": "alta"
+    },
+    "racha_4_rojos_rsi_bajo_no_confirmado": {
+      "reversion": 0.576,
+      "continuacion": 0.424,
+      "muestras": 191,
+      "confianza": "alta"
+    },
+    "racha_4_verdes_rsi_alto_confirmado": {
+      "reversion": 0.582,
+      "continuacion": 0.418,
+      "muestras": 292,
+      "confianza": "alta"
+    },
+    "racha_4_verdes_rsi_alto_no_confirmado": {
+      "reversion": 0.53,
+      "continuacion": 0.47,
+      "muestras": 200,
+      "confianza": "alta"
+    }
+  }
+}

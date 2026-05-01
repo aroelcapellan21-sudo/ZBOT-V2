@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-03-04 23:28:55",
+  "mejor_combinacion": {
+    "tp": 6,
+    "sl": 3.5,
+    "total_ops": 42,
+    "total_tp": 17,
+    "total_sl": 25,
+    "winrate": 40.48,
+    "ganancia_total": 1.447,
+    "max_drawdown": 0.24
+  },
+  "todas_combinaciones": [
+    {
+      "tp": 3,
+      "sl": 2,
+      "total_ops": 66,
+      "total_tp": 25,
+      "total_sl": 41,
+      "winrate": 37.88,
+      "ganancia_total": -0.7016,
+      "max_drawdown": 0.19
+    },
+    {
+      "tp": 4,
+      "sl": 2,
+      "total_ops": 60,
+      "total_tp": 20,
+      "total_sl": 40,
+      "winrate": 33.33,
+      "ganancia_total": -0.0021,
+      "max_drawdown": 0.18
+    },
+    {
+      "tp": 4,
+      "sl": 3,
+      "total_ops": 49,
+      "total_tp": 19,
+      "total_sl": 30,
+      "winrate": 38.78,
+      "ganancia_total": -1.4024,
+      "max_drawdown": 0.21
+    },
+    {
+      "tp": 5,
+      "sl": 3,
+      "total_ops": 48,
+      "total_tp": 17,
+      "total_sl": 31,
+      "winrate": 35.42,
+      "ganancia_total": -0.8032,
+      "max_drawdown": 0.21
+    },
+    {
+      "tp": 6,
+      "sl": 3,
+      "total_ops": 47,
+      "total_tp": 16,
+      "total_sl": 31,
+      "winrate": 34.04,
+      "ganancia_total": 0.2963,
+      "max_drawdown": 0.21
+    },
+    {
+      "tp": 6,
+      "sl": 3.5,
+      "total_ops": 42,
+      "total_tp": 17,
+      "total_sl": 25,
+      "winrate": 40.48,
+      "ganancia_total": 1.447,
+      "max_drawdown": 0.24
+    },
+    {
+      "tp": 5,
+      "sl": 2.5,
+      "total_ops": 52,
+      "total_tp": 17,
+      "total_sl": 35,
+      "winrate": 32.69,
+      "ganancia_total": -0.2529,
+      "max_drawdown": 0.17
+    },
+    {
+      "tp": 7,
+      "sl": 3,
+      "total_ops": 43,
+      "total_tp": 13,
+      "total_sl": 30,
+      "winrate": 30.23,
+      "ganancia_total": 0.0966,
+      "max_drawdown": 0.21
+    }
+  ]
+}

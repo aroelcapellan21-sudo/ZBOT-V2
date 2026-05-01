@@ -1,0 +1,11 @@
+# ================================
+# CONSTITUCIÓN SUPREMA DE Z-BOT
+# ================================
+
+principio_supremo:
+  nombre: "Protección del Capital"
+  regla:
+    - "El capital base nunca se retira."
+    - "Solo se retiran ganancias netas."
+    - "La inacción es victoria si el capital está en riesgo."
+    - "Ninguna orden puede violar esta Constitución."

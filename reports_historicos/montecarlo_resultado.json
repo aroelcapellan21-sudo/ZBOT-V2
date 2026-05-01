@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-03-04 23:46:29",
+  "parametros": {
+    "tp": 6.0,
+    "sl": 3.5,
+    "winrate": 0.4048,
+    "simulaciones": 1000,
+    "trades_por_sim": 100
+  },
+  "capital": {
+    "promedio": 1003.4951,
+    "mejor": 1018.3536,
+    "peor": 989.7437,
+    "p10": 997.2935,
+    "p50": 1002.9936,
+    "p90": 1009.6849
+  },
+  "drawdown": {
+    "promedio": 0.4123,
+    "peor": 1.1441,
+    "p90": 0.6283
+  },
+  "rachas": {
+    "promedio": 7.74,
+    "peor": 22
+  },
+  "pct_rentable": 80.9,
+  "diagnostico": "SISTEMA ESTABLE"
+}

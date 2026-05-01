@@ -1,0 +1,14 @@
+ley_capital:
+  capital_base_protegido: true
+  retiro_capital: prohibido
+
+  concurrencia:
+    max_padres_operando: 2
+
+  reserva_operativa:
+    colchon_minimo: 0.20   # 20% siempre libre
+
+  prioridad:
+    - proteger_capital
+    - cumplir_constitucion
+

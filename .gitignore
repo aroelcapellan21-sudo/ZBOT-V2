@@ -1,0 +1,36 @@
+# Reportes temporales
+corecro/reports/
+data/memory_*.csv
+data/adn_mercado.csv
+
+# Logs
+memoria/*.log
+*.log
+nohup.out
+
+# Signals (datos en tiempo real)
+signals/
+estado/
+
+# Keys — NUNCA subir
+keys.env
+
+# Backups
+backup_*/
+*.bak
+*.bak_*
+*.backup
+__pycache__/
+*.pyc
+
+# Datos historicos grandes
+data/historico_4h/
+data/historico/
+
+# Archivos temporales
+*.zip
+*.tar.gz
+zbot_*.zip
+zip_*.zip
+*.zip
+*.tar.gz

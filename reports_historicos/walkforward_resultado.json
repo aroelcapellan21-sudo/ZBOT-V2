@@ -1,0 +1,62 @@
+{
+  "timestamp": "2026-03-12 01:16:59",
+  "parametros": {
+    "tp": 6,
+    "sl": 3.5
+  },
+  "diagnostico": "POSIBLE_SOBREAJUSTE",
+  "train": {
+    "winrate": 23.61,
+    "ganancia": -4.0967,
+    "detalle": [
+      {
+        "symbol": "BTCUSDT",
+        "ops": 8,
+        "winrate": 25.0,
+        "ganancia": -0.9003,
+        "max_dd": 0.11
+      },
+      {
+        "symbol": "ETHUSDT",
+        "ops": 8,
+        "winrate": 37.5,
+        "ganancia": 0.0492,
+        "max_dd": 0.14
+      },
+      {
+        "symbol": "BNBUSDT",
+        "ops": 12,
+        "winrate": 8.33,
+        "ganancia": -3.2456,
+        "max_dd": 0.38
+      }
+    ]
+  },
+  "validacion": {
+    "winrate": 48.21,
+    "ganancia": 2.1488,
+    "detalle": [
+      {
+        "symbol": "BTCUSDT",
+        "ops": 8,
+        "winrate": 37.5,
+        "ganancia": 0.0492,
+        "max_dd": 0.14
+      },
+      {
+        "symbol": "ETHUSDT",
+        "ops": 7,
+        "winrate": 57.14,
+        "ganancia": 1.35,
+        "max_dd": 0.07
+      },
+      {
+        "symbol": "BNBUSDT",
+        "ops": 6,
+        "winrate": 50.0,
+        "ganancia": 0.7496,
+        "max_dd": 0.1
+      }
+    ]
+  }
+}

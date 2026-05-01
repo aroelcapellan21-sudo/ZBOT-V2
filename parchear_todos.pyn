@@ -1,0 +1,63 @@
+import os
+import re
+
+CARPETA = os.path.expanduser("~/bot-padre-v2")
+
+francotiradores = [
+    "francotirador_lateral_btc.py",
+    "francotirador_lateral_eth.py",
+    "francotirador_lateral_sol.py",
+    "francotirador_lateral_bnb.py",
+    "francotirador_lateral_avax.py",
+    "francotirador_alcista_btc.py",
+    "francotirador_alcista_eth.py",
+    "francotirador_alcista_sol.py",
+    "francotirador_alcista_bnb.py",
+    "francotirador_alcista_avax.py",
+    "francotirador_bajista_btc.py",
+    "francotirador_bajista_eth.py",
+    "francotirador_bajista_sol.py",
+    "francotirador_bajista_bnb.py",
+    "francotirador_bajista_avax.py",
+]
+
+IMPORT_NUEVO = "from gestor_billetera import registrar_tp, registrar_sl\n"
+LINEA_TP = "                    registrar_tp(precio_entrada, precio_actual, TAKE_PROFIT)\n"
+LINEA_SL = "                    registrar_sl(precio_entrada, precio_actual, STOP_LOSS)\n"
+
+for archivo in francotiradores:
+    ruta = os.path.join(CARPETA, archivo)
+    if not os.path.exists(ruta):
+        print(f"⚠️  No existe: {archivo}")
+        continue
+
+    with open(ruta, "r") as f:
+        contenido = f.read()
+
+    # 1. Agregar import si no existe
+    if "from gestor_billetera import" not in contenido:
+        contenido = contenido.replace(
+            "from engine import enviar_aviso",
+            "from engine import enviar_aviso\nfrom gestor_billetera import registrar_tp, registrar_sl"
+        )
+
+    # 2. Agregar registrar_tp despues de enviar_aviso en bloque TP
+    if "registrar_tp" not in contenido:
+        contenido = contenido.replace(
+            '                    partes[5] = "TP"\n',
+            '                    partes[5] = "TP"\n' + LINEA_TP
+        )
+
+    # 3. Agregar registrar_sl despues de enviar_aviso en bloque SL
+    if "registrar_sl" not in contenido:
+        contenido = contenido.replace(
+            '                    partes[5] = "SL"\n',
+            '                    partes[5] = "SL"\n' + LINEA_SL
+        )
+
+    with open(ruta, "w") as f:
+        f.write(contenido)
+
+    print(f"✅ Parcheado: {archivo}")
+
+print("\nListo. Todos los francotiradores actualizados.")

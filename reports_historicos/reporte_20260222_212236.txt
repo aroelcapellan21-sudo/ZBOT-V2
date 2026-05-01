@@ -1,0 +1,10 @@
+✔ CoreCro: reporte generado correctamente.
+✔ Ruta: corecro/reports/corecro_report_20260222_212230.txt
+✔ CoreCro: reporte generado silenciosamente
+🔹 Recomendaciones del Consejero: {'BTC': 'Esperar', 'ETH': 'Vender parcialmente', 'ADA': 'Mantener', 'SOL': 'Comprar parcialmente', 'DOT': 'Esperar'}
+✅ BTC: $67471.2 | RSI: 54.38
+✅ ETH: $1943.63 | RSI: 51.09
+✅ SOL: $83.16 | RSI: 48.57
+✅ ADA: $0.269709 | RSI: 30.1
+✅ DOT: $1.3096 | RSI: 67.23
+⌛ Ciclo completado. Consola actualizada. Reposando...

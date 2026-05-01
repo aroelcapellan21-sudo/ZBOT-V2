@@ -1,0 +1,56 @@
+{
+  "timestamp": "2026-04-13 10:05:53",
+  "resumen": {
+    "total_operaciones": 66,
+    "total_tp": 33,
+    "total_sl": 33,
+    "winrate_global": 50.0
+  },
+  "por_simbolo": {
+    "BTCUSDT": {
+      "total_operaciones": 12,
+      "tp": 6,
+      "sl": 6,
+      "winrate": 50.0,
+      "capital_final": 999.9995,
+      "ganancia_neta": -0.0005,
+      "max_drawdown": 0.09
+    },
+    "ETHUSDT": {
+      "total_operaciones": 13,
+      "tp": 7,
+      "sl": 6,
+      "winrate": 53.85,
+      "capital_final": 1000.2995,
+      "ganancia_neta": 0.2995,
+      "max_drawdown": 0.09
+    },
+    "SOLUSDT": {
+      "total_operaciones": 18,
+      "tp": 8,
+      "sl": 10,
+      "winrate": 44.44,
+      "capital_final": 999.3994,
+      "ganancia_neta": -0.6006,
+      "max_drawdown": 0.15
+    },
+    "BNBUSDT": {
+      "total_operaciones": 9,
+      "tp": 4,
+      "sl": 5,
+      "winrate": 44.44,
+      "capital_final": 999.6996,
+      "ganancia_neta": -0.3004,
+      "max_drawdown": 0.09
+    },
+    "AVAXUSDT": {
+      "total_operaciones": 14,
+      "tp": 8,
+      "sl": 6,
+      "winrate": 57.14,
+      "capital_final": 1000.5995,
+      "ganancia_neta": 0.5995,
+      "max_drawdown": 0.12
+    }
+  }
+}

@@ -1,0 +1,20 @@
+ley_retiros:
+  principio:
+    - solo_ganancias
+    - capital_base_protegido
+
+  distribucion:
+    reinversion: 0.80
+    retiro_sugerido: 0.20
+
+  validacion_previa:
+    operaciones_abiertas: prohibe_retiro
+
+  emergencia:
+    retiro_capital:
+      permitido: true
+      condicion:
+        - evaluacion_manual
+        - sistema_detenido
+        - registro_obligatorio
+

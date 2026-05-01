@@ -1,0 +1,3 @@
+timestamp,symbol,tipo,precio,rsi,diff_ema,fase,filtro,motivo
+2026-04-10 00:34:55.468379,TEST,ALCISTA,50000,70,1.5,ALCISTA,PRUEBA,Rechazo de prueba
+2026-04-10 00:35:05.689361,TEST,ALCISTA,50000,70,1.5,ALCISTA,PRUEBA,Rechazo de prueba

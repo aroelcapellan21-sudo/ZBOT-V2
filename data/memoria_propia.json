@@ -1,0 +1,22 @@
+{
+  "ETHUSDT_wr": 57.1,
+  "ETHUSDT_trades": 7,
+  "AVAXUSDT_wr": 60.0,
+  "AVAXUSDT_trades": 5,
+  "BTCUSDT_wr": 75.0,
+  "BTCUSDT_trades": 4,
+  "SOLUSDT_wr": 50.0,
+  "SOLUSDT_trades": 6,
+  "rsi_bajo_wr": 88.9,
+  "rsi_bajo_trades": 9,
+  "rsi_alto_wr": 66.7,
+  "rsi_alto_trades": 9,
+  "hora_4_8_wr": 25.0,
+  "hora_8_12_wr": 77.8,
+  "hora_12_16_wr": 66.7,
+  "hora_20_24_wr": 33.3,
+  "perdidas_ultimos_5": 4,
+  "total_trades": 24,
+  "wr_global": 62.5,
+  "actualizado": "2026-04-28 10:51:35"
+}

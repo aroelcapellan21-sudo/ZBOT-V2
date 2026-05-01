@@ -1,0 +1,10 @@
+✔ CoreCro: reporte generado correctamente.
+✔ Ruta: corecro/reports/corecro_report_20260224_054455.txt
+✔ CoreCro: reporte generado silenciosamente
+🔹 Recomendaciones del Consejero: {'BTC': 'Esperar', 'ETH': 'Vender parcialmente', 'ADA': 'Mantener', 'SOL': 'Comprar parcialmente', 'DOT': 'Esperar'}
+✅ BTCUSDT: $63150.18 | RSI: 42.61
+✅ ETHUSDT: $1822.65 | RSI: 40.52
+✅ SOLUSDT: $76.59 | RSI: 31.18
+✅ BNBUSDT: $588.79 | RSI: 37.23
+✅ AVAXUSDT: $8.27 | RSI: 33.33
+⌛ Ciclo completado. Consola actualizada. Reposando...

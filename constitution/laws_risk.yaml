@@ -1,0 +1,16 @@
+ley_riesgo:
+  riesgo_maximo_por_operacion: 0.005   # 0.5%
+  stop_loss_obligatorio: true
+
+  apalancamiento:
+    maximo: 10
+    modo: aislado
+
+  exposicion:
+    max_padres_simultaneos: 2
+    colchon_capital_minimo: 0.20
+
+  incumplimiento:
+    accion: abortar_operacion
+    bloquear_padre: true
+

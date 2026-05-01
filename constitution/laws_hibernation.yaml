@@ -1,0 +1,17 @@
+ley_hibernacion:
+  activacion:
+    perdidas_consecutivas: 3
+    riesgo_por_perdida: 0.005   # 0.5%
+
+  accion:
+    estado_sistema: hibernacion
+    duracion_horas: 24
+
+  efecto:
+    ejecucion_operaciones: bloqueada
+    comunicacion_padres: cortada
+
+  notificacion:
+    secretario: obligatorio
+    mensaje: "Sistema en hibernación por protección de capital"
+

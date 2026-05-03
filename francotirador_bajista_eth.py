@@ -28,6 +28,7 @@ from memoria_propia import actualizar_memoria
 
 SYMBOL             = "ETHUSDT"
 MONEDA             = "ETH"
+TIPO_TRADE         = "BAJISTA"
 CAPITAL_MAX_POR_OP = 0.02
 RSI_MIN            = 30
 RSI_MAX            = 50
@@ -67,6 +68,7 @@ def contar_operaciones_abiertas():
             1 for l in lineas[1:]
             if len(l.strip().split(",")) >= 6 and
             l.strip().split(",")[2] == SYMBOL and
+            l.strip().split(",")[1] == TIPO_TRADE and
             l.strip().split(",")[5] == "ABIERTA"
         )
     except Exception as e:
@@ -98,7 +100,7 @@ def revisar_cierres(precio_actual):
             nuevas_lineas.append(linea)
             continue
 
-        if partes[2] == SYMBOL and partes[5] == "ABIERTA":
+        if partes[2] == SYMBOL and partes[1] == TIPO_TRADE and partes[5] == "ABIERTA":
             try:
                 precio_entrada  = float(partes[3])
                 timestamp_entry = partes[0]
@@ -127,9 +129,10 @@ def revisar_cierres(precio_actual):
                 else:
                     trailing_on = False
 
+                monto_op = float(partes[6]) if len(partes) > 6 else 10.0
                 if cambio >= TAKE_PROFIT:
                     partes[5] = "TP"
-                    registrar_tp(precio_entrada, precio_actual, TAKE_PROFIT)
+                    registrar_tp(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
                     enviar_aviso(f"✅ TP BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nGanancia: +{round(cambio,2)}%")
                     registrar_evento(f"BAJISTA ETH: TP {SYMBOL} +{round(cambio,2)}%")
                     actualizar_memoria(SYMBOL, cambio)
@@ -138,7 +141,7 @@ def revisar_cierres(precio_actual):
                 elif precio_actual >= sl_efectivo:
                     if be_activo and sl_efectivo <= be_price:
                         partes[5] = "BE"
-                        registrar_sl(precio_entrada, sl_efectivo, BE_COMISION)
+                        registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)
                         enviar_aviso(
                             f"🛡️ BREAKEVEN BAJISTA {SYMBOL}\n"
                             f"Entrada: ${precio_entrada}\n"
@@ -150,13 +153,13 @@ def revisar_cierres(precio_actual):
                         print(f"  🛡️ BE: ${precio_entrada} → ${sl_efectivo} protegido")
                     elif trailing_on:
                         partes[5] = "TRAILING_SL"
-                        registrar_sl(precio_entrada, sl_efectivo, TRAILING_DISTANCIA)
+                        registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)
                         enviar_aviso(f"🎯 TRAILING SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${sl_efectivo}")
                         registrar_evento(f"BAJISTA ETH: TRAILING_SL {SYMBOL} ${sl_efectivo}")
                         print(f"  🎯 TRAILING_SL: ${precio_entrada} → ${sl_efectivo}")
                     else:
                         partes[5] = "SL"
-                        registrar_sl(precio_entrada, sl_efectivo, STOP_LOSS)
+                        registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)
                         enviar_aviso(f"🛑 SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${sl_efectivo}\nPerdida: -{STOP_LOSS}%")
                         registrar_evento(f"BAJISTA ETH: SL {SYMBOL} -{STOP_LOSS}%")
                         print(f"  🛑 SL: ${precio_entrada} → ${sl_efectivo}")

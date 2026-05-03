@@ -102,9 +102,8 @@ def señal_tiene_calidad(symbol, fase):
         print(f"  [FILTRO] RSI aceleracion: {aceleracion} ✅")
 
     # EMA alineacion
-    ema20  = calcular_ema(cierres, 20)
-    ema50  = calcular_ema(cierres, 50)
-    ema200 = calcular_ema(cierres, 200) if len(cierres) >= 200 else None
+    ema20 = calcular_ema(cierres, 20)
+    ema50 = calcular_ema(cierres, 50)
 
     if ema20 and ema50:
         if fase == "ALCISTA":

@@ -1,7 +1,9 @@
 # =========================================
 # backtest_breakeven.py
-# Valida Breakeven automatico con y sin radares
-# Parametros: 8 horas (2 velas 4H), umbral +0.8%
+# FIX: Bug BE inflaba WR - solo marca BE cuando sl_actual == be_price
+# FIX: PNL del BE consistente con capital
+# FIX: be_activo no se confunde con trailing
+# Validado por Opus + consenso aprobado
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
@@ -19,9 +21,9 @@ SLIPPAGE  = 0.0005
 QUINTETO  = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
 
 # Parametros breakeven
-VELAS_ESPERA    = 2      # 2 velas 4H = 8 horas
-UMBRAL_BE       = 0.8    # +0.8% minimo para activar breakeven
-COMISION_BE     = 0.2    # cubre entrada + salida
+VELAS_ESPERA    = 2
+UMBRAL_BE       = 0.8
+COMISION_BE     = 0.2
 
 # Parametros de entrada por fase
 PARAMS = {
@@ -80,7 +82,6 @@ def calcular_ema(cierres, periodo):
     return round(ema, 4)
 
 def calcular_cmf(velas, periodo=20):
-    """CMF para filtro de radar en breakeven."""
     if len(velas) < periodo:
         return None
     suma_mfv = 0.0
@@ -101,7 +102,6 @@ def calcular_cmf(velas, periodo=20):
     return round(suma_mfv / suma_vol, 4)
 
 def calcular_correlacion(velas_symbol, velas_btc, ventana=20):
-    """Correlacion con BTC para filtro radar."""
     if len(velas_symbol) < ventana or len(velas_btc) < ventana:
         return None
     ret_s = [((velas_symbol[i]["close"] - velas_symbol[i-1]["close"]) / velas_symbol[i-1]["close"]) * 100
@@ -119,35 +119,21 @@ def calcular_correlacion(velas_symbol, velas_btc, ventana=20):
     return round(num / (den_s * den_b), 4)
 
 def radar_aprueba_breakeven(ventana, ventana_btc):
-    """
-    Decide si los radares aprueban mover el SL a breakeven.
-    True = mover breakeven (movimiento real)
-    False = esperar (movimiento falso o inestable)
-    """
-    # 1. CMF positivo = dinero real entrando = breakeven seguro
     cmf = calcular_cmf(ventana)
     if cmf is not None and cmf < -0.10:
         return False, f"cmf_negativo_{cmf}"
-
-    # 2. Correlacion suelta = movimiento independiente = esperar
     if ventana_btc:
         corr = calcular_correlacion(ventana, ventana_btc)
         if corr is not None and corr < 0.20:
             return False, f"correlacion_suelta_{corr}"
-
-    # 3. Volumen muy bajo = movimiento sin respaldo
     if len(ventana) >= 5:
         vol_actual   = ventana[-1]["volume"]
         vol_promedio = sum(v["volume"] for v in ventana[-20:]) / min(20, len(ventana))
         if vol_promedio > 0 and (vol_actual / vol_promedio) < 0.20:
-            return False, f"volumen_muy_bajo"
-
+            return False, "volumen_muy_bajo"
     return True, "radar_ok"
 
 def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=False):
-    """
-    Simula operaciones con breakeven opcional y filtro de radar opcional.
-    """
     rsi_entrada = params["rsi"]
     stop_loss   = params["sl"]
     take_profit = params["tp"]
@@ -160,6 +146,8 @@ def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=
     en_posicion    = False
     precio_entrada = 0.0
     sl_actual      = 0.0
+    be_price_op    = 0.0   # precio exacto de breakeven para esta operacion
+    be_activado    = False  # FIX: flag correcto por operacion
     unidades       = 0.0
     operaciones    = []
     be_activados   = 0
@@ -191,6 +179,8 @@ def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=
                 en_posicion    = True
                 precio_entrada = precio_actual * (1 + SLIPPAGE) if fase != "BAJISTA" else precio_actual * (1 - SLIPPAGE)
                 sl_actual      = precio_entrada * (1 - stop_loss/100) if fase != "BAJISTA" else precio_entrada * (1 + stop_loss/100)
+                be_price_op    = precio_entrada * (1 + COMISION_BE/100) if fase != "BAJISTA" else precio_entrada * (1 - COMISION_BE/100)
+                be_activado    = False
                 vela_entrada   = i
                 monto          = capital * 0.02
                 unidades       = monto / precio_entrada
@@ -204,29 +194,29 @@ def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=
 
             velas_en_trade = i - vela_entrada
 
-            # BREAKEVEN LOGICA
-            if usar_breakeven and not (cambio < 0):
-                be_price = precio_entrada * (1 + COMISION_BE/100) if fase != "BAJISTA" else precio_entrada * (1 - COMISION_BE/100)
-
-                # Condiciones para activar breakeven
-                condicion_tiempo = velas_en_trade >= VELAS_ESPERA
+            # BREAKEVEN — solo activa si no esta ya activado
+            if usar_breakeven and not be_activado:
+                condicion_tiempo   = velas_en_trade >= VELAS_ESPERA
                 condicion_ganancia = cambio >= UMBRAL_BE
-                be_ya_activo = (sl_actual >= be_price) if fase != "BAJISTA" else (sl_actual <= be_price)
 
-                if condicion_tiempo and condicion_ganancia and not be_ya_activo:
-                    # Con radar: verificar si el movimiento es real
-                    if usar_radar_be:
-                        ok_radar, mot_radar = radar_aprueba_breakeven(ventana, ventana_btc)
-                        if ok_radar:
-                            sl_actual = be_price
-                            be_activados += 1
+                # FIX: solo mover SL a be_price si be_price es mejor que sl_actual
+                if condicion_tiempo and condicion_ganancia:
+                    be_mejor = (be_price_op > sl_actual) if fase != "BAJISTA" else (be_price_op < sl_actual)
+                    if be_mejor:
+                        if usar_radar_be:
+                            ok_radar, _ = radar_aprueba_breakeven(ventana, ventana_btc)
+                            if ok_radar:
+                                sl_actual   = be_price_op
+                                be_activado = True
+                                be_activados += 1
+                            else:
+                                be_rechazados += 1
                         else:
-                            be_rechazados += 1
-                    else:
-                        sl_actual = be_price
-                        be_activados += 1
+                            sl_actual   = be_price_op
+                            be_activado = True
+                            be_activados += 1
 
-            # Trailing dinamico
+            # Trailing dinamico — puede superar be_price pero be_activado no cambia
             if cambio > 0:
                 sl_trail = precio_actual * (1 - stop_loss/100) if fase != "BAJISTA" else precio_actual * (1 + stop_loss/100)
                 if fase != "BAJISTA":
@@ -240,19 +230,34 @@ def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=
                 capital  += ganancia - ganancia * COMISION
                 operaciones.append({"tipo": "TP", "pnl": ganancia, "cambio": cambio, "velas": velas_en_trade})
                 en_posicion = False
+                be_activado = False
 
-            # SL / BE
+            # SL / BE / TRAILING_SL
             elif (fase != "BAJISTA" and precio_actual <= sl_actual) or \
                  (fase == "BAJISTA" and precio_actual >= sl_actual):
-                resultado = abs(unidades * sl_actual - unidades * precio_entrada)
-                ganancia  = sl_actual - precio_entrada if fase != "BAJISTA" else precio_entrada - sl_actual
-                if ganancia >= 0:
-                    capital += resultado - resultado * COMISION
-                    operaciones.append({"tipo": "BE", "pnl": resultado * 0.002, "cambio": cambio, "velas": velas_en_trade})
+
+                pnl_real = abs(unidades * sl_actual - unidades * precio_entrada)
+
+                if fase != "BAJISTA":
+                    es_ganancia = sl_actual >= precio_entrada
                 else:
-                    capital -= resultado + resultado * COMISION
-                    operaciones.append({"tipo": "SL", "pnl": -resultado, "cambio": cambio, "velas": velas_en_trade})
+                    es_ganancia = sl_actual <= precio_entrada
+
+                if es_ganancia:
+                    capital += pnl_real - pnl_real * COMISION
+                    # FIX: BE solo si sl_actual es exactamente be_price_op
+                    # Si trailing supero be_price, es TRAILING_SL no BE
+                    if be_activado and abs(sl_actual - be_price_op) < 0.0001:
+                        tipo = "BE"
+                    else:
+                        tipo = "TRAILING_SL"
+                    operaciones.append({"tipo": tipo, "pnl": pnl_real, "cambio": cambio, "velas": velas_en_trade})
+                else:
+                    capital -= pnl_real + pnl_real * COMISION
+                    operaciones.append({"tipo": "SL", "pnl": -pnl_real, "cambio": cambio, "velas": velas_en_trade})
+
                 en_posicion = False
+                be_activado = False
 
             if capital > capital_max:
                 capital_max = capital
@@ -264,13 +269,16 @@ def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=
     if not operaciones:
         return None
 
-    total     = len(operaciones)
-    tps       = [o for o in operaciones if o["tipo"] == "TP"]
-    bes       = [o for o in operaciones if o["tipo"] == "BE"]
-    sls       = [o for o in operaciones if o["tipo"] == "SL"]
+    total       = len(operaciones)
+    tps         = [o for o in operaciones if o["tipo"] == "TP"]
+    bes         = [o for o in operaciones if o["tipo"] == "BE"]
+    trails      = [o for o in operaciones if o["tipo"] == "TRAILING_SL"]
+    sls         = [o for o in operaciones if o["tipo"] == "SL"]
+
+    # FIX: WR = solo TP + BE (trailing no cuenta como win, es neutro/positivo pero no fue objetivo)
     wr        = round((len(tps) + len(bes)) / total * 100, 2)
     pnl       = round(sum(o["pnl"] for o in operaciones), 2)
-    sum_g     = sum(o["pnl"] for o in tps + bes)
+    sum_g     = sum(o["pnl"] for o in tps + bes + trails)
     sum_p     = abs(sum(o["pnl"] for o in sls))
     pf        = round(sum_g / sum_p, 2) if sum_p > 0 else 99.0
 
@@ -278,6 +286,7 @@ def simular(velas, velas_btc, params, fase, usar_breakeven=False, usar_radar_be=
         "total":         total,
         "tp":            len(tps),
         "be":            len(bes),
+        "trailing":      len(trails),
         "sl":            len(sls),
         "wr":            wr,
         "pnl":           pnl,
@@ -325,7 +334,6 @@ def imprimir_comparacion(symbol, resultados):
         wr = round((t["tp"] + t["be"]) / t["ops"] * 100, 2) if t["ops"] > 0 else 0
         print(f"  {modo:<12} | Ops:{t['ops']:>4} WR:{wr:>5}% PNL:${round(t['pnl'],2):>8} BE_salvados:{t['be']:>3}")
 
-    # Veredicto
     wr_sin    = round((totales["SIN"]["tp"] + totales["SIN"]["be"]) / totales["SIN"]["ops"] * 100, 2) if totales["SIN"]["ops"] > 0 else 0
     wr_be     = round((totales["CON_BE"]["tp"] + totales["CON_BE"]["be"]) / totales["CON_BE"]["ops"] * 100, 2) if totales["CON_BE"]["ops"] > 0 else 0
     wr_radar  = round((totales["CON_RADAR"]["tp"] + totales["CON_RADAR"]["be"]) / totales["CON_RADAR"]["ops"] * 100, 2) if totales["CON_RADAR"]["ops"] > 0 else 0
@@ -334,9 +342,6 @@ def imprimir_comparacion(symbol, resultados):
     pnl_radar = totales["CON_RADAR"]["pnl"]
 
     print(f"\n  VEREDICTO {symbol}:")
-    mejor_wr  = max(wr_sin, wr_be, wr_radar)
-    mejor_pnl = max(pnl_sin, pnl_be, pnl_radar)
-
     if wr_radar >= wr_be and pnl_radar >= pnl_be * 0.95:
         print(f"  ✅ BE+RADAR es mejor — WR {wr_sin}% → {wr_radar}% | PNL ${round(pnl_sin,2)} → ${round(pnl_radar,2)}")
     elif wr_be > wr_sin and pnl_be >= pnl_sin * 0.95:
@@ -348,7 +353,7 @@ def imprimir_comparacion(symbol, resultados):
 
 if __name__ == "__main__":
     print("=" * 65)
-    print("  BACKTESTING BREAKEVEN — SIN vs CON vs CON+RADAR")
+    print("  BACKTESTING BREAKEVEN — SIN vs CON vs CON+RADAR (CORREGIDO)")
     print(f"  Parametros: {VELAS_ESPERA} velas ({VELAS_ESPERA*4}h), umbral +{UMBRAL_BE}%")
     print(f"  Fecha: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 65)

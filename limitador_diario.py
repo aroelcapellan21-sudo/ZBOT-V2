@@ -89,7 +89,7 @@ def contar_perdidas_consecutivas():
             return 0
         consecutivas = 0
         for op in reversed(ops):
-            if op == "SL" or op == "TRAILING_SL":
+            if op == "SL":
                 consecutivas += 1
             else:
                 break

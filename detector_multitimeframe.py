@@ -125,13 +125,10 @@ def confirmar_tendencia_multitf(symbol, fase_esperada):
         return False
 
     if fase_esperada == "LATERAL":
-        if tf_4h == "ALCISTA" and tf_1d == "ALCISTA":
-            print(f"  [MTF] ❌ Tendencia alcista fuerte. No operar lateral.")
+        if tf_4h != "LATERAL":
+            print(f"  [MTF] ❌ 4H en tendencia {tf_4h}. No operar lateral.")
             return False
-        if tf_4h == "BAJISTA" and tf_1d == "BAJISTA":
-            print(f"  [MTF] ❌ Tendencia bajista fuerte. No operar lateral.")
-            return False
-        print(f"  [MTF] ✅ Señal lateral confirmada.")
+        print(f"  [MTF] ✅ 4H lateral confirmado. Señal lateral válida.")
         return True
 
     return True

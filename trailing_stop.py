@@ -8,32 +8,16 @@
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
-import json
-import os
-
-TRAILING_DATA = os.path.expanduser("~/bot-padre-v2/signals/trailing_data.json")
+import db
 
 TRAILING_ACTIVACION = 0.5
 TRAILING_DISTANCIA  = 1.5
 
 def cargar_trailing():
-    try:
-        with open(TRAILING_DATA, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {}
-    except Exception as e:
-        print(f"[TRAILING] Error cargando datos: {e}")
-        return {}
+    return db.json_get("trailing_data", {})
 
 def guardar_trailing(data):
-    try:
-        os.makedirs(os.path.dirname(TRAILING_DATA), exist_ok=True)
-        with open(TRAILING_DATA, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"[TRAILING] ERROR CRITICO guardando: {e}")
-        raise RuntimeError(f"[TRAILING] No se pudo guardar trailing_data: {e}")
+    db.json_set("trailing_data", data)
 
 def registrar_entrada_trailing(symbol, precio_entrada, timestamp):
     data = cargar_trailing()

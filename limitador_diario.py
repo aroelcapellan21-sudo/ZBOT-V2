@@ -7,56 +7,29 @@
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
-import json
 import os
 from datetime import datetime
 from engine import enviar_aviso
+import db
 
-ESTADO_DIARIO = os.path.expanduser("~/bot-padre-v2/signals/estado_diario.json")
-AUDITORIA     = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
+AUDITORIA = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
 
 MAX_OPERACIONES_DIA      = 8
 MAX_PERDIDAS_CONSECUTIVAS = 4
 
+def _default_diario(hoy):
+    return {"fecha": hoy, "operaciones_hoy": 0, "perdidas_consecutivas": 0, "pausado": False}
+
 def cargar_estado_diario():
-    hoy = datetime.now().strftime("%Y-%m-%d")
-    try:
-        with open(ESTADO_DIARIO, "r") as f:
-            data = json.load(f)
-        if data.get("fecha") != hoy:
-            data = {
-                "fecha":                 hoy,
-                "operaciones_hoy":       0,
-                "perdidas_consecutivas": 0,
-                "pausado":               False
-            }
-            guardar_estado_diario(data)
-        return data
-    except FileNotFoundError:
-        data = {
-            "fecha":                 hoy,
-            "operaciones_hoy":       0,
-            "perdidas_consecutivas": 0,
-            "pausado":               False
-        }
+    hoy  = datetime.now().strftime("%Y-%m-%d")
+    data = db.json_get("estado_diario")
+    if data is None or data.get("fecha") != hoy:
+        data = _default_diario(hoy)
         guardar_estado_diario(data)
-        return data
-    except Exception as e:
-        print(f"  [LIMITADOR] Error cargando estado: {e}")
-        return {
-            "fecha":                 hoy,
-            "operaciones_hoy":       0,
-            "perdidas_consecutivas": 0,
-            "pausado":               False
-        }
+    return data
 
 def guardar_estado_diario(data):
-    try:
-        os.makedirs(os.path.dirname(ESTADO_DIARIO), exist_ok=True)
-        with open(ESTADO_DIARIO, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        print(f"  [LIMITADOR] ERROR CRITICO guardando estado diario: {e}")
+    db.json_set("estado_diario", data)
 
 def contar_operaciones_hoy():
     """

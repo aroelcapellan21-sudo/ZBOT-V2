@@ -7,12 +7,10 @@
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
-import json
 import os
 from datetime import datetime, timezone
 from engine import enviar_aviso
-
-EVENTOS_MANUAL = os.path.expanduser("~/bot-padre-v2/signals/eventos_macro.json")
+import db
 
 HORAS_RIESGO_MACRO = {
     "13:30": "Apertura mercados USA / Datos economicos",
@@ -22,29 +20,15 @@ HORAS_RIESGO_MACRO = {
     "20:00": "Declaraciones Fed fuera de horario",
 }
 
+_DEFAULT_EVENTO = {"evento_activo": False, "descripcion": "", "hasta": ""}
+
 def cargar_eventos_manuales():
-    try:
-        with open(EVENTOS_MANUAL, "r") as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return {"evento_activo": False, "descripcion": "", "hasta": ""}
-    except Exception as e:
-        print(f"  [EVENTOS] Error cargando eventos: {e}")
-        return {"evento_activo": False, "descripcion": "", "hasta": ""}
+    return db.json_get("eventos_macro", _DEFAULT_EVENTO)
 
 def guardar_evento_manual(activo, descripcion="", hasta=""):
-    try:
-        os.makedirs(os.path.dirname(EVENTOS_MANUAL), exist_ok=True)
-        data = {
-            "evento_activo": activo,
-            "descripcion":   descripcion,
-            "hasta":         hasta
-        }
-        with open(EVENTOS_MANUAL, "w") as f:
-            json.dump(data, f, indent=2)
-        print(f"  [EVENTOS] Evento guardado: {descripcion}")
-    except Exception as e:
-        print(f"  [EVENTOS] Error guardando evento: {e}")
+    data = {"evento_activo": activo, "descripcion": descripcion, "hasta": hasta}
+    db.json_set("eventos_macro", data)
+    print(f"  [EVENTOS] Evento guardado: {descripcion}")
 
 def verificar_hora_riesgo():
     ahora  = datetime.now(timezone.utc)

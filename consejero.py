@@ -14,9 +14,9 @@ import urllib.request
 import urllib.parse
 from config_cartera import CAPITAL_BASE
 from engine import enviar_aviso
+import db
 
-BILLETERA        = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
-ESTADO_CONSEJERO = os.path.expanduser("~/bot-padre-v2/signals/estado_consejero.json")
+BILLETERA = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 UMBRAL_SALUDABLE = 90.0
 UMBRAL_RIESGO    = 80.0
 
@@ -29,21 +29,11 @@ MONEDAS_PRECIO = {
 }
 
 def _cargar_estado_previo():
-    try:
-        if os.path.exists(ESTADO_CONSEJERO):
-            with open(ESTADO_CONSEJERO) as f:
-                return json.load(f).get("estado", None)
-    except Exception:
-        pass
-    return None
+    data = db.json_get("estado_consejero")
+    return data.get("estado") if data else None
 
 def _guardar_estado_actual(estado):
-    try:
-        os.makedirs(os.path.dirname(ESTADO_CONSEJERO), exist_ok=True)
-        with open(ESTADO_CONSEJERO, "w") as f:
-            json.dump({"estado": estado}, f)
-    except Exception as e:
-        print(f"[CONSEJERO] Error guardando estado: {e}")
+    db.json_set("estado_consejero", {"estado": estado})
 
 def obtener_precio(symbol):
     try:

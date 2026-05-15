@@ -14,9 +14,9 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 from engine import enviar_aviso
+import db
 
-BILLETERA     = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
-ESTADO_RIESGO = os.path.expanduser("~/bot-padre-v2/signals/estado_riesgo.json")
+BILLETERA = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 
 DRAWDOWN_MAXIMO_PCT      = 0.10
 PERDIDA_DIARIA_MAXIMA_PCT = 0.05
@@ -61,28 +61,19 @@ def cargar_billetera():
     return round(usdt + valor_monedas, 2)
 
 def cargar_estado_riesgo(capital_actual):
-    try:
-        if os.path.exists(ESTADO_RIESGO):
-            with open(ESTADO_RIESGO, "r") as f:
-                return json.load(f)
-    except Exception as e:
-        print(f"[GUARDIAN] Error cargando estado_riesgo: {e}")
-
+    data = db.json_get("estado_riesgo")
+    if data is not None:
+        return data
     return {
         "capital_maximo_historico": capital_actual,
         "capital_inicio_dia":       capital_actual,
         "fecha":                    datetime.now().strftime("%Y-%m-%d"),
         "bloqueado":                False,
-        "bloqueado_dia":            False
+        "bloqueado_dia":            False,
     }
 
 def guardar_estado_riesgo(estado):
-    try:
-        os.makedirs(os.path.dirname(ESTADO_RIESGO), exist_ok=True)
-        with open(ESTADO_RIESGO, "w") as f:
-            json.dump(estado, f, indent=2)
-    except Exception as e:
-        print(f"[GUARDIAN] ERROR CRITICO guardando estado_riesgo: {e}")
+    db.json_set("estado_riesgo", estado)
 
 def verificar_riesgo(capital_actual=None):
     if capital_actual is None:

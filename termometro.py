@@ -11,8 +11,7 @@ import urllib.request
 import urllib.parse
 from datetime import datetime
 from engine import enviar_aviso
-
-ESTADO_TERMOMETRO = os.path.expanduser("~/bot-padre-v2/signals/estado_termometro.json")
+import db
 
 SIMBOLOS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
 
@@ -88,27 +87,16 @@ def obtener_parametros(estado):
         return {"tp_mult": 1.0, "sl_mult": 1.0, "operar": True, "descripcion": "Estado desconocido"}
 
 def guardar_estado(estado, volatilidad, tendencia, parametros):
-    estado_previo = None
-    try:
-        if os.path.exists(ESTADO_TERMOMETRO):
-            with open(ESTADO_TERMOMETRO) as f:
-                estado_previo = json.load(f).get("estado")
-    except Exception:
-        pass
+    previo = db.json_get("estado_termometro")
+    estado_previo = previo.get("estado") if previo else None
 
-    try:
-        os.makedirs(os.path.dirname(ESTADO_TERMOMETRO), exist_ok=True)
-        data = {
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "estado": estado,
-            "volatilidad_promedio": volatilidad,
-            "tendencia_promedio": tendencia,
-            "parametros": parametros
-        }
-        with open(ESTADO_TERMOMETRO, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception:
-        pass
+    db.json_set("estado_termometro", {
+        "timestamp":            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "estado":               estado,
+        "volatilidad_promedio": volatilidad,
+        "tendencia_promedio":   tendencia,
+        "parametros":           parametros,
+    })
 
     if estado_previo is not None and estado_previo != estado:
         if not parametros["operar"]:
@@ -141,11 +129,8 @@ def guardar_estado(estado, volatilidad, tendencia, parametros):
             )
 
 def cargar_estado():
-    try:
-        with open(ESTADO_TERMOMETRO, "r") as f:
-            return json.load(f)
-    except:
-        return {"estado": "TENDENCIA_DEBIL", "parametros": obtener_parametros("TENDENCIA_DEBIL")}
+    return db.json_get("estado_termometro",
+                       {"estado": "TENDENCIA_DEBIL", "parametros": obtener_parametros("TENDENCIA_DEBIL")})
 
 def puede_operar_termometro():
     estado = cargar_estado()

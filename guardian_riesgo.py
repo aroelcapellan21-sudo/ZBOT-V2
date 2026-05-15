@@ -1,9 +1,10 @@
 # =========================================
-# guardian_riesgo.py - VERSION V2.13
+# guardian_riesgo.py - VERSION V2.14
 # FIX: Imports dentro de funciones eliminados
 # FIX: Fallback $1000 silencioso eliminado
 # FIX: esta_bloqueado() sin doble HTTP
 # FIX: guardar_estado_riesgo con error visible
+# FIX: Notificaciones Telegram en transiciones de bloqueo
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
@@ -12,6 +13,7 @@ import os
 import urllib.request
 import urllib.parse
 from datetime import datetime
+from engine import enviar_aviso
 
 BILLETERA     = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 ESTADO_RIESGO = os.path.expanduser("~/bot-padre-v2/signals/estado_riesgo.json")
@@ -90,10 +92,16 @@ def verificar_riesgo(capital_actual=None):
     hoy    = datetime.now().strftime("%Y-%m-%d")
 
     if estado["fecha"] != hoy:
+        estaba_bloqueado = estado.get("bloqueado_dia", False)
         estado["fecha"]              = hoy
         estado["capital_inicio_dia"] = capital_actual
         estado["bloqueado_dia"]      = False
         print(f"[GUARDIAN] Nuevo dia. Capital base: ${capital_actual}")
+        if estaba_bloqueado:
+            enviar_aviso(
+                f"✅ GUARDIAN DESBLOQUEADO — Nuevo día\n"
+                f"Capital base hoy: ${capital_actual}"
+            )
 
     if capital_actual > estado.get("capital_maximo_historico", 0):
         estado["capital_maximo_historico"] = capital_actual
@@ -114,15 +122,33 @@ def verificar_riesgo(capital_actual=None):
     print(f"  📅 Perdida Hoy      : {round(perdida_dia, 2)}% (Max 5%)")
 
     if capital_actual <= limite_drawdown:
+        ya_bloqueado = estado.get("bloqueado", False)
         estado["bloqueado"] = True
         guardar_estado_riesgo(estado)
         print(f"  🚨 ALERTA: DRAWDOWN MAXIMO VIOLADO")
+        if not ya_bloqueado:
+            enviar_aviso(
+                f"🚨 GUARDIAN — DRAWDOWN MÁXIMO VIOLADO\n"
+                f"Capital actual : ${round(capital_actual, 2)}\n"
+                f"Máximo histórico: ${round(max_hist, 2)}\n"
+                f"Drawdown       : {round(drawdown_actual, 2)}% (límite 10%)\n"
+                f"SISTEMA BLOQUEADO indefinidamente."
+            )
         return False
 
     if capital_actual <= limite_diario:
+        ya_bloqueado_dia = estado.get("bloqueado_dia", False)
         estado["bloqueado_dia"] = True
         guardar_estado_riesgo(estado)
         print(f"  🛑 ALERTA: LIMITE DIARIO ALCANZADO")
+        if not ya_bloqueado_dia:
+            enviar_aviso(
+                f"🛑 GUARDIAN — LÍMITE DIARIO ALCANZADO\n"
+                f"Capital actual : ${round(capital_actual, 2)}\n"
+                f"Capital inicio : ${round(inicio_dia, 2)}\n"
+                f"Pérdida hoy    : {round(perdida_dia, 2)}% (límite 5%)\n"
+                f"BLOQUEADO hasta mañana."
+            )
         return False
 
     guardar_estado_riesgo(estado)

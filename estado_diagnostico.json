@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-05-15 15:50:57",
+  "timestamp": "2026-05-15 15:59:08",
   "capital_usdt": 1024.8441,
   "filtros_globales": {
     "guardian_riesgo": true,
@@ -10,14 +10,14 @@
   },
   "monedas": {
     "BTCUSDT": {
-      "precio": 79165.05,
+      "precio": 79169.75,
       "fase": "LATERAL",
-      "rsi": 40.87,
-      "rsi_estado": "faltan 9.13 puntos para llegar a RSI 50",
-      "rsi_distancia": 9.13,
-      "ema20": 80306.13,
-      "ema50": 80331.92,
-      "ema_estado": "EMA20 está 25.79 por debajo de EMA50 — necesita subir",
+      "rsi": 40.91,
+      "rsi_estado": "faltan 9.09 puntos para llegar a RSI 50",
+      "rsi_distancia": 9.09,
+      "ema20": 80306.57,
+      "ema50": 80332.1,
+      "ema_estado": "EMA20 está 25.53 por debajo de EMA50 — necesita subir",
       "spread_ok": true,
       "calidad_ok": true,
       "multitf_ok": true,
@@ -25,19 +25,19 @@
       "ema_ok": false,
       "listo": false,
       "razones_bloqueado": [
-        "RSI fuera de rango (40.87) — faltan 9.13 puntos para llegar a RSI 50",
-        "EMA no alineada — EMA20 está 25.79 por debajo de EMA50 — necesita subir"
+        "RSI fuera de rango (40.91) — faltan 9.09 puntos para llegar a RSI 50",
+        "EMA no alineada — EMA20 está 25.53 por debajo de EMA50 — necesita subir"
       ]
     },
     "ETHUSDT": {
-      "precio": 2224.22,
+      "precio": 2223.41,
       "fase": "BAJISTA",
-      "rsi": 36.4,
-      "rsi_estado": "faltan 13.6 puntos para llegar a RSI 50",
-      "rsi_distancia": 13.6,
-      "ema20": 2270.13,
-      "ema50": 2292.7,
-      "ema_estado": "EMA20 está 22.57 por debajo de EMA50 — necesita subir",
+      "rsi": 36.16,
+      "rsi_estado": "faltan 13.84 puntos para llegar a RSI 50",
+      "rsi_distancia": 13.84,
+      "ema20": 2270.05,
+      "ema50": 2292.67,
+      "ema_estado": "EMA20 está 22.62 por debajo de EMA50 — necesita subir",
       "spread_ok": true,
       "calidad_ok": true,
       "multitf_ok": true,
@@ -45,18 +45,18 @@
       "ema_ok": false,
       "listo": false,
       "razones_bloqueado": [
-        "RSI fuera de rango (36.4) — faltan 13.6 puntos para llegar a RSI 50",
-        "EMA no alineada — EMA20 está 22.57 por debajo de EMA50 — necesita subir"
+        "RSI fuera de rango (36.16) — faltan 13.84 puntos para llegar a RSI 50",
+        "EMA no alineada — EMA20 está 22.62 por debajo de EMA50 — necesita subir"
       ]
     },
     "SOLUSDT": {
-      "precio": 89.44,
+      "precio": 89.38,
       "fase": "LATERAL",
-      "rsi": 38.21,
-      "rsi_estado": "faltan 11.79 puntos para llegar a RSI 50",
-      "rsi_distancia": 11.79,
-      "ema20": 91.93,
-      "ema50": 91.79,
+      "rsi": 37.91,
+      "rsi_estado": "faltan 12.09 puntos para llegar a RSI 50",
+      "rsi_distancia": 12.09,
+      "ema20": 91.92,
+      "ema50": 91.78,
       "ema_estado": "EMA20 está 0.14 por encima de EMA50 ✅",
       "spread_ok": true,
       "calidad_ok": true,
@@ -65,18 +65,18 @@
       "ema_ok": true,
       "listo": false,
       "razones_bloqueado": [
-        "RSI fuera de rango (38.21) — faltan 11.79 puntos para llegar a RSI 50"
+        "RSI fuera de rango (37.91) — faltan 12.09 puntos para llegar a RSI 50"
       ]
     },
     "BNBUSDT": {
-      "precio": 674.85,
+      "precio": 674.05,
       "fase": "ALCISTA",
-      "rsi": 53.39,
-      "rsi_estado": "RSI 53.39 dentro del rango ✅",
+      "rsi": 52.85,
+      "rsi_estado": "RSI 52.85 dentro del rango ✅",
       "rsi_distancia": 0,
-      "ema20": 673.25,
-      "ema50": 662.19,
-      "ema_estado": "EMA20 está 11.06 por encima de EMA50 ✅",
+      "ema20": 673.18,
+      "ema50": 662.15,
+      "ema_estado": "EMA20 está 11.03 por encima de EMA50 ✅",
       "spread_ok": true,
       "calidad_ok": false,
       "multitf_ok": true,
@@ -88,11 +88,11 @@
       ]
     },
     "AVAXUSDT": {
-      "precio": 9.55,
+      "precio": 9.54,
       "fase": "LATERAL",
-      "rsi": 40.25,
-      "rsi_estado": "faltan 9.75 puntos para llegar a RSI 50",
-      "rsi_distancia": 9.75,
+      "rsi": 39.84,
+      "rsi_estado": "faltan 10.16 puntos para llegar a RSI 50",
+      "rsi_distancia": 10.16,
       "ema20": 9.8,
       "ema50": 9.79,
       "ema_estado": "EMA20 está 0.01 por encima de EMA50 ✅",
@@ -103,7 +103,7 @@
       "ema_ok": true,
       "listo": false,
       "razones_bloqueado": [
-        "RSI fuera de rango (40.25) — faltan 9.75 puntos para llegar a RSI 50"
+        "RSI fuera de rango (39.84) — faltan 10.16 puntos para llegar a RSI 50"
       ]
     }
   },

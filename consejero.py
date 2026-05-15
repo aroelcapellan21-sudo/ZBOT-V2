@@ -3,6 +3,7 @@
 # FIX: Capital total = USDT + valor monedas
 # FIX: Umbrales comparados como porcentaje real
 # FIX: Usa CAPITAL_BASE de config_cartera
+# FIX: Notificaciones Telegram en cambios de estado
 # NO decide. NO ejecuta.
 # Constitucion RESPETADA
 # =========================================
@@ -12,8 +13,10 @@ import os
 import urllib.request
 import urllib.parse
 from config_cartera import CAPITAL_BASE
+from engine import enviar_aviso
 
 BILLETERA        = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
+ESTADO_CONSEJERO = os.path.expanduser("~/bot-padre-v2/signals/estado_consejero.json")
 UMBRAL_SALUDABLE = 90.0
 UMBRAL_RIESGO    = 80.0
 
@@ -24,6 +27,23 @@ MONEDAS_PRECIO = {
     "BNB":  "BNBUSDT",
     "AVAX": "AVAXUSDT"
 }
+
+def _cargar_estado_previo():
+    try:
+        if os.path.exists(ESTADO_CONSEJERO):
+            with open(ESTADO_CONSEJERO) as f:
+                return json.load(f).get("estado", None)
+    except Exception:
+        pass
+    return None
+
+def _guardar_estado_actual(estado):
+    try:
+        os.makedirs(os.path.dirname(ESTADO_CONSEJERO), exist_ok=True)
+        with open(ESTADO_CONSEJERO, "w") as f:
+            json.dump({"estado": estado}, f)
+    except Exception as e:
+        print(f"[CONSEJERO] Error guardando estado: {e}")
 
 def obtener_precio(symbol):
     try:
@@ -75,6 +95,34 @@ def consultar_consejero(capital_actual=None):
     else:
         estado  = "CRITICO"
         mensaje = f"Capital critico ({round(pct,1)}%). Sistema debe pausar operaciones."
+
+    estado_previo = _cargar_estado_previo()
+    _guardar_estado_actual(estado)
+
+    if estado_previo is not None and estado_previo != estado:
+        if estado == "CRITICO":
+            enviar_aviso(
+                f"🚨 CONSEJERO — CAPITAL CRÍTICO\n"
+                f"Capital actual : ${capital_actual}\n"
+                f"Capital inicial: ${CAPITAL_BASE}\n"
+                f"Nivel          : {round(pct, 1)}% (mínimo 80%)\n"
+                f"El sistema debe pausar operaciones."
+            )
+        elif estado == "EN RIESGO":
+            enviar_aviso(
+                f"⚠️ CONSEJERO — CAPITAL EN RIESGO\n"
+                f"Capital actual : ${capital_actual}\n"
+                f"Capital inicial: ${CAPITAL_BASE}\n"
+                f"Nivel          : {round(pct, 1)}% (saludable ≥90%)\n"
+                f"Operar con precaución."
+            )
+        elif estado == "SALUDABLE" and estado_previo in ("EN RIESGO", "CRITICO"):
+            enviar_aviso(
+                f"✅ CONSEJERO — CAPITAL RECUPERADO\n"
+                f"Capital actual : ${capital_actual}\n"
+                f"Capital inicial: ${CAPITAL_BASE}\n"
+                f"Nivel          : {round(pct, 1)}% — Sistema operativo."
+            )
 
     return {
         "estado":          estado,

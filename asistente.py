@@ -147,15 +147,98 @@ def interpretar_screens():
         texto += "- Todo corriendo correctamente\n"
     return texto
 
+def leer_parada_emergencia():
+    ruta = os.path.join(BOT_DIR, 'signals/PARADA_EMERGENCIA.txt')
+    if not os.path.exists(ruta):
+        return ""
+    try:
+        contenido = open(ruta).read().strip()
+        return f"\n⚠️ PARADA DE EMERGENCIA ACTIVA:\n{contenido}\n"
+    except Exception as e:
+        return f"\nError leyendo PARADA_EMERGENCIA.txt: {e}\n"
+
+def leer_estado_mercado():
+    ruta = os.path.join(BOT_DIR, 'signals/estado_mercado.json')
+    if not os.path.exists(ruta):
+        return ""
+    try:
+        with open(ruta) as f:
+            d = json.load(f)
+        texto = "\nESTADO DE MERCADO:\n"
+        for k, v in d.items():
+            texto += f"- {k}: {v}\n"
+        return texto
+    except Exception as e:
+        return f"\nError leyendo estado_mercado.json: {e}\n"
+
+def leer_memoria_propia():
+    ruta = os.path.join(BOT_DIR, 'data/memoria_propia.json')
+    if not os.path.exists(ruta):
+        return "\nMEMORIA PROPIA: sin datos aún.\n"
+    try:
+        with open(ruta) as f:
+            m = json.load(f)
+        texto = "\nMEMORIA PROPIA DEL BOT:\n"
+        texto += f"- WR global: {m.get('wr_global', 'N/A')}%\n"
+        texto += f"- Total trades cerrados: {m.get('total_trades', 0)}\n"
+        texto += f"- Pérdidas últimos 5 trades: {m.get('perdidas_ultimos_5', 0)}\n"
+        texto += f"- Actualizado: {m.get('actualizado', 'N/A')}\n"
+        texto += "- WR por símbolo:\n"
+        for moneda in ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'AVAXUSDT']:
+            wr_key = f"{moneda}_wr"
+            tr_key = f"{moneda}_trades"
+            if wr_key in m:
+                texto += f"    {moneda}: {m[wr_key]}% ({m.get(tr_key, '?')} trades)\n"
+        return texto
+    except Exception as e:
+        return f"\nError leyendo memoria_propia.json: {e}\n"
+
+def leer_log_rechazos():
+    ruta = os.path.join(BOT_DIR, 'log_rechazos_calidad.csv')
+    if not os.path.exists(ruta):
+        return "\nRECHAZOS DE CALIDAD: sin registros aún.\n"
+    try:
+        lineas = open(ruta).readlines()
+        total = max(0, len(lineas) - 1)
+        texto = f"\nRECHAZOS DE CALIDAD (últimos 20 de {total} total):\n"
+        for l in lineas[-20:]:
+            texto += f"  {l.strip()}\n"
+        return texto
+    except Exception as e:
+        return f"\nError leyendo log_rechazos_calidad.csv: {e}\n"
+
+def leer_historial_billetera():
+    ruta = os.path.join(BOT_DIR, 'historial_billetera.csv')
+    if not os.path.exists(ruta):
+        return "\nHISTORIAL BILLETERA: sin registros aún.\n"
+    try:
+        lineas = open(ruta).readlines()
+        if len(lineas) < 2:
+            return "\nHISTORIAL BILLETERA: sin entradas aún.\n"
+        cabecera = lineas[0].strip()
+        ultima = lineas[-1].strip()
+        texto = "\nHISTORIAL BILLETERA (último snapshot):\n"
+        texto += f"  Columnas: {cabecera}\n"
+        texto += f"  Último:   {ultima}\n"
+        return texto
+    except Exception as e:
+        return f"\nError leyendo historial_billetera.csv: {e}\n"
+
 def leer_archivos():
-    datos = leer_contexto_proyecto()
+    datos = leer_parada_emergencia()
+    datos += leer_contexto_proyecto()
     datos += interpretar_diagnostico()
     datos += leer_billetera()
+    datos += leer_historial_billetera()
     datos += leer_auditoria()
+    datos += leer_memoria_propia()
+    datos += leer_log_rechazos()
+    datos += leer_estado_mercado()
     datos += interpretar_screens()
-    ev = os.path.join(BOT_DIR, 'eventos.log')
+    ev = os.path.join(BOT_DIR, 'memoria/eventos.log')
     if os.path.exists(ev):
-        datos += f"\nÚLTIMOS EVENTOS:\n{open(ev).read()[-800:]}\n"
+        lineas = open(ev).readlines()
+        datos += f"\nÚLTIMOS EVENTOS (últimas 50 líneas):\n{''.join(lineas[-50:])}\n"
     return datos
 
 HTML = '''<!DOCTYPE html>

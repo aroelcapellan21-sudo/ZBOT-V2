@@ -3574,3 +3574,6 @@ timestamp,sector,fuerza,estado,confianza
 2026-05-15 15:01:38,SECTOR_ALTS,Fuerza:-0.63,Estado:DEBIL,Confianza:Media
 2026-05-15 15:11:40,SECTOR_ALTS,Fuerza:-0.64,Estado:DEBIL,Confianza:Media
 2026-05-15 15:21:41,SECTOR_ALTS,Fuerza:-0.6,Estado:DEBIL,Confianza:Media
+2026-05-15 15:31:43,SECTOR_ALTS,Fuerza:-0.36,Estado:SINCRONIZADO,Confianza:Media
+2026-05-15 15:41:45,SECTOR_ALTS,Fuerza:-0.3,Estado:SINCRONIZADO,Confianza:Media
+2026-05-15 15:51:46,SECTOR_ALTS,Fuerza:-0.29,Estado:SINCRONIZADO,Confianza:Media

@@ -37,7 +37,7 @@ EMA_CORTA          = 20
 EMA_LARGA          = 50
 MAX_OP_TOTAL       = 3
 TRAILING_ACTIVACION = 0.5
-TRAILING_DISTANCIA  = 1.5
+TRAILING_DISTANCIA  = 1.0
 
 # Breakeven aprobado por backtesting
 BE_VELAS_ESPERA = 2      # 2 velas 4H = 8 horas

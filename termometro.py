@@ -47,7 +47,7 @@ def clasificar_mercado():
     tendencias = []
 
     for symbol in SIMBOLOS:
-        cierres = fetch_velas(symbol, limite=20)
+        cierres = fetch_velas(symbol, limite=50)
         if not cierres:
             continue
         volatilidades.append(calcular_volatilidad(cierres))
@@ -81,7 +81,7 @@ def obtener_parametros(estado):
     elif estado == "TENDENCIA_DEBIL":
         return {"tp_mult": 1.0, "sl_mult": 1.0, "operar": True, "descripcion": "Mercado con tendencia debil"}
     elif estado == "VOLATILIDAD_EXTREMA":
-        return {"tp_mult": 0.7, "sl_mult": 0.7, "operar": True, "descripcion": "Volatilidad extrema - TP/SL reducidos"}
+        return {"tp_mult": 0.0, "sl_mult": 0.0, "operar": False, "descripcion": "Volatilidad extrema - operacion suspendida"}
     elif estado == "MERCADO_MUERTO":
         return {"tp_mult": 0, "sl_mult": 0, "operar": False, "descripcion": "Mercado sin movimiento - no operar"}
     else:
@@ -123,7 +123,7 @@ def guardar_estado(estado, volatilidad, tendencia, parametros):
                 f"⚡ TERMÓMETRO — VOLATILIDAD EXTREMA\n"
                 f"Estado anterior: {estado_previo}\n"
                 f"Volatilidad: {volatilidad}% | Tendencia: {tendencia}%\n"
-                f"TP/SL reducidos al 70%. Operando con precaución."
+                f"Bot suspendido hasta que la volatilidad baje."
             )
         elif estado == "TENDENCIA_FUERTE":
             enviar_aviso(

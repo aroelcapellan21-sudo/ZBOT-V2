@@ -4,14 +4,35 @@
 # FIX: Fallback silencioso eliminado
 # FIX: Error critico si no se puede guardar
 # FIX: Validacion de monto minimo Binance
+# FIX: Historial CSV para reconstruccion de capital
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
+import csv
 import json
 import os
+from datetime import datetime
 
-BILLETERA = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
+BILLETERA           = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
+HISTORIAL_BILLETERA = os.path.expanduser("~/bot-padre-v2/historial_billetera.csv")
+MONEDAS_HISTORIAL   = ["BTC", "ETH", "SOL", "BNB", "AVAX"]
 MONTO_MINIMO_BINANCE = 5.0
+
+def registrar_historial_billetera(billetera, evento):
+    """Appenda una fila al CSV de historial tras cada escritura exitosa de billetera.json."""
+    try:
+        escribir_cabecera = not os.path.exists(HISTORIAL_BILLETERA)
+        with open(HISTORIAL_BILLETERA, "a", newline="") as f:
+            writer = csv.writer(f)
+            if escribir_cabecera:
+                writer.writerow(["timestamp", "evento", "USDT"] + MONEDAS_HISTORIAL)
+            writer.writerow(
+                [datetime.now().strftime("%Y-%m-%d %H:%M:%S"), evento,
+                 billetera.get("USDT", 0)]
+                + [billetera.get(m, 0) for m in MONEDAS_HISTORIAL]
+            )
+    except Exception as e:
+        print(f"[BILLETERA] ⚠️ Error escribiendo historial_billetera.csv: {e}")
 
 def cargar_billetera():
     try:
@@ -50,6 +71,7 @@ def registrar_tp(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA"):
         billetera[moneda] = max(0.0, round(billetera.get(moneda, 0) - cantidad, 8))
         ganancia = round(usdt_recibido - monto, 4)
     guardar_billetera(billetera)
+    registrar_historial_billetera(billetera, "TP")
     print(f"  💰 TP {tipo}: ${precio_entrada} → ${precio_salida} | Ganancia: +${ganancia}")
     return ganancia
 
@@ -72,5 +94,6 @@ def registrar_sl(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA"):
         billetera[moneda] = max(0.0, round(billetera.get(moneda, 0) - cantidad, 8))
         perdida = round(monto - usdt_recibido, 4)
     guardar_billetera(billetera)
+    registrar_historial_billetera(billetera, "SL")
     print(f"  🛑 SL {tipo}: ${precio_entrada} → ${precio_salida} | Perdida: -${perdida}")
     return perdida

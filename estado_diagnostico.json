@@ -1,0 +1,116 @@
+{
+  "timestamp": "2026-05-15 15:25:10",
+  "capital_usdt": 1024.8441,
+  "filtros_globales": {
+    "guardian_riesgo": true,
+    "termometro": true,
+    "horario": true,
+    "limite_diario": true,
+    "eventos_macro": true
+  },
+  "monedas": {
+    "BTCUSDT": {
+      "precio": 79153.4,
+      "fase": "LATERAL",
+      "rsi": 40.77,
+      "rsi_estado": "faltan 9.23 puntos para llegar a RSI 50",
+      "rsi_distancia": 9.23,
+      "ema20": 80305.02,
+      "ema50": 80331.46,
+      "ema_estado": "EMA20 está 26.44 por debajo de EMA50 — necesita subir",
+      "spread_ok": true,
+      "calidad_ok": true,
+      "multitf_ok": true,
+      "señal_rsi": false,
+      "ema_ok": false,
+      "listo": false,
+      "razones_bloqueado": [
+        "RSI fuera de rango (40.77) — faltan 9.23 puntos para llegar a RSI 50",
+        "EMA no alineada — EMA20 está 26.44 por debajo de EMA50 — necesita subir"
+      ]
+    },
+    "ETHUSDT": {
+      "precio": 2224.46,
+      "fase": "BAJISTA",
+      "rsi": 36.47,
+      "rsi_estado": "faltan 13.53 puntos para llegar a RSI 50",
+      "rsi_distancia": 13.53,
+      "ema20": 2270.15,
+      "ema50": 2292.71,
+      "ema_estado": "EMA20 está 22.56 por debajo de EMA50 — necesita subir",
+      "spread_ok": true,
+      "calidad_ok": true,
+      "multitf_ok": true,
+      "señal_rsi": false,
+      "ema_ok": false,
+      "listo": false,
+      "razones_bloqueado": [
+        "RSI fuera de rango (36.47) — faltan 13.53 puntos para llegar a RSI 50",
+        "EMA no alineada — EMA20 está 22.56 por debajo de EMA50 — necesita subir"
+      ]
+    },
+    "SOLUSDT": {
+      "precio": 89.59,
+      "fase": "LATERAL",
+      "rsi": 38.95,
+      "rsi_estado": "faltan 11.05 puntos para llegar a RSI 50",
+      "rsi_distancia": 11.05,
+      "ema20": 91.94,
+      "ema50": 91.79,
+      "ema_estado": "EMA20 está 0.15 por encima de EMA50 ✅",
+      "spread_ok": true,
+      "calidad_ok": true,
+      "multitf_ok": true,
+      "señal_rsi": false,
+      "ema_ok": true,
+      "listo": false,
+      "razones_bloqueado": [
+        "RSI fuera de rango (38.95) — faltan 11.05 puntos para llegar a RSI 50"
+      ]
+    },
+    "BNBUSDT": {
+      "precio": 673.53,
+      "fase": "ALCISTA",
+      "rsi": 52.49,
+      "rsi_estado": "RSI 52.49 dentro del rango ✅",
+      "rsi_distancia": 0,
+      "ema20": 673.13,
+      "ema50": 662.13,
+      "ema_estado": "EMA20 está 11.0 por encima de EMA50 ✅",
+      "spread_ok": true,
+      "calidad_ok": false,
+      "multitf_ok": true,
+      "señal_rsi": true,
+      "ema_ok": true,
+      "listo": false,
+      "razones_bloqueado": [
+        "señal sin calidad suficiente"
+      ]
+    },
+    "AVAXUSDT": {
+      "precio": 9.55,
+      "fase": "LATERAL",
+      "rsi": 40.25,
+      "rsi_estado": "faltan 9.75 puntos para llegar a RSI 50",
+      "rsi_distancia": 9.75,
+      "ema20": 9.8,
+      "ema50": 9.79,
+      "ema_estado": "EMA20 está 0.01 por encima de EMA50 ✅",
+      "spread_ok": true,
+      "calidad_ok": true,
+      "multitf_ok": true,
+      "señal_rsi": false,
+      "ema_ok": true,
+      "listo": false,
+      "razones_bloqueado": [
+        "RSI fuera de rango (40.25) — faltan 9.75 puntos para llegar a RSI 50"
+      ]
+    }
+  },
+  "fase_global": "LATERAL",
+  "conteo_fases": {
+    "ALCISTA": 1,
+    "BAJISTA": 1,
+    "LATERAL": 3
+  }
+}

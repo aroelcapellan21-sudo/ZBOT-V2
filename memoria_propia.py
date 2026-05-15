@@ -20,8 +20,13 @@ def analizar_historial():
     try:
         with open(AUDITORIA) as f:
             reader = csv.DictReader(f)
+            vistos = set()
             for row in reader:
                 if row.get("estado") in ("TP", "SL", "TRAILING_SL"):
+                    clave = (row.get("timestamp", ""), row.get("symbol", ""))
+                    if clave in vistos:
+                        continue
+                    vistos.add(clave)
                     try:
                         trades.append({
                             "timestamp": row["timestamp"],

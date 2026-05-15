@@ -3,14 +3,30 @@
 # FIX: RSI usa calcular_rsi de utils (unico)
 # FIX: fetch usa fetch_velas de utils (unico)
 # FIX: except pass eliminados
+# FIX: log_rechazos_calidad.csv para auditar rechazos
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
+import csv
 import json
 import os
 import urllib.request
 import urllib.parse
+from datetime import datetime
 from utils import fetch_velas, calcular_rsi, calcular_ema
+
+LOG_RECHAZOS = os.path.expanduser("~/bot-padre-v2/log_rechazos_calidad.csv")
+
+def _registrar_rechazo(symbol, fase, motivo):
+    try:
+        escribir_cabecera = not os.path.exists(LOG_RECHAZOS)
+        with open(LOG_RECHAZOS, "a", newline="") as f:
+            writer = csv.writer(f)
+            if escribir_cabecera:
+                writer.writerow(["timestamp", "symbol", "fase", "motivo"])
+            writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), symbol, fase, motivo])
+    except Exception as e:
+        print(f"  [FILTRO] ⚠️ Error escribiendo log_rechazos_calidad.csv: {e}")
 
 def fetch_velas_completas(symbol, limite=50):
     """Retorna velas OHLCV completas para ATR y volumen."""
@@ -77,6 +93,7 @@ def señal_tiene_calidad(symbol, fase):
         atr_pct = (atr / precio_actual) * 100
         if atr_pct < 0.3:
             print(f"  [FILTRO] ❌ ATR bajo ({round(atr_pct,3)}%). Mercado sin movimiento.")
+            _registrar_rechazo(symbol, fase, f"atr_bajo_{round(atr_pct,3)}pct")
             return False
         print(f"  [FILTRO] ATR: {round(atr_pct,3)}% ✅")
 
@@ -87,6 +104,7 @@ def señal_tiene_calidad(symbol, fase):
         vol_ratio = vol_actual / vol_promedio
         if vol_ratio < 0.5:
             print(f"  [FILTRO] ❌ Volumen bajo ({round(vol_ratio,2)}x promedio).")
+            _registrar_rechazo(symbol, fase, f"volumen_bajo_{round(vol_ratio,2)}x")
             return False
         print(f"  [FILTRO] Volumen: {round(vol_ratio,2)}x promedio ✅")
 
@@ -95,9 +113,11 @@ def señal_tiene_calidad(symbol, fase):
     if rsi_actual is not None and aceleracion is not None:
         if fase == "ALCISTA" and aceleracion < -5:
             print(f"  [FILTRO] ❌ RSI desacelerando en alcista ({aceleracion}).")
+            _registrar_rechazo(symbol, fase, f"rsi_desacelera_alcista_{aceleracion}")
             return False
         if fase == "BAJISTA" and aceleracion > 5:
             print(f"  [FILTRO] ❌ RSI desacelerando en bajista ({aceleracion}).")
+            _registrar_rechazo(symbol, fase, f"rsi_desacelera_bajista_{aceleracion}")
             return False
         print(f"  [FILTRO] RSI aceleracion: {aceleracion} ✅")
 
@@ -109,17 +129,20 @@ def señal_tiene_calidad(symbol, fase):
         if fase == "ALCISTA":
             if not (precio_actual > ema20 > ema50):
                 print(f"  [FILTRO] ❌ EMAs no alineadas para alcista.")
+                _registrar_rechazo(symbol, fase, "emas_no_alineadas_alcista")
                 return False
             print(f"  [FILTRO] EMAs alcistas alineadas ✅")
         elif fase == "BAJISTA":
             if not (precio_actual < ema20 < ema50):
                 print(f"  [FILTRO] ❌ EMAs no alineadas para bajista.")
+                _registrar_rechazo(symbol, fase, "emas_no_alineadas_bajista")
                 return False
             print(f"  [FILTRO] EMAs bajistas alineadas ✅")
         elif fase == "LATERAL":
             diff = abs(ema20 - ema50) / ema50 * 100
             if diff > 3.0:
                 print(f"  [FILTRO] ❌ EMAs muy separadas para lateral ({round(diff,2)}%).")
+                _registrar_rechazo(symbol, fase, f"emas_separadas_lateral_{round(diff,2)}pct")
                 return False
             print(f"  [FILTRO] EMAs laterales comprimidas ✅")
 

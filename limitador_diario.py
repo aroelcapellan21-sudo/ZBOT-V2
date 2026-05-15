@@ -58,18 +58,26 @@ def guardar_estado_diario(data):
 
 def contar_operaciones_hoy():
     """
-    FIX: Solo cuenta entradas nuevas del dia (estado ABIERTA).
-    No cuenta cierres para no duplicar.
+    Cuenta solo cierres reales del dia (TP/SL/TRAILING_SL).
+    Excluye MANUAL_LEGACY, RECONCILE y cualquier otro estado no operativo.
+    Deduplica por (timestamp, symbol) para evitar doble conteo si un cierre
+    queda escrito dos veces por procesos solapados.
     """
     try:
         hoy = datetime.now().strftime("%Y-%m-%d")
         with open(AUDITORIA, "r") as f:
             lineas = f.readlines()
         count = 0
+        vistos = set()
         for linea in lineas[1:]:
             partes = linea.strip().split(",")
-            if len(partes) >= 6 and partes[0].startswith(hoy):
-                count += 1
+            if (len(partes) >= 6
+                    and partes[0].startswith(hoy)
+                    and partes[5] in ("TP", "SL", "TRAILING_SL")):
+                clave = (partes[0], partes[2])  # (timestamp, symbol)
+                if clave not in vistos:
+                    vistos.add(clave)
+                    count += 1
         return count
     except Exception as e:
         print(f"  [LIMITADOR] Error contando operaciones: {e}")

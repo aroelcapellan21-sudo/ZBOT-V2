@@ -3,12 +3,14 @@
 # FIX: imports muertos eliminados
 # FIX: Comparacion de horas como enteros
 # FIX: except pass eliminados
+# FIX: Notificaciones Telegram en cambios de evento macro
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
 import json
 import os
 from datetime import datetime, timezone
+from engine import enviar_aviso
 
 EVENTOS_MANUAL = os.path.expanduser("~/bot-padre-v2/signals/eventos_macro.json")
 
@@ -77,6 +79,11 @@ def puede_operar_eventos():
                 if ahora_min >= hasta_min:
                     guardar_evento_manual(False)
                     print(f"  [EVENTOS] ✅ Evento macro terminado. Bot activo.")
+                    enviar_aviso(
+                        f"✅ EVENTO MACRO EXPIRADO\n"
+                        f"Evento: {desc}\n"
+                        f"Bot reanudando operaciones normales."
+                    )
                 else:
                     print(f"  [EVENTOS] ❌ Evento macro activo: {desc}. No operar.")
                     return False
@@ -98,10 +105,20 @@ def puede_operar_eventos():
 def activar_evento_manual(descripcion, hasta_hora_utc):
     guardar_evento_manual(True, descripcion, hasta_hora_utc)
     print(f"  [EVENTOS] 🛑 Evento activado: {descripcion} hasta {hasta_hora_utc} UTC")
+    enviar_aviso(
+        f"🛑 EVENTO MACRO ACTIVADO\n"
+        f"Evento : {descripcion}\n"
+        f"Hasta  : {hasta_hora_utc} UTC\n"
+        f"Bot bloqueado hasta que expire."
+    )
 
 def desactivar_evento_manual():
     guardar_evento_manual(False)
     print(f"  [EVENTOS] ✅ Evento desactivado manualmente.")
+    enviar_aviso(
+        f"✅ EVENTO MACRO DESACTIVADO MANUALMENTE\n"
+        f"Bot reanudando operaciones normales."
+    )
 
 if __name__ == "__main__":
     print("📰 Filtro de Eventos Macro\n")

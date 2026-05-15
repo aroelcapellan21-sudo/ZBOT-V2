@@ -3,12 +3,14 @@
 # FIX: guardar_estado_diario error visible
 # FIX: contar_operaciones_hoy solo cuenta entradas
 # FIX: except pass eliminados
+# FIX: Notificaciones Telegram en bloqueos (sin spam)
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
 import json
 import os
 from datetime import datetime
+from engine import enviar_aviso
 
 ESTADO_DIARIO = os.path.expanduser("~/bot-padre-v2/signals/estado_diario.json")
 AUDITORIA     = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
@@ -120,12 +122,25 @@ def puede_operar_hoy():
 
     if ops_hoy >= MAX_OPERACIONES_DIA:
         print(f"  [LIMITADOR] ❌ Limite diario alcanzado ({MAX_OPERACIONES_DIA} ops).")
+        if not estado.get("notificado_limite"):
+            estado["notificado_limite"] = True
+            guardar_estado_diario(estado)
+            enviar_aviso(
+                f"📊 LÍMITE DIARIO ALCANZADO\n"
+                f"Operaciones hoy: {ops_hoy}/{MAX_OPERACIONES_DIA}\n"
+                f"Bot en pausa hasta mañana."
+            )
         return False
 
     if perdidas_consec >= MAX_PERDIDAS_CONSECUTIVAS:
         estado["pausado"] = True
         guardar_estado_diario(estado)
         print(f"  [LIMITADOR] ❌ {MAX_PERDIDAS_CONSECUTIVAS} perdidas seguidas. Bot pausado hoy.")
+        enviar_aviso(
+            f"🔴 BOT PAUSADO — {MAX_PERDIDAS_CONSECUTIVAS} PÉRDIDAS SEGUIDAS\n"
+            f"Pérdidas consecutivas hoy: {perdidas_consec}\n"
+            f"El sistema no abrirá nuevas operaciones hasta mañana."
+        )
         return False
 
     print(f"  [LIMITADOR] ✅ Puede operar hoy.")

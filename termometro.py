@@ -10,6 +10,7 @@ import os
 import urllib.request
 import urllib.parse
 from datetime import datetime
+from engine import enviar_aviso
 
 ESTADO_TERMOMETRO = os.path.expanduser("~/bot-padre-v2/signals/estado_termometro.json")
 
@@ -87,6 +88,14 @@ def obtener_parametros(estado):
         return {"tp_mult": 1.0, "sl_mult": 1.0, "operar": True, "descripcion": "Estado desconocido"}
 
 def guardar_estado(estado, volatilidad, tendencia, parametros):
+    estado_previo = None
+    try:
+        if os.path.exists(ESTADO_TERMOMETRO):
+            with open(ESTADO_TERMOMETRO) as f:
+                estado_previo = json.load(f).get("estado")
+    except Exception:
+        pass
+
     try:
         os.makedirs(os.path.dirname(ESTADO_TERMOMETRO), exist_ok=True)
         data = {
@@ -98,8 +107,38 @@ def guardar_estado(estado, volatilidad, tendencia, parametros):
         }
         with open(ESTADO_TERMOMETRO, "w") as f:
             json.dump(data, f, indent=2)
-    except:
+    except Exception:
         pass
+
+    if estado_previo is not None and estado_previo != estado:
+        if not parametros["operar"]:
+            enviar_aviso(
+                f"💀 TERMÓMETRO — MERCADO MUERTO\n"
+                f"Estado anterior: {estado_previo}\n"
+                f"Volatilidad: {volatilidad}% | Tendencia: {tendencia}%\n"
+                f"Bot suspendido hasta que el mercado reactive."
+            )
+        elif estado == "VOLATILIDAD_EXTREMA":
+            enviar_aviso(
+                f"⚡ TERMÓMETRO — VOLATILIDAD EXTREMA\n"
+                f"Estado anterior: {estado_previo}\n"
+                f"Volatilidad: {volatilidad}% | Tendencia: {tendencia}%\n"
+                f"TP/SL reducidos al 70%. Operando con precaución."
+            )
+        elif estado == "TENDENCIA_FUERTE":
+            enviar_aviso(
+                f"🚀 TERMÓMETRO — TENDENCIA FUERTE\n"
+                f"Estado anterior: {estado_previo}\n"
+                f"Volatilidad: {volatilidad}% | Tendencia: {tendencia}%\n"
+                f"TP/SL ampliados x1.5. Condiciones favorables."
+            )
+        elif estado_previo == "MERCADO_MUERTO":
+            enviar_aviso(
+                f"✅ TERMÓMETRO — MERCADO ACTIVO\n"
+                f"Estado nuevo: {estado}\n"
+                f"Volatilidad: {volatilidad}% | Tendencia: {tendencia}%\n"
+                f"Bot reanudando operaciones normales."
+            )
 
 def cargar_estado():
     try:

@@ -250,6 +250,15 @@ def supervisar():
         if "errores_criticos" in estado:
             resueltos.append("errores_criticos")
 
+    # --- CHECK 5: Posiciones huerfanas (auto-reconciliacion) ---
+    try:
+        from reconciliar import auto_reconciliar
+        n = auto_reconciliar()
+        if n > 0:
+            print(f"[SUPERVISOR] Auto-reconciliacion: {n} posicion(es) huerfana(s) resueltas.")
+    except Exception as e:
+        print(f"[SUPERVISOR] Error en auto_reconciliar: {e}")
+
     # --- Limpiar resueltos ---
     for clave in resueltos:
         limpiar_resuelto(estado, clave)

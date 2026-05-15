@@ -4,7 +4,9 @@ reconciliar.py — Z-Bot v2
 Detecta crypto huerfana en billetera.json (sin fila ABIERTA en auditoria.csv),
 muestra un reporte detallado y pide confirmacion antes de modificar nada.
 
-Uso: python3 reconciliar.py
+auto_reconciliar(): version automatica sin confirmacion, para llamar desde supervisor.
+
+Uso manual: python3 reconciliar.py
 """
 
 import csv
@@ -14,6 +16,12 @@ import shutil
 import urllib.request
 import urllib.parse
 from datetime import datetime
+
+try:
+    from engine import enviar_aviso as _aviso
+except Exception:
+    def _aviso(msg):
+        print(f"[RECONCILE] Telegram no disponible: {msg}")
 
 BASE       = os.path.expanduser("~/bot-padre-v2")
 BILLETERA  = os.path.join(BASE, "signals/billetera.json")
@@ -65,6 +73,78 @@ def hacer_backup():
     print(f"  Backups creados:")
     print(f"    {BACKUP_BIL}")
     print(f"    {BACKUP_AUD}")
+
+
+def auto_reconciliar():
+    """
+    Reconciliacion automatica sin confirmacion humana.
+    Detecta crypto huerfana y la convierte a USDT al precio de mercado.
+    Notifica por Telegram si reconcilia algo.
+    Retorna cantidad de posiciones reconciliadas (0 si nada que hacer).
+    """
+    try:
+        billetera = cargar_billetera()
+    except Exception as e:
+        print(f"[RECONCILE AUTO] Error leyendo billetera: {e}")
+        return 0
+
+    monitoreados = symbols_con_posicion_abierta()
+    ahora        = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    usdt_antes   = float(billetera.get("USDT", 0))
+    huerfanas    = []
+
+    for moneda, symbol in CRYPTO_MAP.items():
+        cantidad = float(billetera.get(moneda, 0))
+        if cantidad <= CANTIDAD_MINIMA:
+            continue
+        if symbol in monitoreados:
+            continue
+        precio = fetch_precio(symbol)
+        if precio is None:
+            print(f"[RECONCILE AUTO] Sin precio para {symbol}. Omitiendo.")
+            continue
+        valor_usdt = round(cantidad * precio, 4)
+        huerfanas.append({
+            "moneda":     moneda,
+            "symbol":     symbol,
+            "cantidad":   cantidad,
+            "precio":     precio,
+            "valor_usdt": valor_usdt,
+        })
+
+    if not huerfanas:
+        return 0
+
+    hacer_backup()
+
+    for h in huerfanas:
+        billetera[h["moneda"]] = 0.0
+        billetera["USDT"]      = round(float(billetera.get("USDT", 0)) + h["valor_usdt"], 4)
+        with open(AUDITORIA, "a", newline="") as f:
+            csv.writer(f).writerow([
+                ahora, "RECONCILE", h["symbol"],
+                round(h["precio"], 4), "N/A", "RECONCILE"
+            ])
+        print(f"[RECONCILE AUTO] {h['moneda']}: {h['cantidad']:.8f} → +${h['valor_usdt']:.4f} USDT")
+
+    billetera["ultima_actualizacion"] = ahora[:10]
+    with open(BILLETERA, "w") as f:
+        json.dump(billetera, f, indent=2)
+
+    total   = round(sum(h["valor_usdt"] for h in huerfanas), 4)
+    detalle = "\n".join(
+        f"  {h['moneda']}: {h['cantidad']:.6f} → ${h['valor_usdt']:.2f} @ ${h['precio']:,.2f}"
+        for h in huerfanas
+    )
+    _aviso(
+        f"🔄 RECONCILIACIÓN AUTOMÁTICA\n"
+        f"Posiciones huérfanas detectadas y resueltas:\n\n"
+        f"{detalle}\n\n"
+        f"USDT antes : ${usdt_antes:.2f}\n"
+        f"USDT ahora : ${billetera['USDT']:.2f}\n"
+        f"Recuperado : ${total:.2f}"
+    )
+    return len(huerfanas)
 
 
 def main():

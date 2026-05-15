@@ -13,7 +13,7 @@ from datetime import datetime
 
 AUDITORIA = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
 MEMORIA   = os.path.expanduser("~/bot-padre-v2/data/memoria_propia.json")
-MIN_TRADES = 3
+MIN_TRADES = 15
 
 def analizar_historial():
     trades = []

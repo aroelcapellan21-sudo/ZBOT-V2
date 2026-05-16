@@ -9,6 +9,12 @@
   Parámetros restaurados: RSI 50-70, SL 3.5%, TP 6%, EMA 20/50.
   Ver backtest_resultados.txt para detalle completo.
 
+[2026-05-16] ejecutor.py — Conectado a Binance real (api.binance.com)
+  Reemplaza simulación en billetera.json por órdenes MARKET reales vía REST API.
+  Keys cargadas desde keys.env en runtime (sin hardcodear). HMAC-SHA256 firmado.
+  COMPRA usa quoteOrderQty (USDT fijo). VENTA usa quantity (base asset).
+  billetera.json actualizado con fills reales post-ejecución.
+
 [2026-05-16] filtro_calidad.py — Fix filtro de volumen usa vela cerrada
   Bug: vol_actual usaba velas[-1] (vela 4H en curso, incompleta) → ratios 0.07-0.23x → todo bloqueado.
   Fix: vol_actual = velas[-2][5] (última vela cerrada). Promedio también excluye vela abierta.

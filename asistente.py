@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string, session
 import anthropic, os, json
+from historial_precios import leer_historial_formateado as _historial_precios
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'zbot_padre_v2_secreto'
@@ -224,6 +225,12 @@ def leer_historial_billetera():
     except Exception as e:
         return f"\nError leyendo historial_billetera.csv: {e}\n"
 
+def leer_historial_precios():
+    try:
+        return _historial_precios(horas=24)
+    except Exception as e:
+        return f"\nHISTORIAL DE PRECIOS: error ({e})\n"
+
 def leer_archivos():
     datos = leer_parada_emergencia()
     datos += leer_contexto_proyecto()
@@ -234,6 +241,7 @@ def leer_archivos():
     datos += leer_memoria_propia()
     datos += leer_log_rechazos()
     datos += leer_estado_mercado()
+    datos += leer_historial_precios()
     datos += interpretar_screens()
     ev = os.path.join(BOT_DIR, 'memoria/eventos.log')
     if os.path.exists(ev):

@@ -21,6 +21,7 @@ from memoria.memoria import registrar_evento, registrar_corecro, registrar_matri
 from director_orquesta import orquestar
 from centinela.centinela import iniciar as iniciar_centinela
 from brain.telegram_engine import escuchar
+from historial_precios import registrar_snapshot as _registrar_precios
 
 BILLETERA     = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 ESTADO_ARCHIVO = os.path.expanduser("~/bot-padre-v2/estado_padre.txt")
@@ -90,6 +91,12 @@ def ejecutar_ciclo_padre():
                 registrar_evento(f"{symbol}: ${precio} | RSI: {rsi} | EMA50: {ema50} | EMA200: {ema200}")
         except Exception as e:
             print(f"[MAIN] Error procesando {symbol}: {e}")
+
+    # 4 Historial de precios (1 vez por hora — gate interno)
+    try:
+        _registrar_precios()
+    except Exception as e:
+        print(f"[MAIN] Error historial_precios: {e}")
 
     registrar_evento("Ciclo completado.")
     print("Ciclo completado. Reposando...")

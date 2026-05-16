@@ -97,9 +97,9 @@ def señal_tiene_calidad(symbol, fase):
             return False
         print(f"  [FILTRO] ATR: {round(atr_pct,3)}% ✅")
 
-    # Volumen — debe estar activo
-    vol_actual  = float(velas[-1][5])
-    vol_promedio = calcular_volumen_promedio(velas)
+    # Volumen — usar última vela CERRADA ([-2]) para evitar falsos bajos en vela en curso
+    vol_actual   = float(velas[-2][5])
+    vol_promedio = calcular_volumen_promedio(velas[:-1])
     if vol_promedio and vol_promedio > 0:
         vol_ratio = vol_actual / vol_promedio
         if vol_ratio < 0.5:

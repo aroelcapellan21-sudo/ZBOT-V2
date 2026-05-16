@@ -1,0 +1,22 @@
+# =========================================
+# changelog.txt
+# Registro de cambios - Z-Bot V2
+# Formato: [FECHA] ARCHIVO — Qué cambió y por qué
+# =========================================
+
+[2026-05-16] francotirador_alcista_btc.py — REVERTIDO a parámetros originales
+  Backtest 11,769 velas (2021-2026): SET A nuevo alcanzó PF 1.39 (umbral: 1.6). No aprobado.
+  Parámetros restaurados: RSI 50-70, SL 3.5%, TP 6%, EMA 20/50.
+  Ver backtest_resultados.txt para detalle completo.
+
+[2026-05-16] filtro_calidad.py — Fix filtro de volumen usa vela cerrada
+  Bug: vol_actual usaba velas[-1] (vela 4H en curso, incompleta) → ratios 0.07-0.23x → todo bloqueado.
+  Fix: vol_actual = velas[-2][5] (última vela cerrada). Promedio también excluye vela abierta.
+  Backtest: umbral 0.5x sigue siendo válido con velas cerradas (bloquea <1% de señales históricas).
+
+[2026-05-16] SET A ALCISTA — Conclusión de investigación (tema cerrado)
+  Sweep TP 7-10% (RSI 55-75, SL 5%, EMA 20/100): mejor PF obtenido 1.44 en TP 10%. No supera umbral 1.6.
+  Diagnóstico: el problema es el ratio TP/SL, no el TP en sí. SL 5% requeriría TP >8% para PF 1.6 con WR ~50%.
+  Conclusión: parámetros originales (RSI 50-70, SL 3.5%, TP 6%, EMA 20/50) son los mejores validados.
+  Los 15 francotiradores mantienen sus valores hardcodeados sin cambios.
+

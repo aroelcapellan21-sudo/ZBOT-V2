@@ -231,6 +231,106 @@ def leer_historial_precios():
     except Exception as e:
         return f"\nHISTORIAL DE PRECIOS: error ({e})\n"
 
+def leer_estados_internos():
+    """Lee termómetro, guardian, limitador diario, eventos macro y trailing desde SQLite."""
+    try:
+        import db
+        texto = "\nESTADOS INTERNOS DEL BOT:\n"
+
+        t = db.json_get("estado_termometro")
+        if t:
+            operar = t.get("parametros", {}).get("operar", True)
+            texto += (
+                f"\nTermómetro: {t.get('estado','N/A')} "
+                f"({'puede operar' if operar else 'SUSPENDIDO'})\n"
+                f"  Volatilidad: {t.get('volatilidad_promedio','N/A')}% | "
+                f"Tendencia: {t.get('tendencia_promedio','N/A')}% | "
+                f"Última medición: {t.get('timestamp','N/A')}\n"
+            )
+        else:
+            texto += "\nTermómetro: sin datos aún\n"
+
+        g = db.json_get("estado_riesgo")
+        if g:
+            bloq = "SÍ ⛔" if g.get("bloqueado") else "No"
+            bloq_dia = "SÍ ⛔" if g.get("bloqueado_dia") else "No"
+            texto += (
+                f"\nGuardian de Riesgo:\n"
+                f"  Bloqueado (drawdown total): {bloq}\n"
+                f"  Bloqueado (día): {bloq_dia}\n"
+                f"  Capital máx histórico: ${g.get('capital_maximo_historico','N/A')}\n"
+                f"  Capital inicio hoy: ${g.get('capital_inicio_dia','N/A')}\n"
+            )
+        else:
+            texto += "\nGuardian de Riesgo: sin datos aún\n"
+
+        l = db.json_get("estado_diario")
+        if l:
+            pausado = "SÍ ⛔" if l.get("pausado") else "No"
+            texto += (
+                f"\nLimitador Diario:\n"
+                f"  Operaciones hoy: {l.get('operaciones_hoy', 0)}\n"
+                f"  Pérdidas consecutivas: {l.get('perdidas_consecutivas', 0)}\n"
+                f"  Pausado: {pausado}\n"
+            )
+        else:
+            texto += "\nLimitador Diario: sin datos aún\n"
+
+        e = db.json_get("eventos_macro")
+        if e and e.get("evento_activo"):
+            texto += (
+                f"\nEvento Macro ACTIVO ⛔:\n"
+                f"  Descripción: {e.get('descripcion','N/A')}\n"
+                f"  Hasta: {e.get('hasta','N/A')} UTC\n"
+            )
+        else:
+            texto += "\nEventos Macro: ninguno activo\n"
+
+        tr = db.json_get("trailing_data")
+        if tr:
+            abiertos = [(k, v) for k, v in tr.items() if not v.get("cerrado")]
+            if abiertos:
+                texto += f"\nTrailing Stops activos ({len(abiertos)}):\n"
+                for _, op in abiertos:
+                    texto += (
+                        f"  {op['symbol']}: entrada ${op['precio_entrada']} | "
+                        f"SL ${op.get('trailing_sl','N/A')} | "
+                        f"máx ${op.get('precio_maximo','N/A')} | "
+                        f"activo: {'Sí' if op.get('trailing_activo') else 'No'}\n"
+                    )
+            else:
+                texto += "\nTrailing Stops: ninguno activo\n"
+        else:
+            texto += "\nTrailing Stops: sin datos\n"
+
+        return texto
+    except Exception as e:
+        return f"\nESTADOS INTERNOS: error ({e})\n"
+
+def leer_config_cartera_resumida():
+    """Muestra parámetros RSI, TP, SL activos por símbolo y fase."""
+    try:
+        from config_cartera import PARAMETROS, CAPITAL_BASE, CAPITAL_MAX_POR_OP, PESOS_CARTERA
+        texto = "\nCONFIGURACIÓN ACTIVA DE LA CARTERA:\n"
+        texto += (
+            f"  Capital base: ${CAPITAL_BASE} | "
+            f"Capital máx/op: {round(CAPITAL_MAX_POR_OP*100, 1)}%\n"
+            f"  Pesos: "
+            + " | ".join(f"{s.replace('USDT','')} {p}%" for s, p in PESOS_CARTERA.items())
+            + "\n"
+        )
+        texto += "\n  Parámetros (RSI_min-max | TP% | SL% | EC | EL):\n"
+        for symbol, fases in PARAMETROS.items():
+            sym = symbol.replace("USDT", "")
+            for fase, p in fases.items():
+                texto += (
+                    f"    {sym} {fase:8s}: RSI {p['rsi_min']}-{p['rsi_max']} | "
+                    f"TP {p['tp']}% | SL {p['sl']}% | EC {p['ec']} | EL {p['el']}\n"
+                )
+        return texto
+    except Exception as e:
+        return f"\nCONFIGURACIÓN: error ({e})\n"
+
 def leer_archivos():
     datos = leer_parada_emergencia()
     datos += leer_contexto_proyecto()
@@ -242,6 +342,8 @@ def leer_archivos():
     datos += leer_log_rechazos()
     datos += leer_estado_mercado()
     datos += leer_historial_precios()
+    datos += leer_estados_internos()
+    datos += leer_config_cartera_resumida()
     datos += interpretar_screens()
     ev = os.path.join(BOT_DIR, 'memoria/eventos.log')
     if os.path.exists(ev):
@@ -268,7 +370,20 @@ HTML = '''<!DOCTYPE html>
         .theme-toggle { background: none; border: none; cursor: pointer; font-size: 20px; padding: 4px 8px; border-radius: 6px; }
         body.dark .theme-toggle:hover { background: #3a3a3a; }
         body.light .theme-toggle:hover { background: #e0e0e0; }
-        .container { max-width: 860px; margin: 0 auto; padding: 20px 16px; height: calc(100vh - 60px); display: flex; flex-direction: column; }
+        .acciones { display: flex; gap: 8px; flex-wrap: wrap; padding: 8px 20px; }
+        body.dark .acciones { background: #252525; border-bottom: 1px solid #3a3a3a; }
+        body.light .acciones { background: #f8f8f8; border-bottom: 1px solid #d0d0d0; }
+        .accion-btn { padding: 5px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 12px; font-weight: 500; }
+        .accion-btn.danger { background: #c0392b; color: #fff; }
+        .accion-btn.danger:hover { background: #a93226; }
+        .accion-btn.safe { background: #27ae60; color: #fff; }
+        .accion-btn.safe:hover { background: #229954; }
+        .accion-btn.warn { background: #e67e22; color: #fff; }
+        .accion-btn.warn:hover { background: #ca6f1e; }
+        .accion-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 10px 20px; border-radius: 8px; font-size: 14px; z-index: 999; display: none; }
+        body.dark .accion-toast { background: #383838; color: #e0e0e0; }
+        body.light .accion-toast { background: #333; color: #fff; }
+        .container { max-width: 860px; margin: 0 auto; padding: 20px 16px; height: calc(100vh - 100px); display: flex; flex-direction: column; }
         .chat-window { flex: 1; overflow-y: auto; padding: 16px; border-radius: 12px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 12px; }
         body.dark .chat-window { background: #2d2d2d; border: 1px solid #3a3a3a; }
         body.light .chat-window { background: #ffffff; border: 1px solid #d0d0d0; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
@@ -312,6 +427,13 @@ HTML = '''<!DOCTYPE html>
     </div>
     <button class="theme-toggle" onclick="toggleTheme()">🌙</button>
 </div>
+<div class="acciones">
+    <button class="accion-btn danger" onclick="ejecutar(\'parada_activar\')">⛔ Activar Parada</button>
+    <button class="accion-btn safe"   onclick="ejecutar(\'parada_desactivar\')">✅ Desactivar Parada</button>
+    <button class="accion-btn warn"   onclick="pedirEvento()">📰 Activar Evento Macro</button>
+    <button class="accion-btn safe"   onclick="ejecutar(\'evento_desactivar\')">✅ Desactivar Evento</button>
+</div>
+<div id="toast" class="accion-toast"></div>
 <div class="container">
     <div class="chat-window" id="chat">
         <div class="msg bot">
@@ -335,6 +457,28 @@ HTML = '''<!DOCTYPE html>
             body.classList.replace('light', 'dark');
             btn.textContent = '🌙';
         }
+    }
+
+    function mostrarToast(msg, ms=3500) {
+        const t = document.getElementById(\'toast\');
+        t.textContent = msg;
+        t.style.display = \'block\';
+        setTimeout(() => t.style.display = \'none\', ms);
+    }
+
+    async function ejecutar(comando, extra={}) {
+        const payload = {comando, ...extra};
+        const r = await fetch(\'/ejecutar\', {method:\'POST\', headers:{\'Content-Type\':\'application/json\'}, body: JSON.stringify(payload)});
+        const d = await r.json();
+        mostrarToast(d.msg);
+    }
+
+    function pedirEvento() {
+        const desc  = prompt(\'Descripción del evento (ej: FOMC, CPI):\');
+        if (!desc) return;
+        const hasta = prompt(\'Bloquear hasta qué hora UTC (formato HH:MM, ej: 15:30):\');
+        if (!hasta) return;
+        ejecutar(\'evento_activar\', {descripcion: desc, hasta: hasta});
     }
 
     async function preguntar() {
@@ -397,15 +541,20 @@ def preguntar():
 
         respuesta = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=1000,
-            system=f"""Eres el asistente inteligente del bot de trading de Ariel, llamado Z-Bot Padre v2.
-Conoces en detalle el proyecto completo: todo el código, cada francotirador, cada filtro, la billetera, el historial de operaciones y el estado en tiempo real.
-Explica todo en lenguaje simple y directo, como si le hablaras a un amigo que entiende su negocio pero no los tecnicismos.
-Responde EXACTAMENTE lo que te preguntan usando SOLO los datos del reporte.
-Nunca inventes datos, porcentajes ni información que no esté en los archivos.
+            max_tokens=1200,
+            system=f"""Eres el asistente inteligente del bot de trading Z-Bot Padre v2, propiedad de Ariel.
+Tienes dominio total del sistema: conoces el código completo, todos los filtros, los 15 francotiradores (5 monedas × alcista/bajista/lateral), la billetera, operaciones, estado en tiempo real, parámetros y estados internos.
+Explica en lenguaje simple y directo. Responde SOLO con datos del reporte. Nunca inventes cifras.
 Responde siempre en español. Máximo 6 oraciones claras y directas.
-Si detectas algo raro o mejorable basado en los datos reales, menciónalo.
-Recuerdas todo lo que Ariel te ha preguntado en esta sesión.
+Si detectas algo anómalo o mejorable, menciónalo con precisión.
+Recuerdas todo lo que Ariel ha preguntado en esta sesión.
+
+ACCIONES QUE PUEDES SUGERIR (Ariel usa los botones de la pantalla para ejecutarlas):
+- Activar Parada de Emergencia → detiene todas las operaciones inmediatamente
+- Desactivar Parada de Emergencia → reanuda operaciones normales
+- Activar Evento Macro → bloquea operaciones hasta una hora UTC especificada
+- Desactivar Evento Macro → levanta el bloqueo de evento macro
+Cuando Ariel te pida ejecutar alguna de estas acciones, indícale qué botón usar o qué datos ingresar.
 
 DATOS ACTUALES DEL BOT:
 {datos}""",
@@ -424,6 +573,46 @@ DATOS ACTUALES DEL BOT:
 
     except Exception as e:
         return jsonify({"respuesta": f"⚠️ El asistente tuvo un problema: {str(e)}. Revisa el screen z_asistente."})
+
+
+@app.route('/ejecutar', methods=['POST'])
+def ejecutar():
+    """Ejecuta acciones seguras y reversibles sobre el bot."""
+    try:
+        data    = request.json or {}
+        comando = data.get('comando', '')
+
+        if comando == 'parada_activar':
+            ruta = os.path.join(BOT_DIR, 'signals/PARADA_EMERGENCIA.txt')
+            with open(ruta, 'w') as f:
+                f.write('Parada activada desde el asistente web.')
+            return jsonify({"ok": True, "msg": "⛔ Parada de emergencia ACTIVADA. El bot deja de operar."})
+
+        elif comando == 'parada_desactivar':
+            ruta = os.path.join(BOT_DIR, 'signals/PARADA_EMERGENCIA.txt')
+            if os.path.exists(ruta):
+                os.remove(ruta)
+            return jsonify({"ok": True, "msg": "✅ Parada de emergencia DESACTIVADA. El bot puede operar."})
+
+        elif comando == 'evento_activar':
+            desc  = data.get('descripcion', 'Evento manual')
+            hasta = data.get('hasta', '')
+            if not hasta:
+                return jsonify({"ok": False, "msg": "Falta la hora 'hasta' (formato HH:MM)"})
+            from filtro_eventos import activar_evento_manual
+            activar_evento_manual(desc, hasta)
+            return jsonify({"ok": True, "msg": f"⛔ Evento macro activado: {desc} hasta {hasta} UTC"})
+
+        elif comando == 'evento_desactivar':
+            from filtro_eventos import desactivar_evento_manual
+            desactivar_evento_manual()
+            return jsonify({"ok": True, "msg": "✅ Evento macro desactivado. Bot puede operar."})
+
+        else:
+            return jsonify({"ok": False, "msg": f"Comando desconocido: {comando}"})
+
+    except Exception as e:
+        return jsonify({"ok": False, "msg": f"Error ejecutando comando: {e}"})
 
 
 if __name__ == '__main__':

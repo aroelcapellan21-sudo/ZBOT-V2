@@ -231,6 +231,16 @@ def leer_historial_precios():
     except Exception as e:
         return f"\nHISTORIAL DE PRECIOS: error ({e})\n"
 
+def leer_url_tunel():
+    ruta = os.path.join(BOT_DIR, 'signals/tunnel_url.txt')
+    if not os.path.exists(ruta):
+        return "\nURL ASISTENTE: tunel no activo o sin URL guardada.\n"
+    try:
+        url = open(ruta).read().strip()
+        return f"\nURL ASISTENTE: {url}\n"
+    except Exception:
+        return ""
+
 def leer_estados_internos():
     """Lee termómetro, guardian, limitador diario, eventos macro y trailing desde SQLite."""
     try:
@@ -342,6 +352,7 @@ def leer_archivos():
     datos += leer_log_rechazos()
     datos += leer_estado_mercado()
     datos += leer_historial_precios()
+    datos += leer_url_tunel()
     datos += leer_estados_internos()
     datos += leer_config_cartera_resumida()
     datos += interpretar_screens()

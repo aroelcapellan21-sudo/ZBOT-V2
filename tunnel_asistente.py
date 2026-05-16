@@ -71,6 +71,13 @@ def guardar_url(url):
     except Exception as e:
         print(f"[TUNNEL] Error guardando URL: {e}")
 
+def url_ya_notificada(url):
+    try:
+        with open(URL_FILE) as f:
+            return f.read().strip() == url
+    except Exception:
+        return False
+
 def procesar_linea(linea, url_encontrada):
     """Busca la URL publica en la salida de cloudflared."""
     if url_encontrada[0]:
@@ -82,13 +89,15 @@ def procesar_linea(linea, url_encontrada):
         url = m.group()
         url_encontrada[0] = url
         print(f"\n[TUNNEL] ✅ URL publica: {url}\n")
+        ya_guardada = url_ya_notificada(url)
         guardar_url(url)
-        enviar_telegram(
-            f"🌐 ASISTENTE DISPONIBLE\n"
-            f"URL: {url}\n"
-            f"Esta URL cambia al reiniciar el tunel.\n"
-            f"Para URL fija: ver instrucciones en tunnel_asistente.py"
-        )
+        if not ya_guardada:
+            enviar_telegram(
+                f"🌐 ASISTENTE DISPONIBLE\n"
+                f"URL: {url}\n"
+                f"Esta URL cambia al reiniciar el tunel.\n"
+                f"Para URL fija: ver instrucciones en tunnel_asistente.py"
+            )
         return
 
     # Named tunnel (URL fija con dominio propio)
@@ -98,12 +107,14 @@ def procesar_linea(linea, url_encontrada):
             url = m2.group()
             url_encontrada[0] = url
             print(f"\n[TUNNEL] ✅ URL FIJA: {url}\n")
+            ya_guardada = url_ya_notificada(url)
             guardar_url(url)
-            enviar_telegram(
-                f"🔒 ASISTENTE — URL FIJA\n"
-                f"URL: {url}\n"
-                f"Esta URL no cambia al reiniciar."
-            )
+            if not ya_guardada:
+                enviar_telegram(
+                    f"🔒 ASISTENTE — URL FIJA\n"
+                    f"URL: {url}\n"
+                    f"Esta URL no cambia al reiniciar."
+                )
 
 def leer_salida(proc, url_encontrada):
     """Lee stderr de cloudflared en un hilo separado."""
@@ -179,8 +190,8 @@ def main():
 
     rc = proc.returncode
     if rc and rc != -15:
-        print(f"[TUNNEL] Tunel terminado con codigo {rc}. Reiniciando en 10s...")
-        time.sleep(10)
+        print(f"[TUNNEL] Tunel terminado con codigo {rc}. Reiniciando en 60s...")
+        time.sleep(60)
         os.execv(sys.executable, [sys.executable] + sys.argv)
 
 

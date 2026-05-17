@@ -1,0 +1,46 @@
+# =========================================
+# backtest_resultados.txt
+# Resultados de backtesting - Z-Bot V2
+# =========================================
+
+[2026-05-16] BTCUSDT 4H — Validación SET A (Alcista) y SET B (Bajista)
+Período: 2021-01-01 → 2026-05-16
+Velas: 11,769 (~5.4 años)
+Criterio de aprobación: PF > 1.6 y MaxDD < 5%
+
+─────────────────────────────────────────────────────────────────
+SET A — ALCISTA BTCUSDT (largo)
+─────────────────────────────────────────────────────────────────
+BASELINE  RSI 50-70 | SL 3.5% | TP 6.0% | EMA 20/50
+  Trades: 195  |  WR: 42.1%  |  PF: 1.24  |  MaxDD: 0.81%  |  PnL: +$19.40
+  Resultado: ❌ NO CUMPLE (PF < 1.6)
+
+NUEVO     RSI 55-75 | SL 5.0% | TP 6.0% | EMA 20/100
+  Trades: 147  |  WR: 53.7%  |  PF: 1.39  |  MaxDD: 0.82%  |  PnL: +$27.07
+  Resultado: ❌ NO CUMPLE (PF < 1.6)
+
+Observación: El SET A nuevo mejora WR +11.6pp y PnL +$7.67 sobre el baseline.
+El filtro EMA 20/100 reduce trades de 195 a 147 filtrando ruido efectivamente.
+Potencial: necesita mejor ratio TP/SL para superar PF 1.6.
+Candidato a re-evaluar con TP 8-9% manteniendo SL 5%.
+
+─────────────────────────────────────────────────────────────────
+SET B — BAJISTA BTCUSDT (corto)
+─────────────────────────────────────────────────────────────────
+BASELINE  RSI 30-50 | SL 3.5% | TP 6.0% | EMA 20/50
+  Trades: 214  |  WR: 36.4%  |  PF: 0.98  |  MaxDD: 1.21%  |  PnL: -$1.69
+  Resultado: ❌ NO CUMPLE (PF < 1.6)
+
+NUEVO     RSI 20-30 | SL 3.5% | TP 4.0% | EMA 10/50
+  Trades: 129  |  WR: 47.3%  |  PF: 1.02  |  MaxDD: 1.02%  |  PnL: +$1.16
+  Resultado: ❌ NO CUMPLE (PF < 1.6)
+
+Observación: El NUEVO mejora WR de 36% a 47% pero la relación TP/SL ~1:1
+limita estructuralmente el PF. Break-even en ambas configuraciones.
+El bear 2022 ayudó pero no es suficiente para superar 1.6.
+
+─────────────────────────────────────────────────────────────────
+DECISIÓN: Opción B — No aplicar ningún set.
+─────────────────────────────────────────────────────────────────
+Los francotiradores mantienen sus parámetros originales validados.
+Próximo paso sugerido: re-evaluar SET A con TP 8-9% (mejor ratio riesgo/recompensa).

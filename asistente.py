@@ -4,7 +4,22 @@ from historial_precios import leer_historial_formateado as _historial_precios
 
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'zbot_padre_v2_secreto'
-client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+
+def _cargar_anthropic_key():
+    key = os.environ.get("ANTHROPIC_API_KEY")
+    if key:
+        return key
+    keys_file = os.path.expanduser("~/bot-padre-v2/keys.env")
+    try:
+        with open(keys_file) as f:
+            for linea in f:
+                if linea.startswith("ANTHROPIC_API_KEY="):
+                    return linea.strip().split("=", 1)[1]
+    except Exception:
+        pass
+    raise RuntimeError("ANTHROPIC_API_KEY no encontrada en entorno ni en keys.env")
+
+client = anthropic.Anthropic(api_key=_cargar_anthropic_key())
 
 BOT_DIR = "/home/ariel/bot-padre-v2"
 

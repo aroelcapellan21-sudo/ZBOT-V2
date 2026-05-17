@@ -540,12 +540,19 @@ def preguntar():
             'audita', 'real', 'listo', 'opera'
         ])
 
+        necesita_ejecutor = any(x in pregunta_lower for x in [
+            'ejecutor', 'orden', 'compra', 'venta', 'lot', 'lotsize',
+            'simulador', 'binance', 'ejecuta', 'monto', 'slip'
+        ])
+
         datos = leer_archivos()
         if necesita_codigo:
             if archivos_extra:
                 datos += "\n" + leer_codigo_especifico(archivos_extra)
             else:
                 datos += "\n" + leer_codigo_especifico(ARCHIVOS_GLOBALES[:6])
+        if necesita_ejecutor:
+            datos += "\n" + leer_codigo_especifico(['ejecutor.py'])
 
         historial = session['historial'][-10:]
         messages = historial + [{"role": "user", "content": pregunta}]

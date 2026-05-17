@@ -106,11 +106,12 @@ def verificar_riesgo(capital_actual=None):
     drawdown_actual = ((max_hist - capital_actual) / max_hist) * 100
     perdida_dia     = ((inicio_dia - capital_actual) / inicio_dia) * 100
 
-    print(f"\n--- AUDITORIA DE RIESGO V2.13 ---")
+    print(f"\n--- AUDITORIA DE RIESGO V2.14 ---")
+    print(f"  🛡️ Límites activos  : DD máx {DRAWDOWN_MAXIMO_PCT*100:.0f}% | Pérdida día {PERDIDA_DIARIA_MAXIMA_PCT*100:.0f}%")
     print(f"  💰 Capital Actual   : ${round(capital_actual, 2)}")
     print(f"  📈 Maximo Historico : ${round(max_hist, 2)}")
-    print(f"  📉 Drawdown Total   : {round(drawdown_actual, 2)}% (Max 10%)")
-    print(f"  📅 Perdida Hoy      : {round(perdida_dia, 2)}% (Max 5%)")
+    print(f"  📉 Drawdown Total   : {round(drawdown_actual, 2)}% (Max {DRAWDOWN_MAXIMO_PCT*100:.0f}%)")
+    print(f"  📅 Perdida Hoy      : {round(perdida_dia, 2)}% (Max {PERDIDA_DIARIA_MAXIMA_PCT*100:.0f}%)")
 
     if capital_actual <= limite_drawdown:
         ya_bloqueado = estado.get("bloqueado", False)

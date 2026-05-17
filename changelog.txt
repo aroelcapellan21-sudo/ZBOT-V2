@@ -4,6 +4,13 @@
 # Formato: [FECHA] ARCHIVO — Qué cambió y por qué
 # =========================================
 
+[2026-05-16] Simulador Activo — 4 archivos modificados
+  signals/modo.json: flag central de modo (SIMULADOR/REAL), intervalo y sleep configurables.
+  ejecutor.py: LOT_SIZE por símbolo (BTC:5dec, ETH:4, SOL:2, BNB:3, AVAX:2) + modo simulador
+    usa precio real ticker Binance sin enviar orden. Resultado marcado [SIM].
+  director_orquesta.py: lee modo.json → intervalo 1H y sleep 60s en SIMULADOR, 4H/240s en REAL.
+  guardian_riesgo.py: imprime límites activos (DD 10%, pérdida día 5%) en cada auditoría.
+
 [2026-05-16] francotirador_alcista_btc.py — REVERTIDO a parámetros originales
   Backtest 11,769 velas (2021-2026): SET A nuevo alcanzó PF 1.39 (umbral: 1.6). No aprobado.
   Parámetros restaurados: RSI 50-70, SL 3.5%, TP 6%, EMA 20/50.

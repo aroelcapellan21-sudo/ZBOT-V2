@@ -12,6 +12,7 @@ import urllib.request
 import urllib.parse
 import json
 import time
+import os
 from datetime import datetime
 from director_btc import dirigir as dirigir_btc
 from director_eth import dirigir as dirigir_eth
@@ -22,17 +23,26 @@ from engine import enviar_aviso
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
 
-MONEDAS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
+MONEDAS   = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
+MODO_FILE = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
 
 # FIX: Guardar fase anterior para evitar spam Telegram
 _fase_anterior = None
 
-def detectar_fase_global():
+def _leer_modo():
+    try:
+        with open(MODO_FILE) as f:
+            cfg = json.load(f)
+        return cfg.get("modo", "REAL"), cfg.get("intervalo_velas", "4h"), int(cfg.get("sleep_segundos", 240))
+    except Exception:
+        return "REAL", "4h", 240
+
+def detectar_fase_global(intervalo="4h"):
     fases  = {}
     precios = {}
 
     for symbol in MONEDAS:
-        cierres = fetch_velas(symbol, limite=210)
+        cierres = fetch_velas(symbol, intervalo=intervalo, limite=210)
         if cierres:
             fases[symbol]  = detectar_fase(cierres, symbol=symbol)
             precios[symbol] = cierres[-1]
@@ -61,12 +71,13 @@ def _precio_str(precios, symbol):
 def ejecutar_ciclo():
     global _fase_anterior
 
+    modo, intervalo, _ = _leer_modo()
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n{'='*60}")
-    print(f"[DIRECTOR DE ORQUESTA] {timestamp}")
+    print(f"[DIRECTOR DE ORQUESTA] {timestamp}  [{modo} | {intervalo}]")
     print(f"{'='*60}")
 
-    fase_global, fases, precios = detectar_fase_global()
+    fase_global, fases, precios = detectar_fase_global(intervalo=intervalo)
 
     print(f"  BTCUSDT : {_precio_str(precios,'BTCUSDT')} | Fase: {fases['BTCUSDT']}")
     print(f"  ETHUSDT : {_precio_str(precios,'ETHUSDT')} | Fase: {fases['ETHUSDT']}")
@@ -154,7 +165,9 @@ def orquestar():
         except Exception as e:
             registrar_evento(f"ORQUESTA ERROR: {e}")
             print(f"[DIRECTOR ORQUESTA] Error en ciclo: {e}")
-        time.sleep(240)
+        _, _, sleep_seg = _leer_modo()
+        print(f"[DIRECTOR ORQUESTA] Próximo ciclo en {sleep_seg}s.")
+        time.sleep(sleep_seg)
 
 if __name__ == "__main__":
     orquestar()

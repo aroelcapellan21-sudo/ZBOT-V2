@@ -7,6 +7,8 @@
 # FIX: Registro atomico en billetera
 # FIX: Lock file contra condicion de carrera
 # FIX: Conectado a api.binance.com con keys de keys.env
+# FIX: Lot size por simbolo (precision Binance)
+# FIX: Modo Simulador Activo via signals/modo.json
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
 
@@ -24,8 +26,29 @@ from gestor_billetera import registrar_historial_billetera
 BILLETERA            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 LOCK_FILE            = os.path.expanduser("~/bot-padre-v2/signals/ejecutor.lock")
 KEYS_FILE            = os.path.expanduser("~/bot-padre-v2/keys.env")
+MODO_FILE            = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
 MONTO_MINIMO_BINANCE = 5.0
 BASE_URL             = "https://api.binance.com"
+
+# Decimales de cantidad permitidos por símbolo (LOT_SIZE de Binance)
+LOT_SIZE = {
+    "BTCUSDT":  5,
+    "ETHUSDT":  4,
+    "SOLUSDT":  2,
+    "BNBUSDT":  3,
+    "AVAXUSDT": 2,
+}
+
+def _leer_modo():
+    try:
+        with open(MODO_FILE) as f:
+            return json.load(f).get("modo", "REAL")
+    except Exception:
+        return "REAL"
+
+def _redondear_cantidad(symbol, qty):
+    decimales = LOT_SIZE.get(symbol, 6)
+    return round(qty, decimales)
 
 def _cargar_keys():
     api_key = secret = None
@@ -47,6 +70,21 @@ def _firmar(params, secret):
     signature = hmac.new(secret.encode(), query.encode(), hashlib.sha256).hexdigest()
     return query + "&signature=" + signature
 
+def _precio_ticker(symbol):
+    url = f"{BASE_URL}/api/v3/ticker/price?symbol={symbol}"
+    with urllib.request.urlopen(url, timeout=5) as resp:
+        return float(json.loads(resp.read())["price"])
+
+def _simular_fill(symbol, side, quote_qty=None, base_qty=None):
+    precio = _precio_ticker(symbol)
+    if side == "BUY":
+        qty  = round(quote_qty / precio, LOT_SIZE.get(symbol, 6))
+        usdt = quote_qty
+    else:
+        qty  = base_qty
+        usdt = round(base_qty * precio, 2)
+    return {"executedQty": str(qty), "cummulativeQuoteQty": str(usdt), "price": str(precio)}
+
 def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
     api_key, secret = _cargar_keys()
     params = {
@@ -58,7 +96,7 @@ def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
     if quote_qty is not None:
         params["quoteOrderQty"] = f"{quote_qty:.2f}"
     elif base_qty is not None:
-        params["quantity"] = f"{base_qty:.6f}"
+        params["quantity"] = f"{base_qty}"
     else:
         raise ValueError("Debe especificarse quote_qty o base_qty")
 
@@ -68,8 +106,8 @@ def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
         data=body,
         method="POST",
         headers={
-            "X-MBX-APIKEY":  api_key,
-            "Content-Type":  "application/x-www-form-urlencoded",
+            "X-MBX-APIKEY": api_key,
+            "Content-Type": "application/x-www-form-urlencoded",
         }
     )
     try:
@@ -86,7 +124,12 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
     if monto < MONTO_MINIMO_BINANCE:
         return f"❌ RECHAZADO: Monto ${monto:.2f} bajo minimo Binance (${MONTO_MINIMO_BINANCE})"
 
-    symbol = moneda + "USDT"
+    symbol     = moneda + "USDT"
+    modo       = _leer_modo()
+    simulador  = (modo == "SIMULADOR")
+
+    if simulador:
+        print(f"  [EJECUTOR] Modo SIMULADOR — sin orden real a Binance.")
 
     os.makedirs(os.path.dirname(LOCK_FILE), exist_ok=True)
 
@@ -114,9 +157,12 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
                 return f"❌ RECHAZADO: Fondos insuficientes (necesita ${monto:.2f}, tiene ${usdt_disponible:.2f})"
 
             try:
-                respuesta = _orden_mercado(symbol, "BUY", quote_qty=monto)
+                if simulador:
+                    respuesta = _simular_fill(symbol, "BUY", quote_qty=monto)
+                else:
+                    respuesta = _orden_mercado(symbol, "BUY", quote_qty=monto)
             except Exception as e:
-                return f"❌ ERROR Binance COMPRA: {e}"
+                return f"❌ ERROR {'simulando' if simulador else 'Binance'} COMPRA: {e}"
 
             ejecutado_usdt = float(respuesta.get("cummulativeQuoteQty", monto))
             ejecutado_qty  = float(respuesta.get("executedQty", monto / precio))
@@ -124,18 +170,21 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
 
             billetera["USDT"] = round(billetera.get("USDT", 0) - ejecutado_usdt, 4)
             billetera[moneda] = round(billetera.get(moneda, 0) + ejecutado_qty, 8)
-            resultado = f"✅ EJECUTADO: Compra {moneda} a ${precio_real} por ${ejecutado_usdt:.2f} USDT"
+            resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Compra {moneda} a ${precio_real} por ${ejecutado_usdt:.2f} USDT"
 
         elif tipo == "VENTA":
-            cantidad_a_vender   = round(monto / precio, 6)
+            cantidad_a_vender   = _redondear_cantidad(symbol, monto / precio)
             cantidad_disponible = billetera.get(moneda, 0)
             if cantidad_disponible < cantidad_a_vender:
-                return f"❌ RECHAZADO: No tienes suficiente {moneda} (necesita {cantidad_a_vender:.6f}, tiene {cantidad_disponible:.6f})"
+                return f"❌ RECHAZADO: No tienes suficiente {moneda} (necesita {cantidad_a_vender}, tiene {cantidad_disponible:.6f})"
 
             try:
-                respuesta = _orden_mercado(symbol, "SELL", base_qty=cantidad_a_vender)
+                if simulador:
+                    respuesta = _simular_fill(symbol, "SELL", base_qty=cantidad_a_vender)
+                else:
+                    respuesta = _orden_mercado(symbol, "SELL", base_qty=cantidad_a_vender)
             except Exception as e:
-                return f"❌ ERROR Binance VENTA: {e}"
+                return f"❌ ERROR {'simulando' if simulador else 'Binance'} VENTA: {e}"
 
             ejecutado_qty  = float(respuesta.get("executedQty", cantidad_a_vender))
             ejecutado_usdt = float(respuesta.get("cummulativeQuoteQty", monto))
@@ -143,7 +192,7 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
 
             billetera[moneda] = round(billetera.get(moneda, 0) - ejecutado_qty, 8)
             billetera["USDT"] = round(billetera.get("USDT", 0) + ejecutado_usdt, 4)
-            resultado = f"✅ EJECUTADO: Venta {moneda} a ${precio_real} recuperando ${ejecutado_usdt:.2f} USDT"
+            resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Venta {moneda} a ${precio_real} recuperando ${ejecutado_usdt:.2f} USDT"
 
         else:
             return f"❌ Tipo desconocido: {tipo}"

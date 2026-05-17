@@ -21,7 +21,7 @@ ARCHIVOS_GLOBALES = [
     'filtro_calidad.py', 'filtro_horario.py', 'filtro_eventos.py',
     'detector_multitimeframe.py', 'guardian_riesgo.py', 'termometro.py',
     'limitador_diario.py', 'medidor_spread.py', 'gestor_billetera.py',
-    'memoria_propia.py', 'trailing_stop.py', 'utils.py'
+    'memoria_propia.py', 'trailing_stop.py', 'utils.py', 'ejecutor.py'
 ]
 
 def leer_codigo_especifico(archivos):

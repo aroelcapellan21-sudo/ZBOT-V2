@@ -22,12 +22,10 @@ from director_avax import dirigir as dirigir_avax
 from engine import enviar_aviso
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
+import db
 
 MONEDAS   = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
 MODO_FILE = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
-
-# FIX: Guardar fase anterior para evitar spam Telegram
-_fase_anterior = None
 
 def _leer_modo():
     try:
@@ -69,9 +67,9 @@ def _precio_str(precios, symbol):
     return f"${p}" if p is not None else "Sin datos"
 
 def ejecutar_ciclo():
-    global _fase_anterior
-
     modo, intervalo, _ = _leer_modo()
+    previo = db.json_get("fase_orquesta")
+    fase_anterior = previo.get("fase") if previo else None
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"\n{'='*60}")
     print(f"[DIRECTOR DE ORQUESTA] {timestamp}  [{modo} | {intervalo}]")
@@ -94,8 +92,7 @@ def ejecutar_ciclo():
         f"SOL:{fases['SOLUSDT']} BNB:{fases['BNBUSDT']} AVAX:{fases['AVAXUSDT']}"
     )
 
-    # FIX: Solo enviar Telegram si la fase cambio
-    if fase_global != _fase_anterior:
+    if fase_anterior is not None and fase_global != fase_anterior:
         if fase_global == "BAJISTA":
             mensaje = (
                 f"🔻 DIRECTOR DE ORQUESTA\n"
@@ -129,9 +126,9 @@ def ejecutar_ciclo():
                 f"Directores en modo proteccion."
             )
 
-        _fase_anterior = fase_global
+    db.json_set("fase_orquesta", {"fase": fase_global, "timestamp": timestamp})
 
-    # FIX: Directores solo se activan segun fase global
+    # Directores solo se activan segun fase global
     if fase_global == "ALCISTA":
         print(f"  🟢 Activando Directores en modo ALCISTA")
         dirigir_btc("ALCISTA")

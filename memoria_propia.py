@@ -9,7 +9,7 @@
 import csv
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 AUDITORIA = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
 MEMORIA   = os.path.expanduser("~/bot-padre-v2/data/memoria_propia.json")
@@ -75,8 +75,11 @@ def analizar_historial():
             ganadas = sum(1 for t in ops if t["gano"])
             resultado[f"hora_{hora}_{hora+4}_wr"] = round(ganadas / len(ops) * 100, 1)
 
-    # Rachas recientes
-    ultimos             = trades[-5:] if len(trades) >= 5 else trades
+    # Rachas recientes — solo cuenta pérdidas de los últimos 14 días para evitar
+    # deadlock: sin trades recientes la racha expira y el bot se reactiva con cautela
+    hace_14_dias = (datetime.now() - timedelta(days=14)).strftime("%Y-%m-%d")
+    trades_recientes = [t for t in trades if t["timestamp"][:10] >= hace_14_dias]
+    ultimos          = trades_recientes[-5:] if len(trades_recientes) >= 5 else trades_recientes
     perdidas_recientes  = sum(1 for t in ultimos if not t["gano"])
     resultado["perdidas_ultimos_5"] = perdidas_recientes
     resultado["total_trades"]       = len(trades)

@@ -35,7 +35,7 @@ STOP_LOSS          = 3.5
 TAKE_PROFIT        = 6
 EMA_CORTA          = 20
 EMA_LARGA          = 50
-MAX_OP_TOTAL       = 3
+MAX_OP_TOTAL       = 1
 TRAILING_ACTIVACION = 0.5
 TRAILING_DISTANCIA  = 1.0
 
@@ -68,7 +68,6 @@ def contar_operaciones_abiertas():
             1 for l in lineas[1:]
             if len(l.strip().split(",")) >= 6 and
             l.strip().split(",")[2] == SYMBOL and
-            l.strip().split(",")[1] == TIPO_TRADE and
             l.strip().split(",")[5] == "ABIERTA"
         )
     except Exception as e:

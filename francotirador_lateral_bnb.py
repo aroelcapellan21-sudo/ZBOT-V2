@@ -22,7 +22,7 @@ from limitador_diario import puede_operar_hoy
 from filtro_eventos import puede_operar_eventos
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, calcular_rsi, calcular_ema, aplicar_filtro_estadistico, puede_operar_memoria
-from ejecutor import ejecutar_operacion
+from ejecutor import ejecutar_operacion, cerrar_posicion
 from memoria_propia import actualizar_memoria
 
 SYMBOL             = "BNBUSDT"
@@ -131,6 +131,12 @@ def revisar_cierres(precio_actual):
 
                 monto_op = float(partes[6]) if len(partes) > 6 else 10.0
                 if cambio >= TAKE_PROFIT:
+                    res_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op)
+                    if "❌" in res_cierre:
+                        print(f"  ⚠️ Cierre fallido (TP): {res_cierre}")
+                        enviar_aviso(f"⚠️ ERROR CIERRE {SYMBOL}\nNo se pudo cerrar posición en Binance (TP).\nPosición queda ABIERTA — reintentando próximo ciclo.\nError: {res_cierre}")
+                        nuevas_lineas.append(linea)
+                        continue
                     partes[5] = "TP"
                     registrar_tp(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
                     enviar_aviso(f"✅ TP LATERAL {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nGanancia: +{round(cambio,2)}%")
@@ -139,6 +145,12 @@ def revisar_cierres(precio_actual):
                     print(f"  ✅ TP: ${precio_entrada} → ${precio_actual}")
 
                 elif precio_actual <= sl_efectivo:
+                    res_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op)
+                    if "❌" in res_cierre:
+                        print(f"  ⚠️ Cierre fallido (SL): {res_cierre}")
+                        enviar_aviso(f"⚠️ ERROR CIERRE {SYMBOL}\nNo se pudo cerrar posición en Binance (SL).\nPosición queda ABIERTA — reintentando próximo ciclo.\nError: {res_cierre}")
+                        nuevas_lineas.append(linea)
+                        continue
                     if be_activo and sl_efectivo >= be_price:
                         partes[5] = "BE"
                         registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)

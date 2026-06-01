@@ -78,8 +78,12 @@ def _precio_ticker(symbol):
 def _simular_fill(symbol, side, quote_qty=None, base_qty=None):
     precio = _precio_ticker(symbol)
     if side == "BUY":
-        qty  = round(quote_qty / precio, LOT_SIZE.get(symbol, 6))
-        usdt = quote_qty
+        if quote_qty is not None:
+            qty  = round(quote_qty / precio, LOT_SIZE.get(symbol, 6))
+            usdt = quote_qty
+        else:
+            qty  = base_qty
+            usdt = round(base_qty * precio, 2)
     else:
         qty  = base_qty
         usdt = round(base_qty * precio, 2)
@@ -209,3 +213,50 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
         lock_fd.close()
+
+def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op):
+    """
+    Envía la orden de cierre a Binance para una posición abierta.
+    ALCISTA/LATERAL → SELL base_qty (vende la crypto comprada)
+    BAJISTA         → BUY  base_qty (recompra la crypto vendida)
+    No actualiza billetera: eso sigue siendo responsabilidad de registrar_tp/sl.
+    """
+    symbol    = moneda + "USDT"
+    modo      = _leer_modo()
+    simulador = (modo == "SIMULADOR")
+
+    cantidad = _redondear_cantidad(symbol, monto_op / precio_entrada)
+    if cantidad <= 0:
+        return f"❌ Cantidad de cierre inválida: {cantidad}"
+
+    try:
+        if tipo_trade in ("ALCISTA", "LATERAL"):
+            if simulador:
+                respuesta = _simular_fill(symbol, "SELL", base_qty=cantidad)
+            else:
+                respuesta = _orden_mercado(symbol, "SELL", base_qty=cantidad)
+            tag      = "[SIM] " if simulador else ""
+            qty_ej   = float(respuesta.get("executedQty", cantidad))
+            usdt_ej  = float(respuesta.get("cummulativeQuoteQty", 0))
+            precio_r = round(usdt_ej / qty_ej, 4) if qty_ej > 0 else precio_entrada
+            return f"✅ {tag}CIERRE LONG {moneda}: vendido {qty_ej} a ${precio_r}"
+
+        elif tipo_trade == "BAJISTA":
+            if simulador:
+                respuesta = _simular_fill(symbol, "BUY", base_qty=cantidad)
+            else:
+                respuesta = _orden_mercado(symbol, "BUY", base_qty=cantidad)
+            tag      = "[SIM] " if simulador else ""
+            qty_ej   = float(respuesta.get("executedQty", cantidad))
+            usdt_ej  = float(respuesta.get("cummulativeQuoteQty", 0))
+            precio_r = round(usdt_ej / qty_ej, 4) if qty_ej > 0 else precio_entrada
+            return f"✅ {tag}CIERRE SHORT {moneda}: recomprado {qty_ej} a ${precio_r}"
+
+        else:
+            return f"❌ tipo_trade desconocido para cierre: {tipo_trade}"
+
+    except urllib.error.HTTPError as e:
+        cuerpo = e.read().decode()
+        return f"❌ Binance {e.code} en cierre {moneda}: {cuerpo}"
+    except Exception as e:
+        return f"❌ ERROR cierre Binance {moneda}: {e}"

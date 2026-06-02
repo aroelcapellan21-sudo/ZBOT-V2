@@ -24,7 +24,7 @@ import urllib.error
 from gestor_billetera import registrar_historial_billetera
 
 BILLETERA            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
-LOCK_FILE            = os.path.expanduser("~/bot-padre-v2/signals/ejecutor.lock")
+LOCK_FILE            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json.lock")
 KEYS_FILE            = os.path.expanduser("~/bot-padre-v2/keys.env")
 MODO_FILE            = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
 MONTO_MINIMO_BINANCE = 5.0
@@ -202,8 +202,10 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
             return f"❌ Tipo desconocido: {tipo}"
 
         try:
-            with open(BILLETERA, "w") as f:
+            tmp = BILLETERA + ".tmp"
+            with open(tmp, "w") as f:
                 json.dump(billetera, f, indent=2)
+            os.replace(tmp, BILLETERA)
             registrar_historial_billetera(billetera, tipo)
         except Exception as e:
             return f"❌ ERROR CRITICO guardando billetera: {e}"

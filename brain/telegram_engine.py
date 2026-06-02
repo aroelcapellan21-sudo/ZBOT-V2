@@ -339,8 +339,8 @@ def obtener_resumen_personal():
     trailing = stats["bot"]["trailing"]
     abiertas = stats["bot"]["abiertas"]
 
-    total_bot = tp + sl
-    wr_bot    = round((tp / total_bot * 100), 1) if total_bot > 0 else 0.0
+    total_bot = tp + sl + be + trailing
+    wr_bot    = round(((tp + be + trailing) / total_bot * 100), 1) if total_bot > 0 else 0.0
 
     man_gan   = stats["manual"]["ganadas"]
     man_per   = stats["manual"]["perdidas"]
@@ -822,11 +822,11 @@ def obtener_estadisticas():
         stats = {}
         for l in lineas[1:]:
             p = l.strip().split(",")
-            if len(p) >= 6 and p[5] in ("TP","SL","MANUAL_WIN","MANUAL_LOSS","TRAILING_SL"):
+            if len(p) >= 6 and p[5] in ("TP","SL","MANUAL_WIN","MANUAL_LOSS","TRAILING_SL","BE"):
                 sym = p[2]
                 if sym not in stats:
                     stats[sym] = {"tp": 0, "sl": 0}
-                if p[5] in ("TP", "MANUAL_WIN"):
+                if p[5] in ("TP", "MANUAL_WIN", "TRAILING_SL", "BE"):
                     stats[sym]["tp"] += 1
                 else:
                     stats[sym]["sl"] += 1

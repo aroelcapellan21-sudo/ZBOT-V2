@@ -148,22 +148,16 @@ def verificar_riesgo(capital_actual=None):
 
 def esta_bloqueado():
     """
-    FIX: Una sola llamada a cargar_billetera().
-    Capital pasado como parametro a verificar_riesgo().
+    Verifica el capital actual contra los límites en cada llamada.
+    Los flags cacheados no son suficientes: si el capital cae durante el día
+    el guardián no lo detectaría hasta el día siguiente.
     """
     try:
         capital_actual = cargar_billetera()
     except RuntimeError as e:
         print(f"[GUARDIAN] {e}")
-        return True  # Si no hay billetera, bloquear por seguridad
-
-    estado = cargar_estado_riesgo(capital_actual)
-    hoy    = datetime.now().strftime("%Y-%m-%d")
-
-    if estado["fecha"] != hoy:
-        return not verificar_riesgo(capital_actual)
-
-    return estado.get("bloqueado", False) or estado.get("bloqueado_dia", False)
+        return True  # Sin billetera, bloquear por seguridad
+    return not verificar_riesgo(capital_actual)
 
 if __name__ == "__main__":
     if verificar_riesgo():

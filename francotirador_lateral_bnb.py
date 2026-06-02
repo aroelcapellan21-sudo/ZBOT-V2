@@ -7,6 +7,7 @@
 # =========================================
 
 import os
+import fcntl
 import json
 from datetime import datetime
 from engine import enviar_aviso
@@ -46,7 +47,8 @@ BE_UMBRAL       = 0.8
 BE_COMISION     = 0.2
 
 BILLETERA = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
-AUDITORIA = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
+AUDITORIA      = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
+AUDITORIA_LOCK = AUDITORIA + ".lock"
 
 def cargar_capital():
     try:
@@ -84,11 +86,14 @@ def registrar_operacion(accion, precio, rsi, monto):
         print(f"  [AUDITORIA] ERROR registrando operacion: {e}")
 
 def revisar_cierres(precio_actual):
+    _lk = open(AUDITORIA_LOCK, "w")
+    fcntl.flock(_lk, fcntl.LOCK_EX)
     try:
         with open(AUDITORIA, "r") as f:
             lineas = f.readlines()
     except Exception as e:
         print(f"  [AUDITORIA] Error leyendo: {e}")
+        _lk.close()
         return
 
     header        = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto\n"
@@ -185,10 +190,13 @@ def revisar_cierres(precio_actual):
             nuevas_lineas.append(linea)
 
     try:
-        with open(AUDITORIA, "w") as f:
+        _tmp = AUDITORIA + ".tmp"
+        with open(_tmp, "w") as f:
             f.writelines(nuevas_lineas)
+        os.replace(_tmp, AUDITORIA)
     except Exception as e:
         print(f"  [AUDITORIA] ERROR CRITICO guardando: {e}")
+    _lk.close()
 
 def evaluar():
     print(f"[FRANCOTIRADOR LATERAL BNB] Evaluando {SYMBOL}...")

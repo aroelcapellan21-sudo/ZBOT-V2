@@ -16,6 +16,7 @@ import urllib.request
 import urllib.parse
 import json
 import os
+import fcntl
 import threading
 import time
 from datetime import datetime, date
@@ -33,6 +34,7 @@ BITACORAS = {
 
 BILLETERA_PATH = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 AUDITORIA_PATH = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
+AUDITORIA_LOCK = AUDITORIA_PATH + ".lock"
 PARADA_PATH    = os.path.expanduser("~/bot-padre-v2/signals/PARADA_EMERGENCIA.txt")
 
 _monitores_activos = {}
@@ -546,6 +548,8 @@ def cerrar_operacion_manual(symbol):
         return f"⚠️ No pude obtener precio de {symbol}"
 
     try:
+        _lk = open(AUDITORIA_LOCK, "w")
+        fcntl.flock(_lk, fcntl.LOCK_EX)
         with open(AUDITORIA_PATH, "r") as f:
             lineas = f.readlines()
         header         = lineas[0]
@@ -562,8 +566,11 @@ def cerrar_operacion_manual(symbol):
                 p[5] = "MANUAL_WIN" if cambio >= 0 else "MANUAL_LOSS"
                 cerradas += 1
             nuevas.append(",".join(p) + "\n")
-        with open(AUDITORIA_PATH, "w") as f:
+        _tmp = AUDITORIA_PATH + ".tmp"
+        with open(_tmp, "w") as f:
             f.writelines(nuevas)
+        os.replace(_tmp, AUDITORIA_PATH)
+        _lk.close()
         if cerradas == 0:
             return f"⚠️ No hay operaciones abiertas de {symbol}"
         signo  = "+" if ganancia_total >= 0 else ""

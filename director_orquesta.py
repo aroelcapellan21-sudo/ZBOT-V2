@@ -13,6 +13,7 @@ import urllib.parse
 import json
 import time
 import os
+import fcntl
 from datetime import datetime
 from director_btc import dirigir as dirigir_btc
 from director_eth import dirigir as dirigir_eth
@@ -22,10 +23,101 @@ from director_avax import dirigir as dirigir_avax
 from engine import enviar_aviso
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
+from ejecutor import cerrar_posicion
+from gestor_billetera import registrar_tp, registrar_sl
 import db
 
-MONEDAS   = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
-MODO_FILE = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
+MONEDAS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
+MODO_FILE      = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
+AUDITORIA      = os.path.expanduser("~/bot-padre-v2/auditoria.csv")
+AUDITORIA_LOCK = AUDITORIA + ".lock"
+
+def cerrar_huerfanas(fase_nueva):
+    """
+    Al cambiar de fase, cierra en Binance toda posicion ABIERTA cuyo tipo
+    no coincide con la nueva fase. Evita que queden sin guardian de TP/SL.
+    """
+    _lk = open(AUDITORIA_LOCK, "w")
+    fcntl.flock(_lk, fcntl.LOCK_EX)
+    try:
+        with open(AUDITORIA, "r") as f:
+            lineas = f.readlines()
+    except Exception as e:
+        print(f"  [HUERFANAS] Error leyendo auditoria: {e}")
+        _lk.close()
+        return
+
+    header   = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto\n"
+    nuevas   = [header]
+    cerradas = 0
+
+    for linea in lineas[1:]:
+        partes = linea.strip().split(",")
+        if len(partes) < 7 or partes[5] != "ABIERTA" or partes[1] == fase_nueva:
+            nuevas.append(linea)
+            continue
+
+        accion = partes[1]
+        symbol = partes[2]
+        try:
+            precio_entrada = float(partes[3])
+            monto_op       = float(partes[6])
+            moneda         = symbol.replace("USDT", "")
+
+            cierres       = fetch_velas(symbol, limite=5)
+            precio_actual = cierres[-1] if cierres else precio_entrada
+
+            res = cerrar_posicion(moneda, accion, precio_entrada, monto_op)
+            if "❌" in res:
+                print(f"  [HUERFANAS] Cierre fallido {symbol} {accion}: {res}")
+                enviar_aviso(
+                    f"⚠️ ZOMBIE NO CERRADA — {symbol} ({accion})\n"
+                    f"Error al cerrar en Binance: {res}\n"
+                    f"Cerrar manualmente con /cerrar {symbol}."
+                )
+                nuevas.append(linea)
+                continue
+
+            ganando = (precio_actual < precio_entrada) if accion == "BAJISTA" \
+                      else (precio_actual > precio_entrada)
+            if ganando:
+                registrar_tp(precio_entrada, precio_actual, monto_op, moneda, accion)
+            else:
+                registrar_sl(precio_entrada, precio_actual, monto_op, moneda, accion)
+
+            cambio = ((precio_entrada - precio_actual) / precio_entrada * 100) if accion == "BAJISTA" \
+                     else ((precio_actual - precio_entrada) / precio_entrada * 100)
+            partes[5] = "FASE_CAMBIO"
+            cerradas += 1
+            enviar_aviso(
+                f"🔄 CIERRE POR CAMBIO DE FASE\n"
+                f"{symbol} ({accion})\n"
+                f"Entrada: ${precio_entrada} → Salida: ${precio_actual}\n"
+                f"Resultado: {'+' if cambio >= 0 else ''}{round(cambio, 2)}%\n"
+                f"Nueva fase: {fase_nueva}"
+            )
+            print(f"  [HUERFANAS] Cerrada {symbol} {accion} → {round(cambio, 2)}%")
+        except Exception as e:
+            print(f"  [HUERFANAS] Error cerrando {symbol} {accion}: {e}")
+            nuevas.append(linea)
+            continue
+
+        nuevas.append(",".join(partes) + "\n")
+
+    try:
+        _tmp = AUDITORIA + ".tmp"
+        with open(_tmp, "w") as f:
+            f.writelines(nuevas)
+        os.replace(_tmp, AUDITORIA)
+    except Exception as e:
+        print(f"  [HUERFANAS] ERROR CRITICO guardando auditoria: {e}")
+    _lk.close()
+
+    if cerradas > 0:
+        registrar_evento(
+            f"ORQUESTA: {cerradas} posicion(es) zombie cerradas al pasar a fase {fase_nueva}"
+        )
+
 
 def _leer_modo():
     try:
@@ -93,6 +185,7 @@ def ejecutar_ciclo():
     )
 
     if fase_anterior is not None and fase_global != fase_anterior:
+        cerrar_huerfanas(fase_global)
         if fase_global == "BAJISTA":
             mensaje = (
                 f"🔻 DIRECTOR DE ORQUESTA\n"

@@ -22,7 +22,7 @@ def analizar_historial():
             reader = csv.DictReader(f)
             vistos = set()
             for row in reader:
-                if row.get("estado") in ("TP", "SL", "TRAILING_SL"):
+                if row.get("estado") in ("TP", "SL", "TRAILING_SL", "BE"):
                     clave = (row.get("timestamp", ""), row.get("symbol", ""))
                     if clave in vistos:
                         continue
@@ -35,7 +35,7 @@ def analizar_historial():
                             "estado":    row["estado"],
                             "hora":      int(row["timestamp"].split(" ")[1].split(":")[0]),
                             "dia":       datetime.strptime(row["timestamp"][:10], "%Y-%m-%d").weekday(),
-                            "gano":      row["estado"] in ("TP", "TRAILING_SL"),
+                            "gano":      row["estado"] in ("TP", "TRAILING_SL", "BE"),
                         })
                     except Exception as e:
                         print(f"[MEMORIA] Error procesando fila: {e}")

@@ -48,7 +48,7 @@ def contar_operaciones_hoy():
             partes = linea.strip().split(",")
             if (len(partes) >= 6
                     and partes[0].startswith(hoy)
-                    and partes[5] in ("TP", "SL", "TRAILING_SL")):
+                    and partes[5] in ("TP", "SL", "TRAILING_SL", "BE")):
                 clave = (partes[0], partes[2])  # (timestamp, symbol)
                 if clave not in vistos:
                     vistos.add(clave)
@@ -66,7 +66,7 @@ def contar_perdidas_consecutivas():
         ops = []
         for linea in lineas[1:]:
             partes = linea.strip().split(",")
-            if len(partes) >= 6 and partes[5] in ("TP", "SL", "TRAILING_SL") and partes[0].startswith(hoy):
+            if len(partes) >= 6 and partes[5] in ("TP", "SL", "TRAILING_SL", "BE") and partes[0].startswith(hoy):
                 ops.append(partes[5])
         if not ops:
             return 0

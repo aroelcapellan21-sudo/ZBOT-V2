@@ -94,7 +94,7 @@ def cargar_token():
     try:
         with open(ruta, "r") as f:
             for linea in f:
-                if linea.startswith("TELEGRAM_TOKEN="):
+                if linea.startswith("TELEGRAM_BOT_TOKEN="):
                     return linea.strip().split("=", 1)[1]
     except Exception as e:
         print(f"[TELEGRAM] Error cargando token: {e}")

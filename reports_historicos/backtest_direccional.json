@@ -1,0 +1,155 @@
+{
+  "timestamp": "2026-06-10 18:09:28",
+  "metodologia": "4h 2021->hoy, reglas francotiradores (RSI+EMA20/50, salida TP/SL close-based, 1 posicion a la vez). Net en puntos porcentuales (pp). Fee round-trip 0.2pp/trade.",
+  "nota": "Los SHORT (bajista) son INEJECUTABLES en cuenta SPOT. El net bajista solo seria realizable con Futuros USDT-M. Ver gestor_bajistas.py.",
+  "por_activo": {
+    "BTCUSDT": {
+      "velas": 11922,
+      "sl": 3.5,
+      "tp": 6.0,
+      "ALCISTA": {
+        "trades": 201,
+        "wins": 83,
+        "losses": 118,
+        "wr": 41.3,
+        "pf": 1.21,
+        "net_pp": 85.0,
+        "net_pp_con_fees": 44.8
+      },
+      "BAJISTA": {
+        "trades": 218,
+        "wins": 81,
+        "losses": 137,
+        "wr": 37.2,
+        "pf": 1.01,
+        "net_pp": 6.5,
+        "net_pp_con_fees": -37.1
+      }
+    },
+    "ETHUSDT": {
+      "velas": 11922,
+      "sl": 3.5,
+      "tp": 6.0,
+      "ALCISTA": {
+        "trades": 289,
+        "wins": 123,
+        "losses": 166,
+        "wr": 42.6,
+        "pf": 1.27,
+        "net_pp": 157.0,
+        "net_pp_con_fees": 99.2
+      },
+      "BAJISTA": {
+        "trades": 313,
+        "wins": 118,
+        "losses": 195,
+        "wr": 37.7,
+        "pf": 1.04,
+        "net_pp": 25.5,
+        "net_pp_con_fees": -37.1
+      }
+    },
+    "SOLUSDT": {
+      "velas": 11922,
+      "sl": 4.0,
+      "tp": 7.0,
+      "ALCISTA": {
+        "trades": 418,
+        "wins": 186,
+        "losses": 232,
+        "wr": 44.5,
+        "pf": 1.4,
+        "net_pp": 374.0,
+        "net_pp_con_fees": 290.4
+      },
+      "BAJISTA": {
+        "trades": 386,
+        "wins": 149,
+        "losses": 237,
+        "wr": 38.6,
+        "pf": 1.1,
+        "net_pp": 95.0,
+        "net_pp_con_fees": 17.8
+      }
+    },
+    "BNBUSDT": {
+      "velas": 11922,
+      "sl": 4.0,
+      "tp": 7.0,
+      "ALCISTA": {
+        "trades": 224,
+        "wins": 95,
+        "losses": 129,
+        "wr": 42.4,
+        "pf": 1.29,
+        "net_pp": 149.0,
+        "net_pp_con_fees": 104.2
+      },
+      "BAJISTA": {
+        "trades": 228,
+        "wins": 76,
+        "losses": 152,
+        "wr": 33.3,
+        "pf": 0.88,
+        "net_pp": -76.0,
+        "net_pp_con_fees": -121.6
+      }
+    },
+    "AVAXUSDT": {
+      "velas": 11922,
+      "sl": 4.0,
+      "tp": 7.0,
+      "ALCISTA": {
+        "trades": 390,
+        "wins": 165,
+        "losses": 225,
+        "wr": 42.3,
+        "pf": 1.28,
+        "net_pp": 255.0,
+        "net_pp_con_fees": 177.0
+      },
+      "BAJISTA": {
+        "trades": 425,
+        "wins": 181,
+        "losses": 244,
+        "wr": 42.6,
+        "pf": 1.3,
+        "net_pp": 291.0,
+        "net_pp_con_fees": 206.0
+      }
+    }
+  },
+  "agregado": {
+    "ALCISTA": {
+      "trades": 1522,
+      "wr": 42.8,
+      "net_pp": 1020.0,
+      "net_pp_con_fees": 715.6
+    },
+    "BAJISTA": {
+      "trades": 1570,
+      "wr": 38.5,
+      "net_pp": 342.0,
+      "net_pp_con_fees": 28.0
+    }
+  },
+  "antes_despues": {
+    "antes_alc_y_baj": {
+      "trades": 3092,
+      "wr": 40.7,
+      "net_pp_bruto": 1362.0,
+      "net_pp_con_fees": 743.6
+    },
+    "despues_solo_alc": {
+      "trades": 1522,
+      "wr": 42.8,
+      "net_pp_bruto": 1020.0,
+      "net_pp_con_fees": 715.6
+    },
+    "delta": {
+      "wr_pp": 2.1,
+      "net_pp_bruto": -342.0,
+      "net_pp_con_fees": -28.0
+    }
+  }
+}

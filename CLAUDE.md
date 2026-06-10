@@ -81,6 +81,7 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 - Gate central: `gestor_bajistas.py` → `bajistas_activos()`. Cada `evaluar()` bajista lo consulta y retorna temprano si está desactivado.
 - **Reactivación automática:** el gate lee el saldo de Futuros USDT-M de Binance (`/fapi/v2/balance`). Si `availableBalance` USDT ≥ 5.0, los bajistas vuelven solos. Cachea 5 min; ante error de API → desactivado (seguro). Estado en `signals/estado_bajistas.json`.
 - **Pendiente:** `ejecutor.py:cerrar_posicion` cierra shorts con BUY spot. Para shorts reales en futuros hay que reescribir el ejecutor — reactivar el gate no basta.
+- **Evidencia (backtest 5.4 años, 4h):** `backtest_direccional.py` → `reports_historicos/backtest_direccional.json`. Desactivar bajistas sube WR +2.1 pp (40.7%→42.8%) y cuesta ~28 pp de PnL en 5.4 años descontando fees (≈cero). El PnL bajista bruto (+342 pp) descansa casi entero en AVAX; BTC/ETH/BNB bajistas son negativos tras fees. Si se reactivan en futuros, hacerlo **selectivo por activo**, no los 5 en bloque.
 
 ## Constitución (reglas irrompibles)
 - El capital base nunca se retira — solo ganancias netas

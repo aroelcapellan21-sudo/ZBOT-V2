@@ -60,7 +60,12 @@ Cada módulo corre en su propia sesión `screen`. Total esperado: 29 sesiones.
 
 Para verificar caídas: `python3 monitor_screens.py`
 
-**IMPORTANTE al reiniciar un screen:**
+Para iniciar/reiniciar todos los procesos: `bash iniciar_bots.sh`
+- Si el screen no existe → lo crea
+- Si el screen existe y está vivo → lo saltea (`[SKIP]`)
+- Si el screen existe pero está Dead → hace `screen -wipe` y lo reinicia (`[DEAD]` → `[OK]`)
+
+**IMPORTANTE al reiniciar un screen manualmente:**
 `screen -S nombre -X quit` mata la sesión pero NO el proceso Python hijo.
 Siempre matar el proceso también: `kill $(pgrep -f archivo.py)`
 De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram.

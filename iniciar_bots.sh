@@ -23,7 +23,14 @@ iniciar() {
     local comando=$3
 
     if screen -list | grep -q "\.${nombre}[[:space:]]"; then
-        echo "[SKIP] $nombre ya está corriendo"
+        if screen -list | grep "\.${nombre}[[:space:]]" | grep -q "(Dead"; then
+            echo "[DEAD] $nombre estaba muerto — limpiando y reiniciando"
+            screen -wipe "$nombre" 2>/dev/null
+            screen -dmS "$nombre" bash -c "cd $directorio && $comando"
+            echo "[OK]   $nombre reiniciado"
+        else
+            echo "[SKIP] $nombre ya está corriendo"
+        fi
     else
         screen -dmS "$nombre" bash -c "cd $directorio && $comando"
         echo "[OK]   $nombre iniciado"

@@ -34,3 +34,7 @@ zbot_*.zip
 zip_*.zip
 *.zip
 *.tar.gz
+
+# Lock files y binarios descargados
+*.lock
+*.deb

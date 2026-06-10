@@ -26,6 +26,7 @@ from memoria.memoria import registrar_evento
 from utils import fetch_velas, calcular_rsi, calcular_ema, aplicar_filtro_estadistico, puede_operar_memoria
 from ejecutor import ejecutar_operacion, cerrar_posicion
 from memoria_propia import actualizar_memoria
+from gestor_bajistas import bajistas_activos
 
 SYMBOL             = "BNBUSDT"
 MONEDA             = "BNB"
@@ -199,6 +200,10 @@ def revisar_cierres(precio_actual):
 
 def evaluar():
     print(f"[FRANCOTIRADOR BAJISTA BNB] Evaluando {SYMBOL}...")
+
+    if not bajistas_activos():
+        print("  ⏸️ Bajistas desactivados (sin saldo en Futuros USDT-M). Solo ALCISTA/LATERAL.")
+        return
     cierres = fetch_velas(SYMBOL, limite=210)
     if not cierres:
         print("[ERROR] Sin datos.")

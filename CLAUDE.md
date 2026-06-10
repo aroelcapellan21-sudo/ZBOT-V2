@@ -75,6 +75,13 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 - Para cambiar a REAL: editar `modo.json` y `config/modo.txt`
 - **No cambiar a REAL sin autorización explícita de Ariel**
 
+## Dirección de operación — SPOT solo-LONG (desde jun 2026)
+- El bot opera **solo ALCISTA y LATERAL**. Los 5 francotiradores bajistas están desactivados.
+- Razón: hacer SHORT es imposible en cuenta SPOT. En SIMULADOR generaba balances de cripto negativos (causa raíz de los negativos en billetera).
+- Gate central: `gestor_bajistas.py` → `bajistas_activos()`. Cada `evaluar()` bajista lo consulta y retorna temprano si está desactivado.
+- **Reactivación automática:** el gate lee el saldo de Futuros USDT-M de Binance (`/fapi/v2/balance`). Si `availableBalance` USDT ≥ 5.0, los bajistas vuelven solos. Cachea 5 min; ante error de API → desactivado (seguro). Estado en `signals/estado_bajistas.json`.
+- **Pendiente:** `ejecutor.py:cerrar_posicion` cierra shorts con BUY spot. Para shorts reales en futuros hay que reescribir el ejecutor — reactivar el gate no basta.
+
 ## Constitución (reglas irrompibles)
 - El capital base nunca se retira — solo ganancias netas
 - La inacción es victoria si el capital está en riesgo

@@ -19,6 +19,7 @@ import os
 import fcntl
 import threading
 import time
+import csv
 from datetime import datetime, date
 
 ADMIN_YAYO  = 6578945006
@@ -844,6 +845,34 @@ def obtener_estadisticas():
     except Exception as e:
         return f"⚠️ Error: {e}"
 
+INTEL_CSV = os.path.join(os.path.dirname(__file__), "..", "data_inteligencia_pura.csv")
+
+def obtener_noticias_intel():
+    try:
+        if not os.path.isfile(INTEL_CSV) or os.stat(INTEL_CSV).st_size == 0:
+            return "📋 La Matrix está vacía."
+        mensaje = "📋 RESUMEN DE INTELIGENCIA\n\n"
+        with open(INTEL_CSV, mode='r') as f:
+            reader = csv.reader(f)
+            lineas = [l for l in list(reader) if len(l) >= 3 and "fecha" not in l[0]]
+        for fila in lineas[-5:]:
+            fecha = fila[0].split(" ")[1] if " " in fila[0] else fila[0]
+            cat   = fila[2].replace("_", " ")
+            nota  = fila[-1].replace("*", "").replace("_", "").replace('"', "")
+            mensaje += f"🕒 {fecha} | {cat}\n> {nota}\n\n"
+        return mensaje
+    except Exception as e:
+        return f"❌ Error leyendo inteligencia: {e}"
+
+def guardar_entrada_movil(texto, chat_id):
+    fecha = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    try:
+        with open(INTEL_CSV, mode='a', newline='') as f:
+            csv.writer(f).writerow([fecha, str(chat_id), "MOVIL_ENTRY", texto])
+        enviar_mensaje(chat_id, "✅ Guardado en inteligencia.")
+    except Exception as e:
+        enviar_mensaje(chat_id, f"❌ Error guardando: {e}")
+
 def procesar_comando(mensaje, chat_id):
     if chat_id not in ADMIN_IDS:
         enviar_mensaje(chat_id, "⛔ No autorizado.")
@@ -923,6 +952,8 @@ def procesar_comando(mensaje, chat_id):
         tipo   = partes[1] if len(partes) > 1 else "eventos"
         emoji, inicial, nombre, contenido = obtener_bitacora(tipo)
         enviar_mensaje(chat_id, f"{emoji} <b>Bitácora {inicial} - {nombre}</b>\n\n{contenido}")
+    elif mensaje == "/noticias":
+        enviar_mensaje(chat_id, obtener_noticias_intel())
     elif mensaje == "/ayuda":
         enviar_mensaje(chat_id,
             "📋 <b>COMANDOS DISPONIBLES</b>\n\n"
@@ -948,6 +979,8 @@ def procesar_comando(mensaje, chat_id):
             "/ping — Verificar que responde\n"
             "/ayuda — Esta lista"
         )
+    elif not mensaje.startswith("/"):
+        guardar_entrada_movil(mensaje, chat_id)
     else:
         enviar_mensaje(chat_id, "❓ No reconozco ese comando.\nEscribe /ayuda para ver qué puedo hacer.")
 

@@ -177,10 +177,11 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
             resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Compra {moneda} a ${precio_real} por ${ejecutado_usdt:.2f} USDT"
 
         elif tipo == "VENTA":
-            cantidad_a_vender   = _redondear_cantidad(symbol, monto / precio)
-            cantidad_disponible = billetera.get(moneda, 0)
-            if cantidad_disponible < cantidad_a_vender:
-                return f"❌ RECHAZADO: No tienes suficiente {moneda} (necesita {cantidad_a_vender}, tiene {cantidad_disponible:.6f})"
+            cantidad_a_vender = _redondear_cantidad(symbol, monto / precio)
+            if not simulador:
+                cantidad_disponible = billetera.get(moneda, 0)
+                if cantidad_disponible < cantidad_a_vender:
+                    return f"❌ RECHAZADO: No tienes suficiente {moneda} (necesita {cantidad_a_vender}, tiene {cantidad_disponible:.6f})"
 
             try:
                 if simulador:

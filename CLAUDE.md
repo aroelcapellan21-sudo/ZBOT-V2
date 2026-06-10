@@ -60,6 +60,11 @@ Cada módulo corre en su propia sesión `screen`. Total esperado: 29 sesiones.
 
 Para verificar caídas: `python3 monitor_screens.py`
 
+**IMPORTANTE al reiniciar un screen:**
+`screen -S nombre -X quit` mata la sesión pero NO el proceso Python hijo.
+Siempre matar el proceso también: `kill $(pgrep -f archivo.py)`
+De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram.
+
 ## Modo de operación
 - Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"1h","sleep_segundos":60}`
 - Para cambiar a REAL: editar `modo.json` y `config/modo.txt`

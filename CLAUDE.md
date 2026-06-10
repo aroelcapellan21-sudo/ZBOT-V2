@@ -31,11 +31,34 @@ main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca
 ```
 
 ## Procesos en pantalla (screen)
-Cada módulo corre en su propia sesión `screen`. Los principales:
+Cada módulo corre en su propia sesión `screen`. Total esperado: 29 sesiones.
+
+**bot-padre-v2:**
 - `v2_main` → `main.py`
 - `z_asistente` → `asistente.py` (Flask en :5050)
-- `z_tunnel` → cloudflared (túnel público)
+- `z_tunnel` → `tunnel_asistente.py` (cloudflared)
+- `z_dashboard_v2` → `z_webserver_v2.py`
+- `z_diagnostico` → `auto_diagnostico.py`
 - `z_precision`, `z_volumen`, `z_fugas`, `z_fuerza`, `z_liquidez`, `z_velas`, `z_heatmap`, `z_correlation`
+- `z_radar` → `radar_noticias.py`
+- `z_intel` → `servidor_intel.py`
+
+**zbot/radar:**
+- `z_auditor` → `auditor_supremo.py`
+- `z_webserver` → `z_webserver.py`
+- `z_executor` → `radar_executor.py`
+- `z_squeeze` → `squeeze_detector.py`
+- `z_macd` → `macd_engine.py`
+- `z_rsi_adv` → `rsi_advanced.py`
+- `z_vol_engine` → `volumen_engine.py`
+- `z_sentiment` → `z_sentiment.py`
+- `z_orderblocks` → `orderblock_engine.py`
+- `z_timeframes` → `timeframe_engine.py`
+- `z_ignition` → `ignition.py`
+- `z_heatmap_radar` → `heatmap.py`
+- `z_wicks` → `wick_analyzer.py`
+
+Para verificar caídas: `python3 monitor_screens.py`
 
 ## Modo de operación
 - Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"1h","sleep_segundos":60}`

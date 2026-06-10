@@ -45,6 +45,22 @@ iniciar z_liquidez   "$DIR" "python3 liquidez_libro.py"
 iniciar z_heatmap    "$DIR" "python3 heatmap.py"
 iniciar z_correlation "$DIR" "python3 correlation.py"
 
+# --- Inteligencia y análisis técnico (bot-padre-v2) ---
+iniciar z_radar      "$DIR" "python3 radar_noticias.py"
+iniciar z_intel      "$DIR" "python3 servidor_intel.py"
+
+# --- Motores de análisis (zbot/radar) ---
+iniciar z_squeeze      ~/zbot/radar "python3 squeeze_detector.py"
+iniciar z_macd         ~/zbot/radar "python3 macd_engine.py"
+iniciar z_rsi_adv      ~/zbot/radar "python3 rsi_advanced.py"
+iniciar z_vol_engine   ~/zbot/radar "python3 volumen_engine.py"
+iniciar z_sentiment    ~/zbot/radar "python3 z_sentiment.py"
+iniciar z_orderblocks  ~/zbot/radar "python3 orderblock_engine.py"
+iniciar z_timeframes   ~/zbot/radar "python3 timeframe_engine.py"
+iniciar z_ignition     ~/zbot/radar "python3 ignition.py"
+iniciar z_heatmap_radar ~/zbot/radar "python3 heatmap.py"
+iniciar z_wicks        ~/zbot/radar "python3 wick_analyzer.py"
+
 # --- Radar (zbot) ---
 iniciar z_auditor    ~/zbot/radar "python3 auditor_supremo.py"
 iniciar z_webserver  ~/zbot/radar "python3 z_webserver.py"

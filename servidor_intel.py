@@ -4,8 +4,8 @@ import csv
 from datetime import datetime
 from dotenv import load_dotenv
 
-load_dotenv()
-TOKEN = os.getenv("TELEGRAM_TOKEN_INTEL")
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), "keys.env"))
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
 if not TOKEN:
     print("❌ ERROR: No se encontró el TOKEN en el .env")

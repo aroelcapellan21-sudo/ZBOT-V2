@@ -106,5 +106,10 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)
-- Token en `keys.env` como `TELEGRAM_BOT_TOKEN`
-- El bot responde comandos vía polling en `brain/telegram_engine.py`
+- Token en `keys.env` como `TELEGRAM_BOT_TOKEN` — **ese es el nombre exacto de la clave, todos los módulos deben leerlo así**.
+- El bot responde comandos vía polling en `brain/telegram_engine.py`.
+- **Dos rutas de salida a Telegram, no confundir:**
+  - `brain/telegram_engine.py` → polling de comandos y respuestas (`/status`, etc.).
+  - `engine.py:enviar_aviso()` → **avisos de trades** (entradas, TP, SL, errores de cierre). Lo usan los 15 francotiradores y `director_orquesta`.
+- **Bug histórico (jun 2026):** `engine.cargar_token()` buscaba `TELEGRAM_TOKEN=` (clave inexistente) en vez de `TELEGRAM_BOT_TOKEN=`, así que los avisos de trades nunca salían — se abrían posiciones sin notificación. El polling sí funcionaba porque leía la clave correcta. Corregido.
+- **Log de fallos:** `engine.enviar_aviso()` registra cualquier fallo de envío en `memoria/telegram.log` (token ausente, rechazo de la API con `ok:false`, o excepción de red). Antes solo se imprimían al stdout del screen y se perdían. Si no llega un aviso, revisar **primero** ese archivo. Si está vacío, el envío salió bien y el problema es del lado de Telegram/cliente.

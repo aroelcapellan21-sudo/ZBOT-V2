@@ -104,6 +104,24 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 - Cambios en francotiradores requieren backtest previo con umbral PF ≥ 1.6
 - Los 15 francotiradores tienen parámetros validados por backtest — no cambiar sin evidencia
 
+## Gestión de salidas vs gates de entrada (hallazgo jun 2026 — NO cambiar sin re-decidir)
+- En `evaluar()` de los 15 francotiradores, `revisar_cierres()` (que evalúa SL/TP de
+  posiciones abiertas) se llama **después** de los 6 gates de entrada (guardian, termómetro,
+  spread, horario, límite diario, eventos). Si cualquiera hace `return`, el SL/TP **no se
+  evalúa** ese ciclo. En concreto, fuera de la ventana 4-21h (UTC-4) las posiciones quedan
+  **hasta 7h sin stop activo**.
+- Se evaluó moverlo antes de los gates. **Backtest (`backtest_gate_salida.py`, 1h 2023→hoy,
+  5 laterales, ~30k velas, → `reports_historicos/backtest_gate_salida.json`):**
+  - **FIXED** (gestionar salidas siempre): **−44.3 pp** con fees en 3.4 años vs el actual.
+  - **SOLO_SL** (SL siempre 24h, TP solo en horario): **−10.6 pp** con fees (≈−3 pp/año).
+  - Causa: no mirar de noche deja que trades que tocan SL reboten (mercado mean-reverting);
+    corregirlo realiza más pérdidas y añade fees.
+- **Decisión (Ariel, jun 2026): NO cambiar el código** — el backtest histórico no muestra
+  mejora de PnL. El matiz pendiente: el backtest 1h **no captura** la protección de cola que
+  SOLO_SL daría en vivo (el bot evalúa cada 60s; ante crash nocturno cortaría en ~1 min en
+  vez de esperar a las 4am). Si en el futuro pesa más el riesgo de cola que los ~3 pp/año,
+  reconsiderar SOLO_SL. Documentado, sin implementar.
+
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)
 - Token en `keys.env` como `TELEGRAM_BOT_TOKEN` — **ese es el nombre exacto de la clave, todos los módulos deben leerlo así**.

@@ -16,25 +16,49 @@ leer_key() {
 
 ANTHROPIC_API_KEY=$(leer_key "ANTHROPIC_API_KEY")
 
-# Inicia una sesión screen solo si no existe ya
+# ¿Ya hay un proceso python VIVO de este script lanzado desde ESTE directorio?
+# Guard de fondo: la detección por nombre de screen falla bajo cron (el socket dir
+# de screen difiere y no ve las sesiones), por eso duplicaba. Verificar el proceso
+# hijo real es robusto e independiente del entorno. El filtro por cwd evita confundir
+# scripts homónimos de otros bots (main.py de v4, heatmap.py de zbot/radar, etc.).
+proceso_activo() {
+    local dir_abs comando archivo pid cwd
+    dir_abs=$(readlink -f "$1")
+    comando=$2
+    archivo=$(echo "$comando" | grep -oE '[A-Za-z0-9_./-]+\.py' | head -1)
+    [ -z "$archivo" ] && return 1
+    archivo=$(basename "$archivo")
+    while read -r pid; do
+        [ -z "$pid" ] && continue
+        cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null)
+        [ "$cwd" = "$dir_abs" ] && return 0
+    done < <(pgrep -f "python3 .*$archivo")
+    return 1
+}
+
+# Inicia una sesión screen solo si el proceso no está ya corriendo
 iniciar() {
     local nombre=$1
     local directorio=$2
     local comando=$3
 
-    if screen -list | grep -q "\.${nombre}[[:space:]]"; then
-        if screen -list | grep "\.${nombre}[[:space:]]" | grep -q "(Dead"; then
-            echo "[DEAD] $nombre estaba muerto — limpiando y reiniciando"
-            screen -wipe "$nombre" 2>/dev/null
-            screen -dmS "$nombre" bash -c "cd $directorio && $comando"
-            echo "[OK]   $nombre reiniciado"
-        else
-            echo "[SKIP] $nombre ya está corriendo"
-        fi
-    else
-        screen -dmS "$nombre" bash -c "cd $directorio && $comando"
-        echo "[OK]   $nombre iniciado"
+    # Guard primario: proceso hijo vivo en este directorio -> no duplicar.
+    if proceso_activo "$directorio" "$comando"; then
+        echo "[SKIP] $nombre ya está corriendo (proceso vivo)"
+        return
     fi
+
+    # No hay proceso vivo. Si quedó una sesión screen huérfana o muerta con ese
+    # nombre (p.ej. screen vivo con su python ya caído, o un `-X quit` previo que
+    # dejó la sesión a medias), limpiarla antes de relanzar para no acumular.
+    if screen -list | grep -q "\.${nombre}[[:space:]]"; then
+        echo "[WIPE] $nombre: sesión sin proceso vivo — limpiando"
+        screen -S "$nombre" -X quit 2>/dev/null
+        screen -wipe >/dev/null 2>&1
+    fi
+
+    screen -dmS "$nombre" bash -c "cd $directorio && $comando"
+    echo "[OK]   $nombre iniciado"
 }
 
 echo "================================================"

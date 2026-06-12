@@ -1,6 +1,8 @@
 import subprocess
 import json
 import os
+import re
+from collections import Counter
 from datetime import datetime
 
 SCREENS_ESPERADOS = [
@@ -19,21 +21,26 @@ def verificar_screens():
     resultado = subprocess.run(["screen", "-ls"], capture_output=True, text=True)
     salida = resultado.stdout + resultado.stderr
 
-    activos = []
-    for linea in salida.splitlines():
-        for nombre in SCREENS_ESPERADOS:
-            if nombre in linea:
-                activos.append(nombre)
+    # Nombre REAL de cada sesión: lineas tipo "\t12345.nombre\t(fecha)\t(estado)".
+    # Match exacto sobre el nombre, no substring: antes "z_heatmap" matcheaba la
+    # linea de "z_heatmap_radar" y lo contaba dos veces (falso duplicado).
+    sesiones = re.findall(r"^\s*\d+\.(\S+)\s", salida, re.MULTILINE)
 
-    caidos = [s for s in SCREENS_ESPERADOS if s not in activos]
+    conteo = Counter(s for s in sesiones if s in SCREENS_ESPERADOS)
+    activos = [s for s in SCREENS_ESPERADOS if conteo.get(s, 0) >= 1]
+    caidos = [s for s in SCREENS_ESPERADOS if conteo.get(s, 0) == 0]
+    # Duplicados REALES: un nombre esperado con más de una sesión viva.
+    duplicados = {s: conteo[s] for s in SCREENS_ESPERADOS if conteo.get(s, 0) > 1}
 
     reporte = {
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "total_esperados": len(SCREENS_ESPERADOS),
         "total_activos": len(activos),
         "total_caidos": len(caidos),
+        "total_duplicados": len(duplicados),
         "activos": activos,
-        "caidos": caidos
+        "caidos": caidos,
+        "duplicados": duplicados
     }
 
     with open(REPORTE, "w") as f:
@@ -45,3 +52,5 @@ if __name__ == "__main__":
     r = verificar_screens()
     print(f"✅ Activos: {len(r['activos'])}")
     print(f"❌ Caídos: {r['caidos']}")
+    if r["duplicados"]:
+        print(f"⚠️  Duplicados: {r['duplicados']}")

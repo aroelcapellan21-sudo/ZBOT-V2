@@ -122,6 +122,23 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   vez de esperar a las 4am). Si en el futuro pesa más el riesgo de cola que los ~3 pp/año,
   reconsiderar SOLO_SL. Documentado, sin implementar.
 
+## Asimetría TP/SL en el registro de cierres (hallazgo jun 2026 — relevante para paso a real)
+- En `revisar_cierres()` de los **15 francotiradores** (alcista/bajista/lateral × 5 activos), el
+  cierre por **SL se registra al precio teórico `sl_efectivo`, NO al `precio_actual` real**:
+  `registrar_sl(precio_entrada, sl_efectivo, ...)` en las 3 ramas (BE, trailing, SL normal) y el
+  aviso siempre reporta `-STOP_LOSS%` nominal. En cambio el **TP sí usa `precio_actual`**:
+  `registrar_tp(precio_entrada, precio_actual, ...)`.
+- **Consecuencia:** el PnL contable está sesgado **al alza** por ambos lados — ganancias reales
+  (o mayores) en TP, pérdidas **topadas** al nominal en SL. En **SIMULADOR** es inocuo: el peor
+  caso de un SL queda topado en `-STOP_LOSS%` aunque el precio real haya caído mucho más (ej. un
+  gap nocturno con el monitoreo congelado fuera de la ventana 4-21h se contabiliza como -3.5% en
+  BTC, no como la caída real). En **REAL** el registro a `sl_efectivo` es contabilidad ficticia:
+  `cerrar_posicion` ejecutaría orden de mercado al precio real del gap (sin tope) pero los libros
+  anotarían -SL% → riesgo de cola sin tope **y** PnL sobreestimado.
+- **Decisión: documentado, sin implementar.** Si se implementa la mitigación SOLO_SL (ver sección
+  anterior), corregir **también** que el SL registre `precio_actual` en vez de `sl_efectivo`. No
+  tocar antes del paso a real sin re-decidir con Ariel.
+
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)
 - Token en `keys.env` como `TELEGRAM_BOT_TOKEN` — **ese es el nombre exacto de la clave, todos los módulos deben leerlo así**.

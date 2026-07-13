@@ -3,6 +3,15 @@
 ## Idioma
 Responde siempre en español.
 
+## Reportes de análisis
+Toda respuesta (análisis, investigación, conclusión — no código) que ocupe más de **15 líneas** se guarda
+automáticamente como archivo en `~/bot-padre-v2/reports/`, sin pedir permiso, y en la terminal se muestra
+**solo**: el resultado en 1 línea + la ruta del archivo. Nada más se imprime en la conversación.
+- Nombre: `YYYY-MM-DD_tema-descriptivo.md` (fecha del día, slug corto en minúsculas con guiones).
+- Contenido del archivo: el análisis completo (números, tablas, conclusiones), en Markdown.
+- Aplica siempre, sin que Ariel lo pida cada vez — incluida esta misma regla y cualquier respuesta futura.
+- `reports/` no se commitea a git (ver `.gitignore`) — son notas de trabajo, no código ni datos operativos.
+
 ## Proyecto
 **Z-Bot Padre v2** — bot de trading algorítmico sobre Binance.
 - Dueño: Ariel
@@ -71,7 +80,8 @@ Siempre matar el proceso también: `kill $(pgrep -f archivo.py)`
 De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram.
 
 ## Modo de operación
-- Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"1h","sleep_segundos":60}`
+- Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"4h","sleep_segundos":240}`
+  (corregido de 1h/60 el 2026-07-12 — ver hallazgo de oscilación de fase más abajo)
 - Para cambiar a REAL: editar `modo.json` y `config/modo.txt`
 - **No cambiar a REAL sin autorización explícita de Ariel**
 
@@ -138,6 +148,48 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 - **Decisión: documentado, sin implementar.** Si se implementa la mitigación SOLO_SL (ver sección
   anterior), corregir **también** que el SL registre `precio_actual` en vez de `sl_efectivo`. No
   tocar antes del paso a real sin re-decidir con Ariel.
+
+## Oscilación de detectar_fase() — causa raíz y fix (jul 2026)
+- **Síntoma:** en julio 2026, 96.7% de los trades LATERAL y 100% de los ALCISTA cerraban por FASE_CAMBIO,
+  nunca por TP/SL — mediana de vida de una posición LATERAL: 5.2 minutos. Detalle en
+  `reports/2026-07-12_analisis-cierres-fase-cambio-julio.md`.
+- **Causa raíz:** `detectar_fase()` (`utils.py`) tiene hardcodeado `velas_7d=42` y `velas_30d=180`, válido
+  solo si las velas son de **4h** (42×4h=7d, 180×4h=30d). `signals/modo.json` tenía `intervalo_velas:"1h"`,
+  así que "7d" era en realidad 1.75 días y "30d" 7.5 días — un detector calibrado para tendencias de
+  semanas reaccionaba a swings de 1-8 días. Confirmado empírico corriendo `detectar_fase()` real sobre
+  velas reales: con 1h la fase global cambia 1.49/día (dura 16h); con 4h, 0.40/día (dura 60.5h) — ~4x menos
+  oscilación. Detalle en `reports/2026-07-12_causa-oscilacion-detectar_fase.md`.
+- **Fix aplicado (2026-07-12):** `modo.json` → `intervalo_velas:"4h"`, `sleep_segundos:240`. No se tocó
+  `utils.py` ni las constantes — el desajuste era de configuración, no del algoritmo.
+- **Hallazgo colateral resuelto el mismo día:** se encontraron **todos** los screens del stack duplicados
+  (una tanda desde las 13:43, otra desde las 20:22 del 2026-07-12). Solo se depuró `v2_main` (pedido
+  explícito) — el resto de los duplicados (`z_diagnostico`, `z_executor`, `z_webserver`, etc., tanda 13:43)
+  **sigue sin limpiar**, a la espera de instrucción explícita ítem por ítem (no asumir "limpiar duplicados"
+  como autorización en bloque). Detalle en `reports/2026-07-12_fix-duplicado-y-modo-4h.md`.
+
+## TRAILING_DISTANCIA y SL — backtests jul 2026 (NO cambiar sin re-decidir)
+- **Por qué ningún trade llega a TP limpio:** con `TRAILING_ACTIVACION=0.5%` y `TRAILING_DISTANCIA=1.0%`,
+  el trailing exige que el precio nunca retroceda >1% desde su máximo mientras recorre 4-7 pp hasta el TP —
+  casi imposible en cripto. Backtest de 13 posiciones reales dejadas correr sin límite: ninguna superó 77%
+  del camino al TP. Detalle en `reports/2026-07-13_por-que-nunca-llega-a-tp.md`.
+- **Backtest largo (2021-2026, ~10k trades, entrada simplificada = fase 4h + RSI, sin replicar spread/
+  horario/eventos/calidad/multitf/memoria — ver metodología completa en el reporte):**
+  `TRAILING_DISTANCIA` 1% (actual) vs 1.5% vs 2% vs 3%, SL/TP sin cambiar:
+  - WR y % de TP limpio **suben** con trailing más ancho: WR 55.3%→62.9%, TP limpio 5.5%→19.0% (1%→3%).
+  - PnL total y drawdown **empeoran** con trailing más ancho: retorno +186.2%→+91.3%, DD máx 1.12%→1.94%
+    (capital compuesto $1,000, 2%/trade). Causa: trailing angosto genera ~1.7x más trades/año (recicla el
+    slot de `MAX_OP_TOTAL=1` más rápido), y ese volumen pesa más que la calidad por trade.
+  - **No hay un óptimo único** sin definir qué se prioriza (throughput total vs. WR/menos whipsaw).
+  - DD medido es una cota optimista: hereda el sesgo de "Asimetría TP/SL" (SL registra precio teórico, no
+    real) — un gap real (LUNA, FTX) daría más drawdown del que este backtest puede ver.
+  - Detalle: `reports/2026-07-13_backtest_trailing_2021-2026.md` y
+    `reports/2026-07-13_drawdown_maximo_por_escenario.md`.
+- **SL uniforme 3.0% vs SL actual (3.5-5.0% según símbolo), mismo backtest, trailing 1%:** SL 3% **empeora**
+  los tres ejes — WR 55.3%→53.6%, retorno +186.2%→+167.2%, DD máx casi sin cambio (1.12%→1.00%, $0.29 de
+  diferencia). **No se justifica bajar el SL a 3%.** Detalle: `reports/2026-07-13_backtest_sl_actual_vs_sl3.md`.
+- **Decisión: documentado, sin implementar ningún cambio de TRAILING_DISTANCIA ni SL.** Antes de tocar
+  código: correr con capital compuesto real (no suma simple de %) y con los filtros de producción que este
+  backtest no replicó, y decidir explícitamente qué se optimiza (PnL total vs. calidad/WR).
 
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)

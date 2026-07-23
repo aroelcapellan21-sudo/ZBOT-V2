@@ -425,6 +425,45 @@ def obtener_resumen_personal():
         f"━━━━━━━━━━━━━━━━━━━━━"
     )
 
+def obtener_retiro_disponible():
+    capital_inicial = obtener_capital_inicial()
+
+    try:
+        with open(BILLETERA_PATH) as f:
+            bill = json.load(f)
+    except:
+        bill = {}
+
+    usdt = bill.get("USDT", 0)
+    MONEDAS = {"BTC": "BTCUSDT", "ETH": "ETHUSDT", "SOL": "SOLUSDT", "BNB": "BNBUSDT", "AVAX": "AVAXUSDT"}
+    valor_monedas = 0.0
+    for moneda, symbol in MONEDAS.items():
+        cantidad = bill.get(moneda, 0)
+        if cantidad > 0:
+            try:
+                params = urllib.parse.urlencode({"symbol": symbol, "interval": "1m", "limit": 1})
+                url    = f"https://api.binance.com/api/v3/klines?{params}"
+                with urllib.request.urlopen(url, timeout=10) as resp:
+                    data = json.loads(resp.read().decode())
+                precio = float(data[-1][4])
+                valor_monedas += cantidad * precio
+            except:
+                pass
+
+    capital_actual = round(usdt + valor_monedas, 2)
+    disponible_retiro = round(max(capital_actual - capital_inicial, 0), 2)
+
+    return (
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💸 <b>RETIRO DISPONIBLE</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"💰 Capital inicial:      ${capital_inicial:,.2f}\n"
+        f"💵 Capital actual:       ${capital_actual:,.2f}\n"
+        f"✅ Disponible p/retirar: ${disponible_retiro:,.2f}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"⚖️ El capital base (${capital_inicial:,.2f}) nunca se retira — solo ganancias netas."
+    )
+
 def enviar_mensaje_con_botones(chat_id, mensaje, botones):
     api_url = get_api_url()
     if not api_url:
@@ -888,6 +927,8 @@ def procesar_comando(mensaje, chat_id):
     elif mensaje == "/capital":
         capital = obtener_capital_real()
         enviar_mensaje(chat_id, f"💰 Capital disponible en USDT: ${capital}")
+    elif mensaje == "/retiro":
+        enviar_mensaje(chat_id, obtener_retiro_disponible())
     elif mensaje == "/senales":
         enviar_mensaje(chat_id, obtener_senales())
     elif mensaje == "/corecro":
@@ -965,6 +1006,7 @@ def procesar_comando(mensaje, chat_id):
             "/estadisticas — Rendimiento por moneda\n"
             "/registros — Últimas operaciones\n"
             "/capital — Cuánto USDT hay disponible\n"
+            "/retiro — Ganancia disponible para retirar\n"
             "/memoria — Lo que el bot aprendió\n"
             "/disparos — Estado de cada moneda\n\n"
             "⚙️ <b>CONTROLAR EL BOT:</b>\n"

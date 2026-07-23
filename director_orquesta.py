@@ -25,6 +25,7 @@ from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
 from ejecutor import cerrar_posicion
 from gestor_billetera import registrar_tp, registrar_sl
+from memoria_propia import actualizar_memoria
 import db
 
 MONEDAS        = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
@@ -89,6 +90,7 @@ def cerrar_huerfanas(fase_nueva):
                      else ((precio_actual - precio_entrada) / precio_entrada * 100)
             partes[5] = "FASE_CAMBIO"
             cerradas += 1
+            actualizar_memoria(symbol, cambio)
             enviar_aviso(
                 f"🔄 CIERRE POR CAMBIO DE FASE\n"
                 f"{symbol} ({accion})\n"

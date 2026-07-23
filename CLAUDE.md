@@ -191,6 +191,50 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   código: correr con capital compuesto real (no suma simple de %) y con los filtros de producción que este
   backtest no replicó, y decidir explícitamente qué se optimiza (PnL total vs. calidad/WR).
 
+## memoria_propia.json no se actualiza — causa raíz ligada a FASE_CAMBIO (hallazgo jul 2026, NO corregido)
+- **Síntoma:** `data/memoria_propia.json` dejó de actualizarse el 2026-07-17 08:35:05.
+- **Causa raíz:** `actualizar_memoria()` (`memoria_propia.py`) solo se llama desde
+  `revisar_cierres()` de los 15 francotiradores, tras un cierre TP/SL/BE/TRAILING_SL. El último
+  cierre de ese tipo fue el 2026-07-14. Desde entonces, ~91% de los cierres pasan por
+  `cerrar_huerfanas()` en `director_orquesta.py` (cierre por cambio de fase, estado
+  `FASE_CAMBIO`), que nunca importa ni llama a `actualizar_memoria()`.
+- **Segunda capa, más de fondo:** aunque se agregara esa llamada, `analizar_historial()` filtra
+  solo `estado in ("TP","SL","TRAILING_SL","BE")` — ignora `FASE_CAMBIO` por completo. Además,
+  `auditoria.csv` no guarda si un `FASE_CAMBIO` fue ganador o perdedor: `cerrar_huerfanas()`
+  sobreescribe el campo `estado` de la fila pero nunca actualiza `precio` ni `timestamp` (quedan
+  con los valores de apertura), así que el resultado de cada cierre por fase no está persistido
+  en ningún lado en forma directa.
+- **Backtest de impacto (2026-07-23, reconstrucción cruzando `auditoria.csv` con
+  `historial_billetera.csv` por huella de cantidad — `reports/2026-07-23_backtest_fase_cambio_en_memoria.md`):**
+  - Hoy el filtro `puede_operar_memoria()` está **completamente inerte**: con solo 32 trades
+    TP/SL reales repartidos en 5 símbolos, ninguno alcanza `MIN_TRADES=15` — todas las entradas
+    pasan con factor 1.0.
+  - Si se incluyera `FASE_CAMBIO` en el aprendizaje, los 5 símbolos cruzarían el umbral de
+    golpe: BTC/ETH/SOL quedarían al factor 0.6 (WR reconstruido ~44-48%), BNB al factor 0.8 (WR
+    ~58%), y **AVAX quedaría bloqueado por completo** (WR reconstruido 33.3%, debajo del piso de
+    40%).
+  - Confianza del backtest: moderada, no alta — el WR de cada `FASE_CAMBIO` se reconstruyó
+    cruzando datos (no hay ground truth directo), validado 7/7 contra los pocos casos con dato
+    conocido, pero es muestra chica. El período coincide con los screens duplicados encontrados
+    el mismo día (dos instancias de `v2_main` corriendo en paralelo), posible fuente de ruido
+    adicional. La dirección del hallazgo (inerte hoy → bloquearía AVAX si se incluye) es
+    confiable; el número exacto de WR no debería tratarse como definitivo.
+- **Fix mínimo aplicado (2026-07-23):** `director_orquesta.py:cerrar_huerfanas()` ahora importa y
+  llama `actualizar_memoria(symbol, cambio)` tras cada cierre por `FASE_CAMBIO`, igual que ya
+  hacían los francotiradores tras un TP/SL/BE/TRAILING_SL. Esto solo restaura el refresco de
+  `data/memoria_propia.json` (vuelve a actualizarse en cada cierre) — **no** cambia qué cuenta
+  `analizar_historial()` como trade válido, sigue filtrando solo
+  `estado in ("TP","SL","TRAILING_SL","BE")`. Con los 32 trades reales actuales ningún símbolo
+  llega a `MIN_TRADES=15`, así que hoy este fix no cambia ningún factor de `puede_operar_memoria()`
+  — solo mantiene el archivo fresco.
+- **Pendiente, NO aplicado:** incluir `FASE_CAMBIO` en `analizar_historial()`. Se retoma cuando se
+  ataque la causa raíz de por qué el 91% de los cierres son `FASE_CAMBIO` en vez de TP/SL real
+  (ver sección "TRAILING_DISTANCIA y SL" y "Oscilación de detectar_fase()" arriba). Si en ese
+  momento se decide sumarlo, persistir el precio de salida real en `auditoria.csv` al momento del
+  cierre en vez de reconstruirlo después (hoy `cerrar_huerfanas()` no actualiza `precio` ni
+  `timestamp` al cerrar, por eso hubo que reconstruir vía `historial_billetera.csv` para el
+  backtest).
+
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)
 - Token en `keys.env` como `TELEGRAM_BOT_TOKEN` — **ese es el nombre exacto de la clave, todos los módulos deben leerlo así**.

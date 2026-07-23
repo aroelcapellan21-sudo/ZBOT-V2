@@ -98,12 +98,14 @@ def leer_auditoria():
         total = len(lineas) - 1
         tp = sum(1 for l in lineas if ',TP,' in l or l.strip().endswith(',TP'))
         sl = sum(1 for l in lineas if ',SL,' in l or l.strip().endswith(',SL'))
+        fc = sum(1 for l in lineas if 'FASE_CAMBIO' in l)
         be = sum(1 for l in lineas if ',BE,' in l or l.strip().endswith(',BE'))
         abiertas = sum(1 for l in lineas if 'ABIERTA' in l)
         texto = f"\nHISTORIAL DE OPERACIONES:\n"
-        texto += f"- Total operaciones: {total}\n"
+        texto += f"- Total operaciones: {tp + sl + fc}\n"
         texto += f"- Take Profit (TP): {tp}\n"
         texto += f"- Stop Loss (SL): {sl}\n"
+        texto += f"- Cambio de fase: {fc}\n"
         texto += f"- Breakeven (BE): {be}\n"
         texto += f"- Abiertas ahora: {abiertas}\n"
         texto += f"\nÚltimas 10 operaciones:\n"

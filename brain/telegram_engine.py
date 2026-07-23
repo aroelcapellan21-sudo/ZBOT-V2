@@ -807,6 +807,7 @@ def obtener_registros():
                 elif estado == "SL":         emoji = "🔴"; texto = "Perdida"
                 elif estado == "BE":         emoji = "🛡️"; texto = "Salió en cero"
                 elif estado == "TRAILING_SL":emoji = "🎯"; texto = "Salió con trailing"
+                elif estado == "FASE_CAMBIO": emoji = "🔄"; texto = "Cambio de fase"
                 elif estado == "MANUAL_WIN": emoji = "🤚✅"; texto = "Manual — ganada"
                 elif estado == "MANUAL_LOSS":emoji = "🤚🔴"; texto = "Manual — perdida"
                 elif estado == "MANUAL":     emoji = "🤚"; texto = "Manual (histórico)"

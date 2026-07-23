@@ -36,7 +36,7 @@ def leer_trades_por_par(path):
                     resultado[symbol] = {"tp": 0, "sl": 0}
                 if estado == "TP":
                     resultado[symbol]["tp"] += 1
-                elif estado == "SL":
+                elif estado in ("SL", "FASE_CAMBIO"):
                     resultado[symbol]["sl"] += 1
     except:
         pass

@@ -1,5 +1,6 @@
 # Reportes temporales
 corecro/reports/
+reports/
 data/memory_*.csv
 data/adn_mercado.csv
 

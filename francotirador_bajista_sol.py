@@ -158,11 +158,11 @@ def revisar_cierres(precio_actual):
                         continue
                     if be_activo and sl_efectivo <= be_price:
                         partes[5] = "BE"
-                        registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)
+                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
                         enviar_aviso(
                             f"🛡️ BREAKEVEN BAJISTA {SYMBOL}\n"
                             f"Entrada: ${precio_entrada}\n"
-                            f"Salida: ${sl_efectivo}\n"
+                            f"Salida: ${precio_actual}\n"
                             f"Resultado: +{BE_COMISION}% protegido\n"
                             f"Trade de {round(velas_abiert,1)} velas protegido"
                         )
@@ -170,14 +170,14 @@ def revisar_cierres(precio_actual):
                         print(f"  🛡️ BE: ${precio_entrada} → ${sl_efectivo} protegido")
                     elif trailing_on:
                         partes[5] = "TRAILING_SL"
-                        registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)
-                        enviar_aviso(f"🎯 TRAILING SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${sl_efectivo}")
+                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
+                        enviar_aviso(f"🎯 TRAILING SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}")
                         registrar_evento(f"BAJISTA SOL: TRAILING_SL {SYMBOL} ${sl_efectivo}")
                         print(f"  🎯 TRAILING_SL: ${precio_entrada} → ${sl_efectivo}")
                     else:
                         partes[5] = "SL"
-                        registrar_sl(precio_entrada, sl_efectivo, monto_op, MONEDA, TIPO_TRADE)
-                        enviar_aviso(f"🛑 SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${sl_efectivo}\nPerdida: -{STOP_LOSS}%")
+                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
+                        enviar_aviso(f"🛑 SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nPerdida: -{STOP_LOSS}%")
                         registrar_evento(f"BAJISTA SOL: SL {SYMBOL} -{STOP_LOSS}%")
                         print(f"  🛑 SL: ${precio_entrada} → ${sl_efectivo}")
                     actualizar_memoria(SYMBOL, cambio)

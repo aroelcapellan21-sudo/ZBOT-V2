@@ -85,7 +85,7 @@ def registrar_operacion(accion, precio, rsi, monto):
     except Exception as e:
         print(f"  [AUDITORIA] ERROR registrando operacion: {e}")
 
-def revisar_cierres(precio_actual):
+def revisar_cierres(precio_actual, evaluar_tp=True):
     _lk = open(AUDITORIA_LOCK, "w")
     fcntl.flock(_lk, fcntl.LOCK_EX)
     try:
@@ -135,7 +135,7 @@ def revisar_cierres(precio_actual):
                     trailing_on = False
 
                 monto_op = float(partes[6]) if len(partes) > 6 else 10.0
-                if cambio >= TAKE_PROFIT:
+                if evaluar_tp and cambio >= TAKE_PROFIT:
                     res_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op)
                     if "❌" in res_cierre:
                         print(f"  ⚠️ Cierre fallido (TP): {res_cierre}")
@@ -218,6 +218,7 @@ def evaluar():
         return
     if not puede_operar_horario():
         print("  🕐 Fuera de horario.")
+        revisar_cierres(precio_actual, evaluar_tp=False)
         return
     if not puede_operar_hoy():
         print("  📅 Limite diario.")
@@ -226,7 +227,7 @@ def evaluar():
         print("  📰 Evento macro.")
         return
 
-    revisar_cierres(precio_actual)
+    revisar_cierres(precio_actual, evaluar_tp=True)
 
     rsi   = calcular_rsi(cierres)
     ema_c = calcular_ema(cierres, EMA_CORTA)

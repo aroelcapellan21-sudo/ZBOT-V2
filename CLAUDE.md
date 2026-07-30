@@ -84,6 +84,12 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   (corregido de 1h/60 el 2026-07-12 — ver hallazgo de oscilación de fase más abajo)
 - Para cambiar a REAL: editar `modo.json` y `config/modo.txt`
 - **No cambiar a REAL sin autorización explícita de Ariel**
+- **Segunda confirmación técnica (desde 2026-07-29, commit `0278d48`):** `modo.json` diciendo
+  `"REAL"` ya no alcanza por sí solo. `ejecutor.py` (`ejecutar_operacion`, `cerrar_posicion`)
+  también exige la variable de entorno `BOT_REAL_CONFIRMADO=true` en el proceso de `v2_main`
+  — si falta, opera en SIMULADOR aunque el JSON diga REAL. La variable no vive en ningún
+  archivo del repo (ni `keys.env` ni `modo.json`); se exporta a mano en la sesión screen el
+  día del paso a real. Punto 3 de `CIERRE_FINAL.md`.
 
 ## Dirección de operación — SPOT solo-LONG (desde jun 2026)
 - El bot opera **solo ALCISTA y LATERAL**. Los 5 francotiradores bajistas están desactivados.
@@ -114,7 +120,7 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 - Cambios en francotiradores requieren backtest previo con umbral PF ≥ 1.6
 - Los 15 francotiradores tienen parámetros validados por backtest — no cambiar sin evidencia
 
-## Gestión de salidas vs gates de entrada (hallazgo jun 2026 — NO cambiar sin re-decidir)
+## Gestión de salidas vs gates de entrada (hallazgo jun 2026 — SOLO_SL aplicado jul 2026)
 - En `evaluar()` de los 15 francotiradores, `revisar_cierres()` (que evalúa SL/TP de
   posiciones abiertas) se llama **después** de los 6 gates de entrada (guardian, termómetro,
   spread, horario, límite diario, eventos). Si cualquiera hace `return`, el SL/TP **no se
@@ -126,13 +132,18 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   - **SOLO_SL** (SL siempre 24h, TP solo en horario): **−10.6 pp** con fees (≈−3 pp/año).
   - Causa: no mirar de noche deja que trades que tocan SL reboten (mercado mean-reverting);
     corregirlo realiza más pérdidas y añade fees.
-- **Decisión (Ariel, jun 2026): NO cambiar el código** — el backtest histórico no muestra
-  mejora de PnL. El matiz pendiente: el backtest 1h **no captura** la protección de cola que
-  SOLO_SL daría en vivo (el bot evalúa cada 60s; ante crash nocturno cortaría en ~1 min en
-  vez de esperar a las 4am). Si en el futuro pesa más el riesgo de cola que los ~3 pp/año,
-  reconsiderar SOLO_SL. Documentado, sin implementar.
+- **Decisión original (Ariel, jun 2026): NO cambiar el código** — el backtest histórico no
+  mostraba mejora de PnL. El matiz pendiente: el backtest 1h **no captura** la protección de
+  cola que SOLO_SL daría en vivo (el bot evalúa cada 60s; ante crash nocturno cortaría en ~1
+  min en vez de esperar a las 4am).
+- **Reconsiderado y aplicado (2026-07-29, commit `04b4074`, punto 2 de `CIERRE_FINAL.md`):**
+  Ariel priorizó cerrar el riesgo de cola por sobre los ~3 pp/año de costo del backtest.
+  `revisar_cierres()` de los 15 francotiradores ahora acepta `evaluar_tp=False`; cuando
+  `puede_operar_horario()` corta, se llama igual con el SL activo (`evaluar_tp=False`) antes
+  del `return` — el TP sigue exigiendo ventana horaria, el SL ya se evalúa 24h. Los otros 5
+  gates (guardian, termómetro, spread, límite diario, eventos) no se tocaron.
 
-## Asimetría TP/SL en el registro de cierres (hallazgo jun 2026 — relevante para paso a real)
+## Asimetría TP/SL en el registro de cierres (hallazgo jun 2026 — corregido jul 2026)
 - En `revisar_cierres()` de los **15 francotiradores** (alcista/bajista/lateral × 5 activos), el
   cierre por **SL se registra al precio teórico `sl_efectivo`, NO al `precio_actual` real**:
   `registrar_sl(precio_entrada, sl_efectivo, ...)` en las 3 ramas (BE, trailing, SL normal) y el
@@ -145,9 +156,11 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   BTC, no como la caída real). En **REAL** el registro a `sl_efectivo` es contabilidad ficticia:
   `cerrar_posicion` ejecutaría orden de mercado al precio real del gap (sin tope) pero los libros
   anotarían -SL% → riesgo de cola sin tope **y** PnL sobreestimado.
-- **Decisión: documentado, sin implementar.** Si se implementa la mitigación SOLO_SL (ver sección
-  anterior), corregir **también** que el SL registre `precio_actual` en vez de `sl_efectivo`. No
-  tocar antes del paso a real sin re-decidir con Ariel.
+- **Corregido (2026-07-29, commit `ac3dcd0`, punto 1 de `CIERRE_FINAL.md`):** las 3 ramas de
+  `revisar_cierres()` (BE, trailing, SL normal) en los 15 francotiradores ahora llaman
+  `registrar_sl(precio_entrada, precio_actual, ...)` — igual que ya hacía `registrar_tp`. El
+  aviso y el registro contable reflejan el precio real de cierre, no el nominal `sl_efectivo`.
+  Aplicado junto con SOLO_SL (ver sección anterior), como estaba planeado.
 
 ## Oscilación de detectar_fase() — causa raíz y fix (jul 2026)
 - **Síntoma:** en julio 2026, 96.7% de los trades LATERAL y 100% de los ALCISTA cerraban por FASE_CAMBIO,

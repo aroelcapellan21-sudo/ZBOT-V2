@@ -46,6 +46,9 @@ def _leer_modo():
     except Exception:
         return "REAL"
 
+def _confirmacion_real_activa():
+    return os.environ.get("BOT_REAL_CONFIRMADO", "").strip().lower() == "true"
+
 def _redondear_cantidad(symbol, qty):
     decimales = LOT_SIZE.get(symbol, 6)
     return round(qty, decimales)
@@ -130,7 +133,7 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
 
     symbol     = moneda + "USDT"
     modo       = _leer_modo()
-    simulador  = (modo == "SIMULADOR")
+    simulador  = not (modo == "REAL" and _confirmacion_real_activa())
 
     if simulador:
         print(f"  [EJECUTOR] Modo SIMULADOR — sin orden real a Binance.")
@@ -226,7 +229,7 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op):
     """
     symbol    = moneda + "USDT"
     modo      = _leer_modo()
-    simulador = (modo == "SIMULADOR")
+    simulador = not (modo == "REAL" and _confirmacion_real_activa())
 
     cantidad = _redondear_cantidad(symbol, monto_op / precio_entrada)
     if cantidad <= 0:

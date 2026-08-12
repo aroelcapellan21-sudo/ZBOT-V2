@@ -207,12 +207,15 @@ def evaluar():
 
     if esta_bloqueado():
         print("  🚨 Guardian activo.")
+        revisar_cierres(precio_actual, evaluar_tp=False)
         return
     if not puede_operar_termometro():
         print("  🌡️ Termometro activo.")
+        revisar_cierres(precio_actual, evaluar_tp=False)
         return
     if not spread_aceptable(SYMBOL):
         print("  📊 Spread alto.")
+        revisar_cierres(precio_actual, evaluar_tp=False)
         return
     if not puede_operar_horario():
         print("  🕐 Fuera de horario.")
@@ -220,9 +223,11 @@ def evaluar():
         return
     if not puede_operar_hoy():
         print("  📅 Limite diario.")
+        revisar_cierres(precio_actual, evaluar_tp=False)
         return
     if not puede_operar_eventos():
         print("  📰 Evento macro.")
+        revisar_cierres(precio_actual, evaluar_tp=False)
         return
 
     revisar_cierres(precio_actual, evaluar_tp=True)

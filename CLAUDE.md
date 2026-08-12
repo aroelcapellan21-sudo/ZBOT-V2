@@ -197,28 +197,77 @@ y **distorsiona el PnL reportado por trade** hasta un 4%, que es lo que alimenta
 ganancia del trade en curso — reubica la distorsión en vez de eliminarla. El mecanismo correcto es
 `auto_reconciliar()`, que barre **fuera** del ciclo de trades (punto 9, pendiente).
 
-### Pendientes de la auditoría — NO pasar a REAL antes de esto
+### `guardian_riesgo.py` — nunca decidir con datos incompletos (fix #7, ago 2026)
 
-- **#7 `guardian_riesgo.py`:** `_obtener_precio()` devuelve `0.0` si falla la API y
-  `cargar_billetera()` multiplica igual → un timeout de red valoriza la cripto en cero, dispara un
-  falso drawdown del 10% y deja `bloqueado = True`, que **no se resetea nunca** (solo
-  `bloqueado_dia` se limpia al cambiar de fecha). Además `ZeroDivisionError` en las líneas del
-  cálculo de drawdown si `max_hist` o `inicio_dia` valen 0, y `esta_bloqueado()` solo captura
-  `RuntimeError`. Es el pendiente más grave.
-- **#8 gate de bajistas a manual** (ver sección siguiente).
-- **#9 `auto_reconciliar()`:** hoy **no vende de verdad** (pone `billetera[moneda] = 0.0` y suma el
-  USDT teórico, mismo bug que tenía `/cerrar`), escribe `billetera.json` sin `flock` ni
-  `os.replace` (líneas 131 y 253), y `CANTIDAD_MINIMA = 0.000001` está muy por debajo del
-  `minNotional`. No lo llama nadie: la única referencia es `supervisor_v2.py:255`, que no corre.
-- **Validación obligatoria antes de dinero real:** correr el stack contra el testnet de Binance
-  (`testnet.binance.vision`) y verificar que un ciclo abrir → SL → cerrar deja `billetera.json`
-  cuadrado contra el saldo que reporta la API. Ese test no existe hoy.
+Commits `fa243ec` (C1) y `5c5c690` (C2+C3).
+
+- **`_obtener_precio()` devuelve `None`, nunca `0.0`.** Antes, si fallaba la llamada, la moneda
+  valía $0: el capital se hundía, se disparaba un drawdown inexistente y quedaba
+  `bloqueado = True` en la DB — flag que **no se resetea nunca**.
+  Qué tan cerca estaba: USDT libre $983.52, umbral de bloqueo $968.29, margen **$15.23**. Una
+  posición normal es 2% = ~$19.67, así que con **una** posición abierta el margen desaparecía.
+  Y los fallos de red no son teóricos: `memoria/telegram.log` tenía 40 errores de conexión, el
+  último del 2026-08-11 (`Temporary failure in name resolution`).
+- **`cargar_billetera()` levanta `DatosIncompletos`** (subclase de `RuntimeError`) si alguna
+  moneda con saldo se quedó sin precio. `esta_bloqueado()` lo captura → pausa el ciclo. La
+  diferencia clave: **no se persiste nada en la DB**, así que es transitorio. Cuando la red
+  vuelve, el guardián autoriza solo.
+- **Divisiones protegidas.** `max_hist` o `inicio_dia` en 0 levantan `DatosIncompletos` en vez de
+  `ZeroDivisionError`.
+- **`esta_bloqueado()` es fail-safe de verdad.** Antes capturaba solo `RuntimeError` **y** dejaba
+  `verificar_riesgo()` fuera del `try`, así que el `ZeroDivisionError` mataba el ciclo entero del
+  francotirador. Ahora `verificar_riesgo()` está dentro y se captura `Exception`.
+- **Regla:** ante cualquier duda sobre los datos, pausar sin escribir estado. Un bloqueo
+  persistido solo puede venir de un drawdown calculado con **todos** los precios disponibles.
+
+### Camino de dinero — `reconciliar.py` (fix #9, ago 2026)
+
+Commit `512c21c`. Barre el polvo del truncado al lot size (ver sección "Polvo inmovilizado").
+
+- **Vende de verdad.** Antes hacía `billetera[moneda] = 0.0` y sumaba el USDT teórico **sin mandar
+  ninguna orden**. En REAL: los libros decían USDT y la cripto seguía en la cuenta. Ahora usa
+  `cerrar_posicion(qty=...)`; si Binance rechaza, la billetera **no se toca**.
+- **Respeta los locks:** `billetera.json` bajo `signals/billetera.json.lock` reusando
+  `gestor_billetera`, y `auditoria.csv` bajo `AUDITORIA_LOCK`.
+- **Umbral por `minNotional` ($5 USDT).** Antes era `CANTIDAD_MINIMA = 0.000001`, una cantidad de
+  cripto sin relación con lo que Binance acepta.
+- **Barre `saldo − qty comprometida`,** no saltea la moneda entera si tiene posición abierta. Antes
+  el polvo de un activo que se opera seguido no se limpiaba nunca. El barrido pasó de $16.98 a
+  $40.67.
+- **`RESERVADA` también protege.** Es un bug que introdujo el fix #5: entre `ejecutar_operacion` y
+  `_actualizar_fila(ABIERTA)` la fila dice `RESERVADA` y la cripto **ya está comprada**. Mirando
+  solo `ABIERTA`, el barrido la habría vendido.
+- **Solo manual.** `auto_reconciliar()` fue **eliminado** y su llamada en `supervisor_v2.py`
+  reemplazada por un comentario. Vende dinero real: no corre sin supervisión.
+- Backups con sello temporal (antes el nombre era fijo y cada corrida pisaba el anterior).
+
+### Pendientes — NO pasar a REAL antes de esto
+
+Los 9 puntos del plan están cerrados. Lo que falta **no es código**:
+
+- **Validación en testnet (bloqueante).** Nada de lo anterior se probó contra órdenes reales: todo
+  fue SIMULADOR y sandbox. Correr el stack contra `testnet.binance.vision` y verificar que un
+  ciclo abrir → SL → cerrar deja `billetera.json` cuadrado contra el saldo que reporta la API.
+  Ese test habría detectado los bugs #3 y #4 solo, sin auditoría de por medio.
+- **$7.56 inbarribles** en SOL/BNB/AVAX, por debajo del `minNotional`. Nada que hacer hasta que
+  crezcan.
+- **52 sesiones de screen** contra las 29 documentadas — duplicados de julio, sin limpiar.
 
 ## Dirección de operación — SPOT solo-LONG (desde jun 2026)
 - El bot opera **solo ALCISTA y LATERAL**. Los 5 francotiradores bajistas están desactivados.
 - Razón: hacer SHORT es imposible en cuenta SPOT. En SIMULADOR generaba balances de cripto negativos (causa raíz de los negativos en billetera).
 - Gate central: `gestor_bajistas.py` → `bajistas_activos()`. Cada `evaluar()` bajista lo consulta y retorna temprano si está desactivado.
-- **Reactivación automática:** el gate lee el saldo de Futuros USDT-M de Binance (`/fapi/v2/balance`). Si `availableBalance` USDT ≥ 5.0, los bajistas vuelven solos. Cachea 5 min; ante error de API → desactivado (seguro). Estado en `signals/estado_bajistas.json`.
+- **Reactivación MANUAL (desde 2026-08-12, commit `c263fbd`, fix #8).** Exige **dos** condiciones:
+  `BOT_BAJISTAS_CONFIRMADO=true` en el entorno del proceso **y** `availableBalance` USDT ≥ 5.0 en
+  Futuros USDT-M. Sin la variable corta antes de consultar la API (ahorra una llamada por ciclo).
+  Cachea 5 min; ante error de API → desactivado. Estado en `signals/estado_bajistas.json`.
+  La variable sigue el patrón de `BOT_REAL_CONFIRMADO`: no vive en ningún archivo del repo, se
+  exporta a mano el día que se decida — **después** de reescribir el ejecutor para futuros.
+- **Antes bastaba el saldo:** fondear futuros por cualquier motivo, incluso ajeno a los shorts,
+  reactivaba solos a los 5 francotiradores. Y fondear futuros **no habilita shorts reales** — la
+  ruta de ejecución sigue siendo spot. Al momento del fix el gate estaba en `false` por accidente,
+  no por diseño: el motivo registrado era `error_api: HTTP Error 401: Unauthorized` (la API key no
+  tiene permiso de futuros). Si algún día lo tuviera, se habría reactivado solo.
 - **Pendiente:** `ejecutor.py:cerrar_posicion` cierra shorts con BUY spot. Para shorts reales en futuros hay que reescribir el ejecutor — reactivar el gate no basta.
 - **Evidencia (backtest 5.4 años, 4h):** `backtest_direccional.py` → `reports_historicos/backtest_direccional.json`. Desactivar bajistas sube WR +2.1 pp (40.7%→42.8%) y cuesta ~28 pp de PnL en 5.4 años descontando fees (≈cero). El PnL bajista bruto (+342 pp) descansa casi entero en AVAX; BTC/ETH/BNB bajistas son negativos tras fees. Si se reactivan en futuros, hacerlo **selectivo por activo**, no los 5 en bloque.
 
@@ -400,6 +449,16 @@ ganancia del trade en curso — reubica la distorsión en vez de eliminarla. El 
   - `engine.py:enviar_aviso()` → **avisos de trades** (entradas, TP, SL, errores de cierre). Lo usan los 15 francotiradores y `director_orquesta`.
 - **Bug histórico (jun 2026):** `engine.cargar_token()` buscaba `TELEGRAM_TOKEN=` (clave inexistente) en vez de `TELEGRAM_BOT_TOKEN=`, así que los avisos de trades nunca salían — se abrían posiciones sin notificación. El polling sí funcionaba porque leía la clave correcta. Corregido.
 - **Log de fallos:** `engine.enviar_aviso()` registra cualquier fallo de envío en `memoria/telegram.log` (token ausente, rechazo de la API con `ok:false`, o excepción de red). Antes solo se imprimían al stdout del screen y se perdían. Si no llega un aviso, revisar **primero** ese archivo. Si está vacío, el envío salió bien y el problema es del lado de Telegram/cliente.
+- **Comandos que mueven dinero o estado, patrón de dos pasos** (ago 2026): sin argumento muestran
+  un previo que **no toca nada**; solo con `confirmar` como segunda palabra ejecutan. Ambos están
+  admin-gateados por el chequeo al tope de `procesar_comando`.
+  - `/reconciliar` → previo del polvo vendible · `/reconciliar confirmar` → vende en Binance.
+  - `/desbloquear` → estado del guardián · `/desbloquear confirmar` → levanta el bloqueo.
+    **Ojo:** desbloquear **rebasea `capital_maximo_historico` al capital actual**. Es a propósito:
+    si solo se apagara el flag, `verificar_riesgo()` compararía contra el mismo pico y bloquearía
+    de nuevo en el ciclo siguiente. La contrapartida es que se pierde la referencia del pico
+    anterior y el drawdown se cuenta desde el capital del momento. Queda huella en
+    `estado_riesgo.desbloqueo` con timestamp, motivo y estado previo.
 - **`/cerrar` no cerraba nada (bug encontrado y corregido el 2026-08-12, commit `49b1e55`):**
   `cerrar_operacion_manual()` marcaba la fila como `MANUAL_WIN`/`MANUAL_LOSS`, calculaba una
   ganancia y la reportaba — pero **nunca llamaba a `cerrar_posicion` ni tocaba

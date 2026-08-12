@@ -21,6 +21,7 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
+from decimal import Decimal, ROUND_DOWN
 from gestor_billetera import registrar_historial_billetera
 
 BILLETERA            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
@@ -52,9 +53,18 @@ def _leer_modo():
 def _confirmacion_real_activa():
     return os.environ.get("BOT_REAL_CONFIRMADO", "").strip().lower() == "true"
 
-def _redondear_cantidad(symbol, qty):
+def _truncar_cantidad(symbol, qty):
+    """
+    Trunca hacia abajo al LOT_SIZE del simbolo. NUNCA redondea hacia arriba:
+    pedir mas cantidad de la que hay en la cuenta = rechazo -2010 de Binance
+    = el cierre falla y la posicion queda ABIERTA sin stop.
+
+    Se usa Decimal y no floor() sobre float porque el error binario se come un
+    tick entero: 0.29 * 100 = 28.999999999999996 -> floor daria 0.28.
+    """
     decimales = LOT_SIZE.get(symbol, 6)
-    return round(qty, decimales)
+    paso      = Decimal(1).scaleb(-decimales)
+    return float(Decimal(str(qty)).quantize(paso, rounding=ROUND_DOWN))
 
 def _cargar_keys():
     api_key = secret = None
@@ -85,7 +95,7 @@ def _simular_fill(symbol, side, quote_qty=None, base_qty=None):
     precio = _precio_ticker(symbol)
     if side == "BUY":
         if quote_qty is not None:
-            qty  = round(quote_qty / precio, LOT_SIZE.get(symbol, 6))
+            qty  = _truncar_cantidad(symbol, quote_qty / precio)
             usdt = quote_qty
         else:
             qty  = base_qty
@@ -183,7 +193,7 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
             resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Compra {moneda} a ${precio_real} por ${ejecutado_usdt:.2f} USDT"
 
         elif tipo == "VENTA":
-            cantidad_a_vender = _redondear_cantidad(symbol, monto / precio)
+            cantidad_a_vender = _truncar_cantidad(symbol, monto / precio)
             if not simulador:
                 cantidad_disponible = billetera.get(moneda, 0)
                 if cantidad_disponible < cantidad_a_vender:
@@ -234,7 +244,7 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op):
     modo      = _leer_modo()
     simulador = not (modo == "REAL" and _confirmacion_real_activa())
 
-    cantidad = _redondear_cantidad(symbol, monto_op / precio_entrada)
+    cantidad = _truncar_cantidad(symbol, monto_op / precio_entrada)
     if cantidad <= 0:
         return f"❌ Cantidad de cierre inválida: {cantidad}"
 

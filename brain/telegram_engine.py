@@ -21,6 +21,8 @@ import threading
 import time
 import csv
 from datetime import datetime, date
+from ejecutor import cerrar_posicion
+from gestor_billetera import registrar_tp, registrar_sl
 
 ADMIN_YAYO  = 6578945006
 ADMIN_SOCIA = 6533031969
@@ -595,15 +597,35 @@ def cerrar_operacion_manual(symbol):
         header         = lineas[0]
         nuevas         = [header]
         cerradas       = 0
+        fallidas       = []
         ganancia_total = 0.0
         for linea in lineas[1:]:
             p = linea.strip().split(",")
             if len(p) >= 6 and p[2] == symbol and p[5] == "ABIERTA":
+                accion         = p[1]
                 precio_entrada = float(p[3])
                 cambio         = ((precio_ahora - precio_entrada) / precio_entrada) * 100
                 monto          = float(p[6]) if len(p) > 6 else 10.0
-                ganancia_total += round((cambio / 100) * monto, 3)
+                qty_op         = float(p[7]) if len(p) > 7 and p[7] else None
+                moneda         = symbol.replace("USDT", "")
+
+                # Antes esto solo marcaba el CSV: la orden nunca se enviaba a
+                # Binance y la billetera no se tocaba. En REAL el bot quedaba
+                # creyendose plano mientras la cripto seguia en la cuenta.
+                res, fill = cerrar_posicion(moneda, accion, precio_entrada, monto, qty_op)
+                if "❌" in res:
+                    print(f"  [MANUAL] Cierre fallido {symbol}: {res}")
+                    fallidas.append(res)
+                    nuevas.append(linea)
+                    continue
+
+                if accion == "BAJISTA":
+                    cambio = -cambio
                 p[5] = "MANUAL_WIN" if cambio >= 0 else "MANUAL_LOSS"
+                registrador = registrar_tp if cambio >= 0 else registrar_sl
+                registrador(precio_entrada, precio_ahora, monto, moneda, accion,
+                            qty=(fill or {}).get("qty"), usdt=(fill or {}).get("usdt"))
+                ganancia_total += round((cambio / 100) * monto, 3)
                 cerradas += 1
             nuevas.append(",".join(p) + "\n")
         _tmp = AUDITORIA_PATH + ".tmp"
@@ -612,6 +634,9 @@ def cerrar_operacion_manual(symbol):
         os.replace(_tmp, AUDITORIA_PATH)
         _lk.close()
         if cerradas == 0:
+            if fallidas:
+                return (f"⚠️ No se pudo cerrar {symbol} en Binance.\n"
+                        f"La posición sigue ABIERTA.\n" + "\n".join(fallidas))
             return f"⚠️ No hay operaciones abiertas de {symbol}"
         signo  = "+" if ganancia_total >= 0 else ""
         emoji  = "✅" if ganancia_total >= 0 else "🔴"

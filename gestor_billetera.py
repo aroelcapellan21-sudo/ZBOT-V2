@@ -66,46 +66,58 @@ def guardar_billetera(billetera):
     except Exception as e:
         raise RuntimeError(f"[BILLETERA] No se pudo guardar. Capital en riesgo: {e}")
 
-def registrar_tp(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA"):
+def _aplicar_cierre(billetera, precio_entrada, precio_salida, monto, moneda, tipo, qty, usdt):
+    """
+    Mueve la billetera por un cierre y devuelve el resultado en USDT
+    (positivo = ganancia, en TP; el llamador de SL lo invierte de signo).
+
+    qty/usdt vienen del fill REAL que devolvio cerrar_posicion:
+      qty  = cripto efectivamente entregada (SELL) o recibida neta (BUY)
+      usdt = USDT NETO de comision recibido (SELL) o pagado (BUY)
+    Si son None se cae al calculo teorico de siempre (filas escritas antes de
+    este cambio, o cierres que no pasaron por cerrar_posicion).
+    """
+    teorico = qty is None or usdt is None
+    if teorico:
+        qty  = round(monto / precio_entrada, 8)
+        usdt = round(qty * precio_salida, 4)
+
+    if tipo == "BAJISTA":
+        billetera["USDT"] = round(billetera.get("USDT", 0) - usdt, 4)
+        billetera[moneda] = round(billetera.get(moneda, 0) + qty, 8)
+        resultado = round(monto - usdt, 4)
+    else:
+        billetera["USDT"] = round(billetera.get("USDT", 0) + usdt, 4)
+        billetera[moneda] = max(0.0, round(billetera.get(moneda, 0) - qty, 8))
+        resultado = round(usdt - monto, 4)
+    return resultado, teorico
+
+
+def registrar_tp(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA", qty=None, usdt=None):
     if precio_entrada <= 0 or monto < MONTO_MINIMO_BINANCE:
         print(f"[BILLETERA] ⚠️ Datos invalidos para TP. monto=${monto}, entrada=${precio_entrada}")
         return 0
     with _billetera_lock():
         billetera = cargar_billetera()
-        cantidad = round(monto / precio_entrada, 8)
-        if tipo == "BAJISTA":
-            costo_recompra = round(cantidad * precio_salida, 4)
-            billetera["USDT"] = round(billetera.get("USDT", 0) - costo_recompra, 4)
-            billetera[moneda] = round(billetera.get(moneda, 0) + cantidad, 8)
-            ganancia = round(monto - costo_recompra, 4)
-        else:
-            usdt_recibido = round(cantidad * precio_salida, 4)
-            billetera["USDT"] = round(billetera.get("USDT", 0) + usdt_recibido, 4)
-            billetera[moneda] = max(0.0, round(billetera.get(moneda, 0) - cantidad, 8))
-            ganancia = round(usdt_recibido - monto, 4)
+        ganancia, teorico = _aplicar_cierre(
+            billetera, precio_entrada, precio_salida, monto, moneda, tipo, qty, usdt)
         guardar_billetera(billetera)
     registrar_historial_billetera(billetera, "TP")
-    print(f"  💰 TP {tipo}: ${precio_entrada} → ${precio_salida} | Ganancia: +${ganancia}")
+    origen = " (calculo teorico, sin fill real)" if teorico else ""
+    print(f"  💰 TP {tipo}: ${precio_entrada} → ${precio_salida} | Ganancia: +${ganancia}{origen}")
     return ganancia
 
-def registrar_sl(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA"):
+def registrar_sl(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA", qty=None, usdt=None):
     if precio_entrada <= 0 or monto < MONTO_MINIMO_BINANCE:
         print(f"[BILLETERA] ⚠️ Datos invalidos para SL. monto=${monto}, entrada=${precio_entrada}")
         return 0
     with _billetera_lock():
         billetera = cargar_billetera()
-        cantidad = round(monto / precio_entrada, 8)
-        if tipo == "BAJISTA":
-            costo_recompra = round(cantidad * precio_salida, 4)
-            billetera["USDT"] = round(billetera.get("USDT", 0) - costo_recompra, 4)
-            billetera[moneda] = round(billetera.get(moneda, 0) + cantidad, 8)
-            perdida = round(costo_recompra - monto, 4)
-        else:
-            usdt_recibido = round(cantidad * precio_salida, 4)
-            billetera["USDT"] = round(billetera.get("USDT", 0) + usdt_recibido, 4)
-            billetera[moneda] = max(0.0, round(billetera.get(moneda, 0) - cantidad, 8))
-            perdida = round(monto - usdt_recibido, 4)
+        resultado, teorico = _aplicar_cierre(
+            billetera, precio_entrada, precio_salida, monto, moneda, tipo, qty, usdt)
         guardar_billetera(billetera)
+    perdida = round(-resultado, 4)
     registrar_historial_billetera(billetera, "SL")
-    print(f"  🛑 SL {tipo}: ${precio_entrada} → ${precio_salida} | Perdida: -${perdida}")
+    origen = " (calculo teorico, sin fill real)" if teorico else ""
+    print(f"  🛑 SL {tipo}: ${precio_entrada} → ${precio_salida} | Perdida: -${perdida}{origen}")
     return perdida

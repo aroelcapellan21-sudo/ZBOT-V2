@@ -48,7 +48,7 @@ def cerrar_huerfanas(fase_nueva):
         _lk.close()
         return
 
-    header   = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto\n"
+    header   = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto,qty\n"
     nuevas   = [header]
     cerradas = 0
 
@@ -63,12 +63,14 @@ def cerrar_huerfanas(fase_nueva):
         try:
             precio_entrada = float(partes[3])
             monto_op       = float(partes[6])
+            # qty real del fill de entrada; None en filas previas al fix #4
+            qty_op         = float(partes[7]) if len(partes) > 7 and partes[7] else None
             moneda         = symbol.replace("USDT", "")
 
             cierres       = fetch_velas(symbol, limite=5)
             precio_actual = cierres[-1] if cierres else precio_entrada
 
-            res = cerrar_posicion(moneda, accion, precio_entrada, monto_op)
+            res, fill_cierre = cerrar_posicion(moneda, accion, precio_entrada, monto_op, qty_op)
             if "❌" in res:
                 print(f"  [HUERFANAS] Cierre fallido {symbol} {accion}: {res}")
                 enviar_aviso(
@@ -81,10 +83,14 @@ def cerrar_huerfanas(fase_nueva):
 
             ganando = (precio_actual < precio_entrada) if accion == "BAJISTA" \
                       else (precio_actual > precio_entrada)
+            qty_real  = (fill_cierre or {}).get("qty")
+            usdt_real = (fill_cierre or {}).get("usdt")
             if ganando:
-                registrar_tp(precio_entrada, precio_actual, monto_op, moneda, accion)
+                registrar_tp(precio_entrada, precio_actual, monto_op, moneda, accion,
+                             qty=qty_real, usdt=usdt_real)
             else:
-                registrar_sl(precio_entrada, precio_actual, monto_op, moneda, accion)
+                registrar_sl(precio_entrada, precio_actual, monto_op, moneda, accion,
+                             qty=qty_real, usdt=usdt_real)
 
             cambio = ((precio_entrada - precio_actual) / precio_entrada * 100) if accion == "BAJISTA" \
                      else ((precio_actual - precio_entrada) / precio_entrada * 100)

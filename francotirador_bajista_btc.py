@@ -77,11 +77,11 @@ def contar_operaciones_abiertas():
         print(f"  [AUDITORIA] Error contando ops: {e}")
         return 0
 
-def registrar_operacion(accion, precio, rsi, monto):
+def registrar_operacion(accion, precio, rsi, monto, qty):
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     try:
         with open(AUDITORIA, "a") as f:
-            f.write(f"{timestamp},{accion},{SYMBOL},{precio},{rsi},ABIERTA,{monto}\n")
+            f.write(f"{timestamp},{accion},{SYMBOL},{precio},{rsi},ABIERTA,{monto},{qty}\n")
     except Exception as e:
         print(f"  [AUDITORIA] ERROR registrando operacion: {e}")
 
@@ -96,7 +96,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
         _lk.close()
         return
 
-    header        = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto\n"
+    header        = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto,qty\n"
     nuevas_lineas = [header]
 
     for linea in lineas[1:]:
@@ -137,22 +137,25 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                     trailing_on = False
 
                 monto_op = float(partes[6]) if len(partes) > 6 else 10.0
+                # qty real del fill de entrada; None en filas previas al fix #4
+                qty_op   = float(partes[7]) if len(partes) > 7 and partes[7] else None
                 if evaluar_tp and cambio >= TAKE_PROFIT:
-                    res_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op)
+                    res_cierre, fill_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op, qty_op)
                     if "❌" in res_cierre:
                         print(f"  ⚠️ Cierre fallido (TP): {res_cierre}")
                         enviar_aviso(f"⚠️ ERROR CIERRE {SYMBOL}\nNo se pudo cerrar posición en Binance (TP).\nPosición queda ABIERTA — reintentando próximo ciclo.\nError: {res_cierre}")
                         nuevas_lineas.append(linea)
                         continue
                     partes[5] = "TP"
-                    registrar_tp(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
+                    registrar_tp(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                                 qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                     enviar_aviso(f"✅ TP BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nGanancia: +{round(cambio,2)}%")
                     registrar_evento(f"BAJISTA BTC: TP {SYMBOL} +{round(cambio,2)}%")
                     actualizar_memoria(SYMBOL, cambio)
                     print(f"  ✅ TP: ${precio_entrada} → ${precio_actual}")
 
                 elif precio_actual >= sl_efectivo:
-                    res_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op)
+                    res_cierre, fill_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op, qty_op)
                     if "❌" in res_cierre:
                         print(f"  ⚠️ Cierre fallido (SL): {res_cierre}")
                         enviar_aviso(f"⚠️ ERROR CIERRE {SYMBOL}\nNo se pudo cerrar posición en Binance (SL).\nPosición queda ABIERTA — reintentando próximo ciclo.\nError: {res_cierre}")
@@ -160,7 +163,8 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         continue
                     if be_activo and sl_efectivo <= be_price:
                         partes[5] = "BE"
-                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
+                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                                     qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(
                             f"🛡️ BREAKEVEN BAJISTA {SYMBOL}\n"
                             f"Entrada: ${precio_entrada}\n"
@@ -172,13 +176,15 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         print(f"  🛡️ BE: ${precio_entrada} → ${sl_efectivo} protegido")
                     elif trailing_on:
                         partes[5] = "TRAILING_SL"
-                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
+                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                                     qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(f"🎯 TRAILING SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}")
                         registrar_evento(f"BAJISTA BTC: TRAILING_SL {SYMBOL} ${sl_efectivo}")
                         print(f"  🎯 TRAILING_SL: ${precio_entrada} → ${sl_efectivo}")
                     else:
                         partes[5] = "SL"
-                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE)
+                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                                     qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(f"🛑 SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nPerdida: -{STOP_LOSS}%")
                         registrar_evento(f"BAJISTA BTC: SL {SYMBOL} -{STOP_LOSS}%")
                         print(f"  🛑 SL: ${precio_entrada} → ${sl_efectivo}")
@@ -287,16 +293,16 @@ def evaluar():
         monto_base = capital * CAPITAL_MAX_POR_OP
         monto_op   = round(monto_base * factor_mem, 2)
 
-        resultado = ejecutar_operacion(MONEDA, "VENTA", precio_actual, monto_op)
+        resultado, fill = ejecutar_operacion(MONEDA, "VENTA", precio_actual, monto_op)
         print(f"  {resultado}")
 
         if "✅" in resultado:
-            registrar_operacion("BAJISTA", precio_actual, rsi, monto_op)
-            registrar_evento(f"FRANCOTIRADOR BAJISTA BTC: ENTRADA {precio_actual} RSI:{rsi} | {resultado}")
+            registrar_operacion("BAJISTA", fill["precio"], rsi, monto_op, fill["qty"])
+            registrar_evento(f"FRANCOTIRADOR BAJISTA BTC: ENTRADA {fill['precio']} RSI:{rsi} | {resultado}")
             enviar_aviso(
                 f"📉 FRANCOTIRADOR BAJISTA BTC\n"
                 f"Symbol: {SYMBOL}\n"
-                f"Precio: ${precio_actual}\n"
+                f"Precio: ${fill['precio']} (fill real)\n"
                 f"RSI: {rsi} | EMA{EMA_CORTA}: {ema_c} | EMA{EMA_LARGA}: {ema_l}\n"
                 f"Operacion: {ops_abiertas+1}/{MAX_OP_TOTAL}\n"
                 f"Monto: ${monto_op} | Factor memoria: {factor_mem}\n"

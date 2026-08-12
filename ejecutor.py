@@ -137,12 +137,52 @@ def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
         cuerpo = e.read().decode()
         raise RuntimeError(f"Binance {e.code}: {cuerpo}")
 
+def _extraer_fill(respuesta, moneda, qty_fallback, usdt_fallback, precio_fallback):
+    """
+    Normaliza la respuesta de Binance a (qty_neta, usdt_neto, precio_real).
+
+    'executedQty' es BRUTO, antes de comision. Binance cobra:
+      - en COMPRA : la comision en el activo BASE  -> recibis menos cripto
+      - en VENTA  : la comision en el activo QUOTE -> recibis menos USDT
+    El detalle viene en respuesta["fills"][i]["commission"/"commissionAsset"].
+    Persistir executedQty sin restar la comision hace que despues intentes
+    vender ~0.1% mas de lo que realmente tenes.
+
+    _simular_fill no devuelve 'fills', asi que en SIMULADOR la comision es 0.
+    Modelar fees simuladas es otro cambio (punto 5 del plan de auditoria).
+    """
+    qty  = float(respuesta.get("executedQty") or qty_fallback)
+    usdt = float(respuesta.get("cummulativeQuoteQty") or usdt_fallback)
+
+    com_base = com_quote = 0.0
+    for f in respuesta.get("fills") or []:
+        try:
+            c = float(f.get("commission") or 0)
+        except (TypeError, ValueError) as e:
+            print(f"  [EJECUTOR] ⚠️ Comision ilegible en fill: {e}")
+            continue
+        activo = f.get("commissionAsset")
+        if activo == moneda:
+            com_base += c
+        elif activo == "USDT":
+            com_quote += c
+
+    precio_real = round(usdt / qty, 4) if qty > 0 else precio_fallback
+    return round(qty - com_base, 8), round(usdt - com_quote, 8), precio_real
+
+
 def ejecutar_operacion(moneda, tipo, precio, monto=None):
+    """
+    Devuelve (mensaje, fill).
+      fill = {"qty": <cripto NETA de comision>, "usdt": <USDT NETO>, "precio": <fill real>}
+      fill = None  si la orden fue rechazada o fallo.
+    El mensaje mantiene el formato "✅ ..."/"❌ ..." de siempre.
+    """
     if not monto or monto <= 0:
-        return f"❌ RECHAZADO: Monto invalido (${monto})"
+        return f"❌ RECHAZADO: Monto invalido (${monto})", None
 
     if monto < MONTO_MINIMO_BINANCE:
-        return f"❌ RECHAZADO: Monto ${monto:.2f} bajo minimo Binance (${MONTO_MINIMO_BINANCE})"
+        return f"❌ RECHAZADO: Monto ${monto:.2f} bajo minimo Binance (${MONTO_MINIMO_BINANCE})", None
 
     symbol     = moneda + "USDT"
     modo       = _leer_modo()
@@ -156,25 +196,25 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
     try:
         lock_fd = open(LOCK_FILE, "w")
     except Exception as e:
-        return f"❌ ERROR abriendo lock file: {e}"
+        return f"❌ ERROR abriendo lock file: {e}", None
 
     try:
         fcntl.flock(lock_fd, fcntl.LOCK_EX)
     except Exception as e:
         lock_fd.close()
-        return f"❌ ERROR adquiriendo lock de billetera: {e}"
+        return f"❌ ERROR adquiriendo lock de billetera: {e}", None
 
     try:
         try:
             with open(BILLETERA, "r") as f:
                 billetera = json.load(f)
         except Exception as e:
-            return f"❌ ERROR leyendo billetera: {e}"
+            return f"❌ ERROR leyendo billetera: {e}", None
 
         if tipo == "COMPRA":
             usdt_disponible = billetera.get("USDT", 0)
             if usdt_disponible < monto:
-                return f"❌ RECHAZADO: Fondos insuficientes (necesita ${monto:.2f}, tiene ${usdt_disponible:.2f})"
+                return f"❌ RECHAZADO: Fondos insuficientes (necesita ${monto:.2f}, tiene ${usdt_disponible:.2f})", None
 
             try:
                 if simulador:
@@ -182,22 +222,24 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
                 else:
                     respuesta = _orden_mercado(symbol, "BUY", quote_qty=monto)
             except Exception as e:
-                return f"❌ ERROR {'simulando' if simulador else 'Binance'} COMPRA: {e}"
+                return f"❌ ERROR {'simulando' if simulador else 'Binance'} COMPRA: {e}", None
 
-            ejecutado_usdt = float(respuesta.get("cummulativeQuoteQty", monto))
-            ejecutado_qty  = float(respuesta.get("executedQty", monto / precio))
-            precio_real    = round(ejecutado_usdt / ejecutado_qty, 4) if ejecutado_qty > 0 else precio
+            qty_neta, usdt_neto, precio_real = _extraer_fill(
+                respuesta, moneda, monto / precio, monto, precio)
+            # En COMPRA se gasta el USDT bruto; la comision se descuenta de la cripto.
+            usdt_gastado = float(respuesta.get("cummulativeQuoteQty") or monto)
 
-            billetera["USDT"] = round(billetera.get("USDT", 0) - ejecutado_usdt, 4)
-            billetera[moneda] = round(billetera.get(moneda, 0) + ejecutado_qty, 8)
-            resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Compra {moneda} a ${precio_real} por ${ejecutado_usdt:.2f} USDT"
+            billetera["USDT"] = round(billetera.get("USDT", 0) - usdt_gastado, 4)
+            billetera[moneda] = round(billetera.get(moneda, 0) + qty_neta, 8)
+            fill      = {"qty": qty_neta, "usdt": usdt_gastado, "precio": precio_real}
+            resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Compra {moneda} a ${precio_real} por ${usdt_gastado:.2f} USDT"
 
         elif tipo == "VENTA":
             cantidad_a_vender = _truncar_cantidad(symbol, monto / precio)
             if not simulador:
                 cantidad_disponible = billetera.get(moneda, 0)
                 if cantidad_disponible < cantidad_a_vender:
-                    return f"❌ RECHAZADO: No tienes suficiente {moneda} (necesita {cantidad_a_vender}, tiene {cantidad_disponible:.6f})"
+                    return f"❌ RECHAZADO: No tienes suficiente {moneda} (necesita {cantidad_a_vender}, tiene {cantidad_disponible:.6f})", None
 
             try:
                 if simulador:
@@ -205,18 +247,20 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
                 else:
                     respuesta = _orden_mercado(symbol, "SELL", base_qty=cantidad_a_vender)
             except Exception as e:
-                return f"❌ ERROR {'simulando' if simulador else 'Binance'} VENTA: {e}"
+                return f"❌ ERROR {'simulando' if simulador else 'Binance'} VENTA: {e}", None
 
-            ejecutado_qty  = float(respuesta.get("executedQty", cantidad_a_vender))
-            ejecutado_usdt = float(respuesta.get("cummulativeQuoteQty", monto))
-            precio_real    = round(ejecutado_usdt / ejecutado_qty, 4) if ejecutado_qty > 0 else precio
+            _, usdt_neto, precio_real = _extraer_fill(
+                respuesta, moneda, cantidad_a_vender, monto, precio)
+            # En VENTA se entrega la cripto bruta; la comision se descuenta del USDT.
+            qty_entregada = float(respuesta.get("executedQty") or cantidad_a_vender)
 
-            billetera[moneda] = round(billetera.get(moneda, 0) - ejecutado_qty, 8)
-            billetera["USDT"] = round(billetera.get("USDT", 0) + ejecutado_usdt, 4)
-            resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Venta {moneda} a ${precio_real} recuperando ${ejecutado_usdt:.2f} USDT"
+            billetera[moneda] = round(billetera.get(moneda, 0) - qty_entregada, 8)
+            billetera["USDT"] = round(billetera.get("USDT", 0) + usdt_neto, 4)
+            fill      = {"qty": qty_entregada, "usdt": usdt_neto, "precio": precio_real}
+            resultado = f"✅ {'[SIM] ' if simulador else ''}EJECUTADO: Venta {moneda} a ${precio_real} recuperando ${usdt_neto:.2f} USDT"
 
         else:
-            return f"❌ Tipo desconocido: {tipo}"
+            return f"❌ Tipo desconocido: {tipo}", None
 
         try:
             tmp = BILLETERA + ".tmp"
@@ -225,57 +269,71 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
             os.replace(tmp, BILLETERA)
             registrar_historial_billetera(billetera, tipo)
         except Exception as e:
-            return f"❌ ERROR CRITICO guardando billetera: {e}"
+            return f"❌ ERROR CRITICO guardando billetera: {e}", None
 
-        return resultado
+        return resultado, fill
 
     finally:
         fcntl.flock(lock_fd, fcntl.LOCK_UN)
         lock_fd.close()
 
-def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op):
+def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op, qty=None):
     """
     Envía la orden de cierre a Binance para una posición abierta.
     ALCISTA/LATERAL → SELL base_qty (vende la crypto comprada)
     BAJISTA         → BUY  base_qty (recompra la crypto vendida)
     No actualiza billetera: eso sigue siendo responsabilidad de registrar_tp/sl.
+
+    qty: cantidad REAL de la posicion (columna 'qty' de auditoria.csv, que
+         guarda el executedQty neto de comision del fill de entrada).
+         Si es None se cae al calculo teorico monto_op/precio_entrada, que es
+         lo que hacian las filas escritas antes de este cambio.
+
+    Devuelve (mensaje, fill) igual que ejecutar_operacion:
+      fill = {"qty": ..., "usdt": <USDT NETO recibido>, "precio": <fill real>}
+      fill = None si el cierre fallo.
     """
     symbol    = moneda + "USDT"
     modo      = _leer_modo()
     simulador = not (modo == "REAL" and _confirmacion_real_activa())
 
-    cantidad = _truncar_cantidad(symbol, monto_op / precio_entrada)
+    if qty is None:
+        cantidad = _truncar_cantidad(symbol, monto_op / precio_entrada)
+        print(f"  [EJECUTOR] {symbol} sin qty persistida — cierre por calculo teorico.")
+    else:
+        cantidad = _truncar_cantidad(symbol, qty)
+
     if cantidad <= 0:
-        return f"❌ Cantidad de cierre inválida: {cantidad}"
+        return f"❌ Cantidad de cierre inválida: {cantidad}", None
 
     try:
         if tipo_trade in ("ALCISTA", "LATERAL"):
-            if simulador:
-                respuesta = _simular_fill(symbol, "SELL", base_qty=cantidad)
-            else:
-                respuesta = _orden_mercado(symbol, "SELL", base_qty=cantidad)
-            tag      = "[SIM] " if simulador else ""
-            qty_ej   = float(respuesta.get("executedQty", cantidad))
-            usdt_ej  = float(respuesta.get("cummulativeQuoteQty", 0))
-            precio_r = round(usdt_ej / qty_ej, 4) if qty_ej > 0 else precio_entrada
-            return f"✅ {tag}CIERRE LONG {moneda}: vendido {qty_ej} a ${precio_r}"
-
+            lado, verbo = "SELL", "vendido"
+            etiqueta    = "CIERRE LONG"
         elif tipo_trade == "BAJISTA":
-            if simulador:
-                respuesta = _simular_fill(symbol, "BUY", base_qty=cantidad)
-            else:
-                respuesta = _orden_mercado(symbol, "BUY", base_qty=cantidad)
-            tag      = "[SIM] " if simulador else ""
-            qty_ej   = float(respuesta.get("executedQty", cantidad))
-            usdt_ej  = float(respuesta.get("cummulativeQuoteQty", 0))
-            precio_r = round(usdt_ej / qty_ej, 4) if qty_ej > 0 else precio_entrada
-            return f"✅ {tag}CIERRE SHORT {moneda}: recomprado {qty_ej} a ${precio_r}"
-
+            lado, verbo = "BUY", "recomprado"
+            etiqueta    = "CIERRE SHORT"
         else:
-            return f"❌ tipo_trade desconocido para cierre: {tipo_trade}"
+            return f"❌ tipo_trade desconocido para cierre: {tipo_trade}", None
+
+        if simulador:
+            respuesta = _simular_fill(symbol, lado, base_qty=cantidad)
+        else:
+            respuesta = _orden_mercado(symbol, lado, base_qty=cantidad)
+
+        qty_neta, usdt_neto, precio_r = _extraer_fill(
+            respuesta, moneda, cantidad, 0.0, precio_entrada)
+        qty_ej = float(respuesta.get("executedQty") or cantidad)
+        # SELL: se entrega la cripto bruta y se recibe USDT neto de comision.
+        # BUY (cierre de short): se recibe cripto neta y se paga USDT bruto.
+        fill = {"qty": qty_neta if lado == "BUY" else qty_ej,
+                "usdt": usdt_neto,
+                "precio": precio_r}
+        tag = "[SIM] " if simulador else ""
+        return f"✅ {tag}{etiqueta} {moneda}: {verbo} {qty_ej} a ${precio_r}", fill
 
     except urllib.error.HTTPError as e:
         cuerpo = e.read().decode()
-        return f"❌ Binance {e.code} en cierre {moneda}: {cuerpo}"
+        return f"❌ Binance {e.code} en cierre {moneda}: {cuerpo}", None
     except Exception as e:
-        return f"❌ ERROR cierre Binance {moneda}: {e}"
+        return f"❌ ERROR cierre Binance {moneda}: {e}", None

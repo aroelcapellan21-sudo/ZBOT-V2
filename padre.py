@@ -12,7 +12,7 @@ def ejecutar_orden(moneda, accion, precio):
     Recibe orden limpia de la Matrix.
     Solo ejecuta. Nada mas.
     """
-    confirmacion = ejecutar_operacion(moneda, accion, precio)
+    confirmacion, _fill = ejecutar_operacion(moneda, accion, precio)
     print(f"[PADRE] Orden ejecutada: {accion} {moneda} a ${precio}")
     print(f"[PADRE] Confirmacion: {confirmacion}")
     return confirmacion

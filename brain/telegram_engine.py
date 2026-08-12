@@ -621,12 +621,18 @@ def cerrar_operacion_manual(symbol):
 
                 if accion == "BAJISTA":
                     cambio = -cambio
+                # La orden ya salio: marcar cerrada ANTES de contabilizar, y no
+                # dejar que un fallo de contabilidad devuelva la fila a ABIERTA.
                 p[5] = "MANUAL_WIN" if cambio >= 0 else "MANUAL_LOSS"
-                registrador = registrar_tp if cambio >= 0 else registrar_sl
-                registrador(precio_entrada, precio_ahora, monto, moneda, accion,
-                            qty=(fill or {}).get("qty"), usdt=(fill or {}).get("usdt"))
                 ganancia_total += round((cambio / 100) * monto, 3)
                 cerradas += 1
+                try:
+                    registrador = registrar_tp if cambio >= 0 else registrar_sl
+                    registrador(precio_entrada, precio_ahora, monto, moneda, accion,
+                                qty=(fill or {}).get("qty"), usdt=(fill or {}).get("usdt"))
+                except Exception as e:
+                    print(f"  [MANUAL] ⚠️ Contabilidad fallida tras cierre ejecutado: {e}")
+                    fallidas.append(f"Cierre ejecutado pero contabilidad fallida: {e}")
             nuevas.append(",".join(p) + "\n")
         _tmp = AUDITORIA_PATH + ".tmp"
         with open(_tmp, "w") as f:

@@ -71,19 +71,90 @@ def contar_operaciones_abiertas():
             1 for l in lineas[1:]
             if len(l.strip().split(",")) >= 6 and
             l.strip().split(",")[2] == SYMBOL and
-            l.strip().split(",")[5] == "ABIERTA"
+            l.strip().split(",")[5] in ("ABIERTA", "RESERVADA")
         )
     except Exception as e:
         print(f"  [AUDITORIA] Error contando ops: {e}")
         return 0
 
-def registrar_operacion(accion, precio, rsi, monto, qty):
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def reservar_operacion(accion, precio, rsi, monto):
+    """
+    Escribe la fila ANTES de mandar la orden, en estado RESERVADA y bajo el
+    mismo lock que usan los que reescriben el archivo entero (un append sin
+    lock se pierde si entra en medio de una reescritura).
+
+    Devuelve el id de fila (su timestamp) o None si no se pudo escribir.
+    Si devuelve None NO hay que operar: preferimos no comprar antes que
+    comprar sin registro, porque una posicion sin fila no la vigila nadie y
+    ademas no cuenta para el limite, asi que el bot volveria a comprar.
+    """
+    fila_id = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    _lk = open(AUDITORIA_LOCK, "w")
+    fcntl.flock(_lk, fcntl.LOCK_EX)
     try:
         with open(AUDITORIA, "a") as f:
-            f.write(f"{timestamp},{accion},{SYMBOL},{precio},{rsi},ABIERTA,{monto},{qty}\n")
+            f.write(f"{fila_id},{accion},{SYMBOL},{precio},{rsi},RESERVADA,{monto},\n")
+        return fila_id
     except Exception as e:
-        print(f"  [AUDITORIA] ERROR registrando operacion: {e}")
+        print(f"  [AUDITORIA] ERROR reservando operacion: {e}")
+        enviar_aviso(f"⚠️ {SYMBOL}: no se pudo reservar la fila de auditoria.\nNO se opera.\n{e}")
+        return None
+    finally:
+        fcntl.flock(_lk, fcntl.LOCK_UN)
+        _lk.close()
+
+def _actualizar_fila(fila_id, nuevo_estado, precio=None, qty=None):
+    """
+    Cierra el ciclo de una reserva: ABIERTA con el fill real si la orden
+    salio, ANULADA si fallo. La fila ANULADA se conserva a proposito, como
+    rastro de auditoria.
+    """
+    _lk = open(AUDITORIA_LOCK, "w")
+    fcntl.flock(_lk, fcntl.LOCK_EX)
+    try:
+        with open(AUDITORIA, "r") as f:
+            lineas = f.readlines()
+        for i, l in enumerate(lineas):
+            p = l.rstrip("\n").split(",")
+            if len(p) >= 6 and p[0] == fila_id and p[2] == SYMBOL and p[5] == "RESERVADA":
+                p[5] = nuevo_estado
+                if precio is not None:
+                    p[3] = str(precio)
+                while len(p) < 8:
+                    p.append("")
+                if qty is not None:
+                    p[7] = str(qty)
+                lineas[i] = ",".join(p) + "\n"
+                break
+        else:
+            print(f"  [AUDITORIA] ⚠️ No se encontro la reserva {fila_id} de {SYMBOL}")
+            return False
+        _tmp = AUDITORIA + ".tmp"
+        with open(_tmp, "w") as f:
+            f.writelines(lineas)
+        os.replace(_tmp, AUDITORIA)
+        return True
+    except Exception as e:
+        print(f"  [AUDITORIA] ERROR actualizando reserva {fila_id}: {e}")
+        enviar_aviso(f"⚠️ DESCUADRE {SYMBOL}\nOrden {nuevo_estado} pero la fila quedo en RESERVADA:\n{e}")
+        return False
+    finally:
+        fcntl.flock(_lk, fcntl.LOCK_UN)
+        _lk.close()
+
+def _contabilizar(fn, *args, **kwargs):
+    """
+    Corre la contabilidad de un cierre que YA se ejecuto en Binance.
+    Nunca propaga la excepcion: si la fila volviera a ABIERTA el bot
+    re-venderia una posicion que ya no existe.
+    """
+    try:
+        return fn(*args, **kwargs)
+    except Exception as e:
+        print(f"  [CONTABILIDAD] ⚠️ FALLO tras un cierre YA ejecutado: {e}")
+        enviar_aviso(f"⚠️ DESCUADRE {SYMBOL}\nEl cierre SI se ejecuto en Binance pero la "
+                     f"contabilidad fallo:\n{e}\nRevisar billetera.json a mano.")
+        return 0
 
 def revisar_cierres(precio_actual, evaluar_tp=True):
     _lk = open(AUDITORIA_LOCK, "w")
@@ -145,7 +216,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         nuevas_lineas.append(linea)
                         continue
                     partes[5] = "TP"
-                    registrar_tp(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                    _contabilizar(registrar_tp, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                  qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                     enviar_aviso(f"✅ TP BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nGanancia: +{round(cambio,2)}%")
                     registrar_evento(f"BAJISTA ETH: TP {SYMBOL} +{round(cambio,2)}%")
@@ -161,7 +232,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         continue
                     if be_activo and sl_efectivo <= be_price:
                         partes[5] = "BE"
-                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                        _contabilizar(registrar_sl, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                      qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(
                             f"🛡️ BREAKEVEN BAJISTA {SYMBOL}\n"
@@ -174,14 +245,14 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         print(f"  🛡️ BE: ${precio_entrada} → ${sl_efectivo} protegido")
                     elif trailing_on:
                         partes[5] = "TRAILING_SL"
-                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                        _contabilizar(registrar_sl, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                      qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(f"🎯 TRAILING SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}")
                         registrar_evento(f"BAJISTA ETH: TRAILING_SL {SYMBOL} ${sl_efectivo}")
                         print(f"  🎯 TRAILING_SL: ${precio_entrada} → ${sl_efectivo}")
                     else:
                         partes[5] = "SL"
-                        registrar_sl(precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
+                        _contabilizar(registrar_sl, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                      qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(f"🛑 SL BAJISTA {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nPerdida: -{STOP_LOSS}%")
                         registrar_evento(f"BAJISTA ETH: SL {SYMBOL} -{STOP_LOSS}%")
@@ -191,7 +262,9 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                 nuevas_lineas.append(",".join(partes) + "\n")
             except Exception as e:
                 print(f"  [AUDITORIA] Error procesando linea: {e}")
-                nuevas_lineas.append(linea)
+                # Si el cierre YA se ejecuto (partes[5] cambio), la fila no puede
+                # volver a ABIERTA: el bot re-venderia una posicion cerrada.
+                nuevas_lineas.append((",".join(partes) + "\n") if partes[5] != "ABIERTA" else linea)
         else:
             nuevas_lineas.append(linea)
 
@@ -291,11 +364,16 @@ def evaluar():
         monto_base = capital * CAPITAL_MAX_POR_OP
         monto_op   = round(monto_base * factor_mem, 2)
 
+        fila_id = reservar_operacion("BAJISTA", precio_actual, rsi, monto_op)
+        if fila_id is None:
+            print("  [AUDITORIA] Reserva fallida. NO se opera.")
+            return
+        
         resultado, fill = ejecutar_operacion(MONEDA, "VENTA", precio_actual, monto_op)
         print(f"  {resultado}")
 
         if "✅" in resultado:
-            registrar_operacion("BAJISTA", fill["precio"], rsi, monto_op, fill["qty"])
+            _actualizar_fila(fila_id, "ABIERTA", precio=fill["precio"], qty=fill["qty"])
             registrar_evento(f"FRANCOTIRADOR BAJISTA ETH: ENTRADA {fill['precio']} RSI:{rsi} | {resultado}")
             enviar_aviso(
                 f"📉 FRANCOTIRADOR BAJISTA ETH\n"
@@ -308,6 +386,8 @@ def evaluar():
                 f"Breakeven: 8h + {BE_UMBRAL}%\n"
                 f"{resultado}"
             )
+        else:
+            _actualizar_fila(fila_id, "ANULADA")
     else:
         print(f"  Sin señal bajista. RSI:{rsi} EMA_C:{ema_c} EMA_L:{ema_l}")
         registrar_evento(f"FRANCOTIRADOR BAJISTA ETH: Sin señal. RSI:{rsi}")

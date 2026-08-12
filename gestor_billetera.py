@@ -14,6 +14,7 @@ import json
 import os
 from contextlib import contextmanager
 from datetime import datetime
+from engine import enviar_aviso
 
 BILLETERA           = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 HISTORIAL_BILLETERA = os.path.expanduser("~/bot-padre-v2/historial_billetera.csv")
@@ -66,6 +67,22 @@ def guardar_billetera(billetera):
     except Exception as e:
         raise RuntimeError(f"[BILLETERA] No se pudo guardar. Capital en riesgo: {e}")
 
+def _alertar_cierre_sin_registrar(clase, precio_entrada, monto, moneda):
+    """
+    Los datos no permiten contabilizar, pero la orden de cierre YA salio a
+    Binance. Antes esto solo imprimia una linea que se perdia en el stdout del
+    screen; ahora avisa, porque la billetera queda descuadrada.
+    """
+    msg = (f"[BILLETERA] ⚠️ {clase} NO REGISTRADO en {moneda}: datos invalidos "
+           f"(monto=${monto}, entrada=${precio_entrada}). La orden ya se ejecuto "
+           f"en Binance — billetera.json quedo descuadrada.")
+    print(msg)
+    try:
+        enviar_aviso(f"⚠️ DESCUADRE {moneda}\n{msg}")
+    except Exception as e:
+        print(f"[BILLETERA] No se pudo avisar del descuadre: {e}")
+
+
 def _aplicar_cierre(billetera, precio_entrada, precio_salida, monto, moneda, tipo, qty, usdt):
     """
     Mueve la billetera por un cierre y devuelve el resultado en USDT
@@ -95,7 +112,9 @@ def _aplicar_cierre(billetera, precio_entrada, precio_salida, monto, moneda, tip
 
 def registrar_tp(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA", qty=None, usdt=None):
     if precio_entrada <= 0 or monto < MONTO_MINIMO_BINANCE:
-        print(f"[BILLETERA] ⚠️ Datos invalidos para TP. monto=${monto}, entrada=${precio_entrada}")
+        # Se llega aca DESPUES de que la orden se ejecuto en Binance: salir en
+        # silencio deja la billetera sin registrar una venta que si ocurrio.
+        _alertar_cierre_sin_registrar("TP", precio_entrada, monto, moneda)
         return 0
     with _billetera_lock():
         billetera = cargar_billetera()
@@ -109,7 +128,7 @@ def registrar_tp(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA", q
 
 def registrar_sl(precio_entrada, precio_salida, monto, moneda, tipo="ALCISTA", qty=None, usdt=None):
     if precio_entrada <= 0 or monto < MONTO_MINIMO_BINANCE:
-        print(f"[BILLETERA] ⚠️ Datos invalidos para SL. monto=${monto}, entrada=${precio_entrada}")
+        _alertar_cierre_sin_registrar("SL", precio_entrada, monto, moneda)
         return 0
     with _billetera_lock():
         billetera = cargar_billetera()

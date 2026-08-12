@@ -81,21 +81,30 @@ def cerrar_huerfanas(fase_nueva):
                 nuevas.append(linea)
                 continue
 
+            # La orden YA se ejecuto en Binance: marcar la fila cerrada ANTES de
+            # contabilizar. Si la contabilidad falla y la fila volviera a
+            # ABIERTA, el proximo ciclo re-venderia una posicion inexistente.
+            partes[5] = "FASE_CAMBIO"
+            cerradas += 1
+
             ganando = (precio_actual < precio_entrada) if accion == "BAJISTA" \
                       else (precio_actual > precio_entrada)
             qty_real  = (fill_cierre or {}).get("qty")
             usdt_real = (fill_cierre or {}).get("usdt")
-            if ganando:
-                registrar_tp(precio_entrada, precio_actual, monto_op, moneda, accion,
-                             qty=qty_real, usdt=usdt_real)
-            else:
-                registrar_sl(precio_entrada, precio_actual, monto_op, moneda, accion,
-                             qty=qty_real, usdt=usdt_real)
+            try:
+                registrador = registrar_tp if ganando else registrar_sl
+                registrador(precio_entrada, precio_actual, monto_op, moneda, accion,
+                            qty=qty_real, usdt=usdt_real)
+            except Exception as e:
+                print(f"  [HUERFANAS] ⚠️ Contabilidad fallida tras cierre ejecutado: {e}")
+                enviar_aviso(
+                    f"⚠️ DESCUADRE {symbol}\n"
+                    f"El cierre por cambio de fase SI se ejecuto en Binance, pero la "
+                    f"contabilidad fallo:\n{e}\nRevisar billetera.json a mano."
+                )
 
             cambio = ((precio_entrada - precio_actual) / precio_entrada * 100) if accion == "BAJISTA" \
                      else ((precio_actual - precio_entrada) / precio_entrada * 100)
-            partes[5] = "FASE_CAMBIO"
-            cerradas += 1
             actualizar_memoria(symbol, cambio)
             enviar_aviso(
                 f"🔄 CIERRE POR CAMBIO DE FASE\n"
@@ -107,7 +116,8 @@ def cerrar_huerfanas(fase_nueva):
             print(f"  [HUERFANAS] Cerrada {symbol} {accion} → {round(cambio, 2)}%")
         except Exception as e:
             print(f"  [HUERFANAS] Error cerrando {symbol} {accion}: {e}")
-            nuevas.append(linea)
+            # Igual que arriba: si ya se cerro en Binance, la fila no vuelve a ABIERTA.
+            nuevas.append((",".join(partes) + "\n") if partes[5] != "ABIERTA" else linea)
             continue
 
         nuevas.append(",".join(partes) + "\n")

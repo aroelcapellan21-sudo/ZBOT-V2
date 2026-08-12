@@ -39,3 +39,9 @@ zip_*.zip
 # Lock files y binarios descargados
 *.lock
 *.deb
+
+# Keys de testnet — tampoco se suben
+keys_testnet.env
+
+# Estado de la validacion en testnet
+historial_testnet.csv

@@ -122,12 +122,15 @@ def cerrar_huerfanas(fase_nueva):
 
 
 def _leer_modo():
+    # Fallback SIMULADOR: coherente con ejecutor._leer_modo(). Ante cualquier
+    # fallo de lectura, nunca asumir REAL.
     try:
         with open(MODO_FILE) as f:
             cfg = json.load(f)
-        return cfg.get("modo", "REAL"), cfg.get("intervalo_velas", "4h"), int(cfg.get("sleep_segundos", 240))
-    except Exception:
-        return "REAL", "4h", 240
+        return cfg.get("modo", "SIMULADOR"), cfg.get("intervalo_velas", "4h"), int(cfg.get("sleep_segundos", 240))
+    except Exception as e:
+        print(f"  [ORQUESTA] ⚠️ Error leyendo {MODO_FILE}: {e} — asumiendo SIMULADOR.")
+        return "SIMULADOR", "4h", 240
 
 def detectar_fase_global(intervalo="4h"):
     fases  = {}

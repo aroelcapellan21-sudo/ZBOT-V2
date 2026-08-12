@@ -40,11 +40,14 @@ LOT_SIZE = {
 }
 
 def _leer_modo():
+    # Fallback SIMULADOR: si modo.json falta, esta corrupto o se lee a medio
+    # escribir, NUNCA asumir REAL. El default seguro es no tocar dinero.
     try:
         with open(MODO_FILE) as f:
-            return json.load(f).get("modo", "REAL")
-    except Exception:
-        return "REAL"
+            return json.load(f).get("modo", "SIMULADOR")
+    except Exception as e:
+        print(f"  [EJECUTOR] ⚠️ Error leyendo {MODO_FILE}: {e} — asumiendo SIMULADOR.")
+        return "SIMULADOR"
 
 def _confirmacion_real_activa():
     return os.environ.get("BOT_REAL_CONFIRMADO", "").strip().lower() == "true"

@@ -997,6 +997,19 @@ def procesar_comando(mensaje, chat_id):
                 enviar_mensaje(chat_id, reconciliar.reporte_telegram())
         except Exception as e:
             enviar_mensaje(chat_id, f"⚠️ Error en reconciliar: {e}")
+    elif mensaje.startswith("/desbloquear"):
+        # Sin argumento muestra el estado; solo "confirmar" levanta el bloqueo.
+        partes = mensaje.split()
+        try:
+            from guardian_riesgo import estado_bloqueo, desbloquear
+            if len(partes) > 1 and partes[1].lower() == "confirmar":
+                _ok, texto = desbloquear(motivo=f"telegram admin {chat_id}")
+                enviar_mensaje(chat_id, texto)
+            else:
+                _bloq, texto = estado_bloqueo()
+                enviar_mensaje(chat_id, texto)
+        except Exception as e:
+            enviar_mensaje(chat_id, f"⚠️ Error en desbloquear: {e}")
     elif mensaje == "/memoria":
         enviar_mensaje(chat_id, obtener_memoria())
     elif mensaje == "/registros":
@@ -1057,7 +1070,9 @@ def procesar_comando(mensaje, chat_id):
             "/status — Ver si el bot está activo\n"
             "/salir SYMBOL — Cerrar un trade manualmente\n"
             "/reconciliar — Ver cripto suelta sin vender nada\n"
-            "/reconciliar confirmar — Venderla y pasarla a USDT\n\n"
+            "/reconciliar confirmar — Venderla y pasarla a USDT\n"
+            "/desbloquear — Ver si el guardián frenó el bot\n"
+            "/desbloquear confirmar — Levantar ese freno\n\n"
             "📡 <b>MONITOREAR PRECIOS:</b>\n"
             "/alertar SYMBOL PRECIO — Vigilar un precio\n"
             "/cancelar SYMBOL — Dejar de vigilar\n\n"

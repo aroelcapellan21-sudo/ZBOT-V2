@@ -198,6 +198,95 @@ def esta_bloqueado():
         print(f"[GUARDIAN] {type(e).__name__}: {e}")
         return True   # sin datos confiables, no operar
 
+def estado_bloqueo():
+    """
+    Foto del guardian, sin tocar nada. La usa /desbloquear sin argumento.
+    Devuelve (bloqueado, texto).
+    """
+    try:
+        capital_actual = cargar_billetera()
+    except RuntimeError as e:
+        return None, f"⚠️ No se pudo leer el capital: {e}"
+
+    estado = cargar_estado_riesgo(capital_actual)
+    dd_bloq  = estado.get("bloqueado", False)
+    dia_bloq = estado.get("bloqueado_dia", False)
+    max_hist = estado.get("capital_maximo_historico") or 0
+
+    if not dd_bloq and not dia_bloq:
+        return False, (f"✅ <b>GUARDIÁN ACTIVO</b>\n\n"
+                       f"No está bloqueado. Nada que desbloquear.\n"
+                       f"Capital actual : ${capital_actual}\n"
+                       f"Máximo histórico: ${max_hist}")
+
+    dd = ((max_hist - capital_actual) / max_hist * 100) if max_hist > 0 else 0
+    return True, (
+        f"🔒 <b>GUARDIÁN BLOQUEADO</b>\n\n"
+        f"Drawdown permanente : {'sí' if dd_bloq else 'no'}\n"
+        f"Límite diario       : {'sí' if dia_bloq else 'no'}\n"
+        f"Capital actual      : ${capital_actual}\n"
+        f"Máximo histórico    : ${max_hist}\n"
+        f"Caída desde el pico : {round(dd, 2)}%\n\n"
+        f"⚠️ Desbloquear <b>rebasea el máximo histórico</b> a ${capital_actual}.\n"
+        f"El drawdown vuelve a contarse desde ahí: se pierde la referencia\n"
+        f"del pico anterior. Sin eso el bloqueo se re-dispara solo en el\n"
+        f"ciclo siguiente.\n\n"
+        f"Para confirmar: <code>/desbloquear confirmar</code>"
+    )
+
+
+def desbloquear(motivo="manual"):
+    """
+    Levanta el bloqueo del guardian. Unica salida documentada: antes habia que
+    editar bot.db a mano.
+
+    Rebasea capital_maximo_historico al capital actual a proposito. Si solo se
+    apagara el flag, verificar_riesgo() compararia contra el mismo pico, veria
+    la misma caida y volveria a bloquear en el ciclo siguiente.
+
+    Devuelve (ok, mensaje).
+    """
+    try:
+        capital_actual = cargar_billetera()
+    except RuntimeError as e:
+        return False, f"⚠️ No se pudo leer el capital: {e}"
+
+    estado = cargar_estado_riesgo(capital_actual)
+    if not estado.get("bloqueado") and not estado.get("bloqueado_dia"):
+        return False, "El guardián no está bloqueado. No se cambió nada."
+
+    previo = {
+        "capital_maximo_historico": estado.get("capital_maximo_historico"),
+        "capital_inicio_dia":       estado.get("capital_inicio_dia"),
+        "bloqueado":                estado.get("bloqueado"),
+        "bloqueado_dia":            estado.get("bloqueado_dia"),
+    }
+    estado["bloqueado"]                = False
+    estado["bloqueado_dia"]            = False
+    estado["capital_maximo_historico"] = capital_actual
+    estado["capital_inicio_dia"]       = capital_actual
+    # Huella del desbloqueo: quien lo levanto, cuando y desde que estado.
+    estado["desbloqueo"] = {
+        "timestamp":     datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "motivo":        motivo,
+        "estado_previo": previo,
+    }
+    guardar_estado_riesgo(estado)
+
+    msg = (f"🔓 <b>GUARDIÁN DESBLOQUEADO</b>\n\n"
+           f"Motivo : {motivo}\n"
+           f"Capital: ${capital_actual}\n"
+           f"Máximo histórico rebaseado: ${previo['capital_maximo_historico']} → ${capital_actual}\n"
+           f"El drawdown se cuenta desde acá. El bot vuelve a operar.")
+    print(f"[GUARDIAN] Desbloqueo manual ({motivo}). "
+          f"max_hist {previo['capital_maximo_historico']} -> {capital_actual}")
+    try:
+        enviar_aviso(msg)
+    except Exception as e:
+        print(f"[GUARDIAN] No se pudo avisar del desbloqueo: {e}")
+    return True, msg
+
+
 if __name__ == "__main__":
     if verificar_riesgo():
         print("\n  ✅ RESULTADO: El Guardian autoriza operacion.")

@@ -29,7 +29,16 @@ MONEDAS_PRECIO = {
     "AVAX": "AVAXUSDT"
 }
 
+class DatosIncompletos(RuntimeError):
+    """
+    No se pudo calcular el capital con certeza (falta algun precio).
+    Es RuntimeError a proposito: esta_bloqueado() ya lo captura y pausa el
+    ciclo. Lo importante es que NUNCA se persiste bloqueo por esta causa.
+    """
+
 def _obtener_precio(symbol):
+    """Devuelve None si no se pudo obtener. NUNCA 0.0: valorizar en cero una
+    moneda con saldo hunde el capital y dispara un drawdown que no existe."""
     try:
         params = urllib.parse.urlencode({"symbol": symbol, "interval": "1m", "limit": 1})
         url    = f"https://api.binance.com/api/v3/klines?{params}"
@@ -38,7 +47,7 @@ def _obtener_precio(symbol):
         return float(data[-1][4])
     except Exception as e:
         print(f"[GUARDIAN] Error precio {symbol}: {e}")
-        return 0.0
+        return None
 
 def cargar_billetera():
     try:
@@ -51,12 +60,24 @@ def cargar_billetera():
 
     usdt          = float(data.get("USDT", 0))
     valor_monedas = 0.0
+    sin_precio    = []
 
     for moneda, symbol in MONEDAS_PRECIO.items():
         cantidad = float(data.get(moneda, 0))
         if cantidad > 0:
             precio = _obtener_precio(symbol)
+            if precio is None:
+                sin_precio.append(moneda)
+                continue
             valor_monedas += cantidad * precio
+
+    if sin_precio:
+        # Preferimos no evaluar el riesgo antes que evaluarlo con la cripto
+        # valorizada en cero. El llamador pausa el ciclo, sin persistir nada.
+        raise DatosIncompletos(
+            f"[GUARDIAN] Sin precio para {', '.join(sin_precio)} — "
+            f"no se evalua el riesgo este ciclo (no se bloquea de forma permanente)."
+        )
 
     return round(usdt + valor_monedas, 2)
 

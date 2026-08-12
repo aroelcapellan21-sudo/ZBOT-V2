@@ -1,9 +1,16 @@
 # =========================================
 # gestor_bajistas.py
 # Gate central de francotiradores BAJISTAS (SHORT).
-# Los shorts son imposibles en cuenta SPOT. Permanecen DESACTIVADOS
-# hasta que exista saldo en Futuros USDT-M de Binance.
-# Reactivacion AUTOMATICA: lee el saldo disponible de futuros.
+# Los shorts son imposibles en cuenta SPOT. Permanecen DESACTIVADOS.
+#
+# Reactivacion MANUAL (desde 2026-08-12): exige DOS condiciones
+#   1. BOT_BAJISTAS_CONFIRMADO=true en el entorno del proceso, y
+#   2. saldo suficiente en Futuros USDT-M.
+# Antes bastaba (2): fondear futuros por cualquier motivo reactivaba solos a
+# los 5 francotiradores bajistas. Eso es peligroso porque la ruta de ejecucion
+# sigue siendo SPOT: ejecutar_operacion(..., "VENTA", ...) y
+# cerrar_posicion(..., "BAJISTA") operan contra spot, donde un short no existe.
+# Fondear futuros NO habilita shorts reales — hay que reescribir el ejecutor.
 # Ante cualquier error de API -> DESACTIVADO (seguro).
 # Sin librerias externas. Constitucion RESPETADA
 # =========================================
@@ -121,25 +128,43 @@ def _notificar_transicion(previo, activos_nuevo, saldo):
         print(f"  [BAJISTAS] Error notificando transicion: {e}")
 
 
+def _autorizacion_manual():
+    """
+    Segunda llave, deliberada y fuera del repo. Mismo patron que
+    BOT_REAL_CONFIRMADO para el paso a REAL: no vive en ningun archivo
+    versionado, se exporta a mano en la sesion screen el dia que se decida
+    reactivar los shorts — despues de reescribir el ejecutor para futuros.
+    """
+    return os.environ.get("BOT_BAJISTAS_CONFIRMADO", "").strip().lower() == "true"
+
+
 def bajistas_activos():
     """
-    True solo si hay saldo suficiente en Futuros USDT-M de Binance.
-    Cachea 5 min. Ante cualquier error de API -> DESACTIVADO (seguro).
+    True solo si hay autorizacion manual explicita Y saldo suficiente en
+    Futuros USDT-M. Cachea 5 min. Ante cualquier error -> DESACTIVADO.
     """
     ahora = time.time()
     if ahora - _cache["ts"] < _CACHE_TTL:
         return _cache["activos"]
 
-    try:
-        saldo   = _saldo_futuros_usdt()
-        activos = saldo >= SALDO_MINIMO_FUTUROS
-        motivo  = "saldo_suficiente" if activos else "saldo_insuficiente"
-    except Exception as e:
-        # Cuenta solo spot, sin permiso de futuros, o API caida -> desactivado.
+    if not _autorizacion_manual():
+        # Corta antes de consultar la API: sin la llave manual el saldo de
+        # futuros es irrelevante, y ademas evita una llamada por ciclo.
         saldo   = 0.0
         activos = False
-        motivo  = f"error_api: {e}"
-        print(f"  [BAJISTAS] Sin acceso a futuros, desactivados: {e}")
+        motivo  = "sin_autorizacion_manual"
+        print("  [BAJISTAS] Sin BOT_BAJISTAS_CONFIRMADO=true — desactivados (gate manual).")
+    else:
+        try:
+            saldo   = _saldo_futuros_usdt()
+            activos = saldo >= SALDO_MINIMO_FUTUROS
+            motivo  = "saldo_suficiente" if activos else "saldo_insuficiente"
+        except Exception as e:
+            # Cuenta solo spot, sin permiso de futuros, o API caida -> desactivado.
+            saldo   = 0.0
+            activos = False
+            motivo  = f"error_api: {e}"
+            print(f"  [BAJISTAS] Sin acceso a futuros, desactivados: {e}")
 
     previo = _leer_estado_previo()
     _notificar_transicion(previo, activos, saldo)

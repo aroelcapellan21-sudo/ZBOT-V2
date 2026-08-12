@@ -118,8 +118,18 @@ def verificar_riesgo(capital_actual=None):
     if capital_actual > estado.get("capital_maximo_historico", 0):
         estado["capital_maximo_historico"] = capital_actual
 
-    max_hist    = estado["capital_maximo_historico"]
-    inicio_dia  = estado["capital_inicio_dia"]
+    max_hist    = estado.get("capital_maximo_historico") or 0
+    inicio_dia  = estado.get("capital_inicio_dia") or 0
+
+    # Sin una base valida no hay porcentaje que calcular. Antes esto era un
+    # ZeroDivisionError que ni siquiera capturaba esta_bloqueado(), asi que
+    # mataba el ciclo entero del francotirador. Mismo criterio que
+    # DatosIncompletos por falta de precio: se pausa, no se persiste bloqueo.
+    if max_hist <= 0 or inicio_dia <= 0:
+        raise DatosIncompletos(
+            f"[GUARDIAN] Base de riesgo invalida (max_hist=${max_hist}, "
+            f"inicio_dia=${inicio_dia}) — no se evalua el riesgo este ciclo."
+        )
 
     limite_drawdown = max_hist  * (1 - DRAWDOWN_MAXIMO_PCT)
     limite_diario   = inicio_dia * (1 - PERDIDA_DIARIA_MAXIMA_PCT)
@@ -172,13 +182,21 @@ def esta_bloqueado():
     Verifica el capital actual contra los límites en cada llamada.
     Los flags cacheados no son suficientes: si el capital cae durante el día
     el guardián no lo detectaría hasta el día siguiente.
+
+    Fail-safe: ante CUALQUIER fallo devuelve True (no operar). Antes capturaba
+    solo RuntimeError y ademas dejaba verificar_riesgo() FUERA del try, asi que
+    un ZeroDivisionError o un KeyError se propagaban y mataban el ciclo del
+    francotirador en vez de limitarse a bloquear.
     """
     try:
         capital_actual = cargar_billetera()
-    except RuntimeError as e:
+        return not verificar_riesgo(capital_actual)
+    except DatosIncompletos as e:
         print(f"[GUARDIAN] {e}")
-        return True  # Sin billetera, bloquear por seguridad
-    return not verificar_riesgo(capital_actual)
+        return True   # pausa transitoria: nada se persiste, se reintenta solo
+    except Exception as e:
+        print(f"[GUARDIAN] {type(e).__name__}: {e}")
+        return True   # sin datos confiables, no operar
 
 if __name__ == "__main__":
     if verificar_riesgo():

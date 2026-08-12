@@ -31,11 +31,16 @@ MODO_FILE            = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
 MONTO_MINIMO_BINANCE = 5.0
 BASE_URL             = "https://api.binance.com"
 
+# Comision spot de Binance para el SIMULADOR: 0.1% por lado (taker VIP0), o sea
+# 0.2% por operacion completa. En REAL no se usa: la comision se lee del array
+# 'fills' de la respuesta. Si algun dia se paga con BNB, el descuento es 25%.
+COMISION_SPOT        = 0.001
+
 # Decimales de cantidad permitidos por símbolo (LOT_SIZE de Binance)
 LOT_SIZE = {
     "BTCUSDT":  5,
     "ETHUSDT":  4,
-    "SOLUSDT":  2,
+    "SOLUSDT":  3,   # verificado contra /api/v3/exchangeInfo: stepSize 0.00100000
     "BNBUSDT":  3,
     "AVAXUSDT": 2,
 }
@@ -92,18 +97,35 @@ def _precio_ticker(symbol):
         return float(json.loads(resp.read())["price"])
 
 def _simular_fill(symbol, side, quote_qty=None, base_qty=None):
+    """
+    Simula un fill con la MISMA forma que devuelve Binance, incluido el array
+    'fills' con la comision. Asi _extraer_fill() no distingue simulado de real
+    y el SIMULADOR deja de sobreestimar las ganancias.
+    """
     precio = _precio_ticker(symbol)
     if side == "BUY":
         if quote_qty is not None:
             qty  = _truncar_cantidad(symbol, quote_qty / precio)
-            usdt = quote_qty
+            # El USDT gastado se recalcula sobre la cantidad ya truncada. Dejarlo
+            # en quote_qty inventaba un precio implicito (usdt/qty) distinto del
+            # de mercado: con BTC a 5 decimales, un ticket de $20 tiene ~3% de
+            # granularidad, y desde el fix #4 ese precio es el que fija SL y TP.
+            usdt = round(qty * precio, 8)
         else:
             qty  = base_qty
             usdt = round(base_qty * precio, 2)
     else:
         qty  = base_qty
         usdt = round(base_qty * precio, 2)
-    return {"executedQty": str(qty), "cummulativeQuoteQty": str(usdt), "price": str(precio)}
+
+    # Binance cobra en el activo BASE al comprar y en el QUOTE al vender.
+    if side == "BUY":
+        comision, activo = round(qty * COMISION_SPOT, 8), symbol.replace("USDT", "")
+    else:
+        comision, activo = round(usdt * COMISION_SPOT, 8), "USDT"
+
+    return {"executedQty": str(qty), "cummulativeQuoteQty": str(usdt), "price": str(precio),
+            "fills": [{"commission": str(comision), "commissionAsset": activo}]}
 
 def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
     api_key, secret = _cargar_keys()

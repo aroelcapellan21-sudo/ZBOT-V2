@@ -986,6 +986,17 @@ def procesar_comando(mensaje, chat_id):
             enviar_mensaje(chat_id, "⚠️ Uso: /salir BTCUSDT")
         else:
             enviar_mensaje(chat_id, cerrar_operacion_manual(partes[1].upper()))
+    elif mensaje.startswith("/reconciliar"):
+        # Sin argumento muestra el previo; solo "confirmar" vende de verdad.
+        partes = mensaje.split()
+        try:
+            import reconciliar
+            if len(partes) > 1 and partes[1].lower() == "confirmar":
+                enviar_mensaje(chat_id, reconciliar.ejecutar_telegram())
+            else:
+                enviar_mensaje(chat_id, reconciliar.reporte_telegram())
+        except Exception as e:
+            enviar_mensaje(chat_id, f"⚠️ Error en reconciliar: {e}")
     elif mensaje == "/memoria":
         enviar_mensaje(chat_id, obtener_memoria())
     elif mensaje == "/registros":
@@ -1044,7 +1055,9 @@ def procesar_comando(mensaje, chat_id):
             "/parar — Detener el bot de emergencia\n"
             "/reactivar — Volver a activar el bot\n"
             "/status — Ver si el bot está activo\n"
-            "/salir SYMBOL — Cerrar un trade manualmente\n\n"
+            "/salir SYMBOL — Cerrar un trade manualmente\n"
+            "/reconciliar — Ver cripto suelta sin vender nada\n"
+            "/reconciliar confirmar — Venderla y pasarla a USDT\n\n"
             "📡 <b>MONITOREAR PRECIOS:</b>\n"
             "/alertar SYMBOL PRECIO — Vigilar un precio\n"
             "/cancelar SYMBOL — Dejar de vigilar\n\n"

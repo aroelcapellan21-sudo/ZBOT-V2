@@ -250,14 +250,12 @@ def supervisar():
         if "errores_criticos" in estado:
             resueltos.append("errores_criticos")
 
-    # --- CHECK 5: Posiciones huerfanas (auto-reconciliacion) ---
-    try:
-        from reconciliar import auto_reconciliar
-        n = auto_reconciliar()
-        if n > 0:
-            print(f"[SUPERVISOR] Auto-reconciliacion: {n} posicion(es) huerfana(s) resueltas.")
-    except Exception as e:
-        print(f"[SUPERVISOR] Error en auto_reconciliar: {e}")
+    # --- CHECK 5: Posiciones huerfanas ---
+    # auto_reconciliar() fue eliminado el 2026-08-12: desde entonces reconciliar
+    # VENDE de verdad en Binance, asi que es una accion con dinero y siempre
+    # exige confirmacion humana. Se hace a mano con /reconciliar en Telegram
+    # (previo) y /reconciliar confirmar (ejecuta), o con python3 reconciliar.py.
+    # Barrer automaticamente sin supervision quedo descartado a proposito.
 
     # --- Limpiar resueltos ---
     for clave in resueltos:

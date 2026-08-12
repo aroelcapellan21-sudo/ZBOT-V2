@@ -79,6 +79,11 @@ Para iniciar/reiniciar todos los procesos: `bash iniciar_bots.sh`
 Siempre matar el proceso también: `kill $(pgrep -f archivo.py)`
 De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram.
 
+⚠️ **`pgrep -f` matchea por substring y cruza proyectos.** `pgrep -f main.py` también
+devuelve el `main.py` de `~/motor-confluencia`, así que `kill $(pgrep -f main.py)` mata un
+bot ajeno. Para `v2_main` **usar siempre PIDs explícitos**, verificados antes con
+`pgrep -af main.py` y `readlink /proc/<pid>/cwd`.
+
 ## Modo de operación
 - Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"4h","sleep_segundos":240}`
   (corregido de 1h/60 el 2026-07-12 — ver hallazgo de oscilación de fase más abajo)
@@ -90,6 +95,124 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   — si falta, opera en SIMULADOR aunque el JSON diga REAL. La variable no vive en ningún
   archivo del repo (ni `keys.env` ni `modo.json`); se exporta a mano en la sesión screen el
   día del paso a real. Punto 3 de `CIERRE_FINAL.md`.
+- **Fallback seguro (desde 2026-08-12, commit `0aee782`):** `_leer_modo()` en `ejecutor.py` y
+  `director_orquesta.py` devolvía `"REAL"` por defecto — tanto en el `.get()` como en el
+  `except`. Si `modo.json` faltaba, se corrompía o se leía a medio escribir (ese archivo no se
+  escribe atómicamente en ningún lado), el sistema asumía REAL. Ahora ambos devuelven
+  `"SIMULADOR"` y loguean el motivo del fallo.
+
+## Camino de dinero — contrato tras la auditoría pre-REAL (ago 2026)
+
+Auditoría completa del 2026-08-12 antes de pasar a REAL: `reports/2026-08-12_auditoria-pre-real.md`
+(plan de 9 puntos; los reportes no se commitean). **Veredicto: NO pasar a REAL todavía** — ver
+"Pendientes" al final de esta sección.
+
+### `ejecutor.py` — devuelve tuplas, no strings
+
+`ejecutar_operacion()` y `cerrar_posicion()` devuelven **`(mensaje, fill)`**, no un string suelto.
+El mensaje conserva el formato `"✅ ..."` / `"❌ ..."` de siempre, así que `if "✅" in resultado`
+sigue funcionando, pero **hay que desempaquetar la tupla**.
+
+```python
+resultado, fill = ejecutar_operacion(MONEDA, "COMPRA", precio, monto)
+res, fill_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op, qty_op)
+# fill = {"qty": <cripto neta de comisión>, "usdt": <USDT neto>, "precio": <fill real>}
+# fill = None si la orden fue rechazada o falló
+```
+
+- **`_extraer_fill()`** normaliza la respuesta de Binance restando la comisión del array `fills`.
+  `executedQty` es **bruto**: en COMPRA la comisión se cobra en el activo **base** (recibís menos
+  cripto), en VENTA en el **quote** (recibís menos USDT). Persistir `executedQty` tal cual hace
+  que después intentes vender ~0.1% de más.
+- **`_truncar_cantidad()`** (antes `_redondear_cantidad`) trunca al `LOT_SIZE` con
+  `Decimal`/`ROUND_DOWN`. Nunca `round()`: redondear hacia arriba pide más de lo que hay en cuenta
+  → rechazo `-2010` → el cierre falla y la posición queda `ABIERTA` sin stop. No usar `floor()`
+  sobre float: el error binario se come un tick entero (`0.29 * 100 = 28.999999999999996`).
+- **`cerrar_posicion(..., qty=None)`**: si se le pasa la `qty` real persistida la usa; si es `None`
+  (filas escritas antes de ago 2026) cae al cálculo teórico `monto_op / precio_entrada` y lo loguea.
+- **`LOT_SIZE` está hardcodeado.** Verificado contra `/api/v3/exchangeInfo` el 2026-08-12: SOLUSDT
+  decía 2 decimales y el `stepSize` real es `0.00100000` (3) — corregido. Los otros 4 estaban bien.
+  Binance puede cambiarlos sin avisar; lo correcto sería leerlos al arrancar.
+- **Comisiones:** `COMISION_SPOT = 0.001` (0.1% por lado, taker VIP0) se aplica **solo en
+  SIMULADOR**, dentro de `_simular_fill()`, que ahora devuelve un array `fills` con la misma forma
+  que Binance. En REAL la comisión se lee de la respuesta real. Antes el simulador no cobraba nada:
+  el paper trading venía inflado ~0.2% por operación completa (386 ops, $7.909 de nocional, $15.82
+  = 1.58 pp sobre el capital inicial).
+
+### `auditoria.csv` — 8 columnas, y dos estados nuevos
+
+```
+timestamp,accion,symbol,precio,rsi,estado,monto,qty
+```
+
+- El header tenía **6** columnas mientras las filas tenían 7 (faltaba `monto`). Corregido a 8.
+- **`precio` ahora es el fill real de Binance**, no `cierres[-1]` (el cierre de la vela de 4h, que
+  podía tener horas). SL, TP, breakeven y trailing se calculan sobre el precio al que se compró de
+  verdad. Backup previo al cambio: `auditoria.csv.bak_prefix4`.
+- **`qty` (8ª columna)** = `executedQty` **neto de comisión** del fill de entrada. Es la cantidad
+  con la que se cierra. Filas viejas sin esa columna caen al cálculo teórico.
+- Retrocompatible: los 33 módulos que leen el archivo usan `len(partes) >= N` e indexan 0..6.
+  Agregar columnas al final no los rompe. **No insertar columnas en el medio.**
+- **Estados nuevos: `RESERVADA` y `ANULADA`.** El flujo de apertura pasó a reservar antes de operar
+  (commit `5b0e88e`):
+
+```
+reservar_operacion()  → fila RESERVADA, bajo AUDITORIA_LOCK, ANTES de mandar la orden
+   ├─ falla la escritura → NO se opera (return). Nunca hay cripto sin registro.
+   └─ ok → ejecutar_operacion()
+             ├─ ❌ → _actualizar_fila(ANULADA)   ← se conserva como rastro de auditoría
+             └─ ✅ → _actualizar_fila(ABIERTA, precio=fill["precio"], qty=fill["qty"])
+```
+
+  `contar_operaciones_abiertas()` cuenta **`RESERVADA` además de `ABIERTA`**: si el proceso muere
+  entre la reserva y la orden, la fila huérfana frena compras nuevas en vez de habilitarlas.
+
+### Reglas de oro del camino de dinero
+
+1. **Escribir la fila ANTES de mandar la orden.** El bot decide leyendo `auditoria.csv`; si opera
+   primero y anota después, un fallo al anotar hace que repita la operación.
+2. **Todo append a `auditoria.csv` va bajo `AUDITORIA_LOCK`.** `revisar_cierres()` y
+   `cerrar_huerfanas()` leen el archivo entero y lo reescriben con `os.replace`; una fila
+   appendeada sin lock en medio de esa reescritura **se pierde**.
+3. **Marcar el cierre ANTES de contabilizar, nunca al revés.** Si la contabilidad falla y la fila
+   vuelve a `ABIERTA`, el ciclo siguiente re-vende una posición que ya no existe. Para eso está
+   `_contabilizar()`, que envuelve `registrar_tp/sl` y nunca propaga la excepción: avisa por
+   Telegram del descuadre y sigue. El `except` general tampoco devuelve la fila a `ABIERTA`
+   (`nuevas_lineas.append(",".join(partes)...) if partes[5] != "ABIERTA" else linea`).
+4. **Nunca salir en silencio después de haber operado.** `registrar_tp/sl` tenían un early return
+   por `monto < $5` que no tocaba la billetera aunque la venta ya hubiera salido; ahora avisa.
+
+### Polvo inmovilizado — punto abierto, no resuelto
+
+Al cerrar hay que truncar al `stepSize` y el resto queda como cripto suelta. En BTC y BNB un tick
+vale ~$0.62 y ~$0.59: sobre posiciones de $20 (`CAPITAL_MAX_POR_OP = 0.02` sobre $1.000) eso es
+~3% por cierre. Medido el 2026-08-12: **$49.63 de cripto que no respalda ninguna posición abierta**
+(4.6% del capital). BNB ($4.02) y AVAX ($0.33) están **debajo del `minNotional` de $5** — no se
+pueden vender hasta que crezcan.
+
+El polvo **no se pierde** (sigue en `billetera.json` y el guardián lo valoriza) pero se inmoviliza
+y **distorsiona el PnL reportado por trade** hasta un 4%, que es lo que alimenta `memoria_propia`.
+
+**No barrer el saldo completo dentro de `cerrar_posicion`**: eso realizaría el polvo viejo como
+ganancia del trade en curso — reubica la distorsión en vez de eliminarla. El mecanismo correcto es
+`auto_reconciliar()`, que barre **fuera** del ciclo de trades (punto 9, pendiente).
+
+### Pendientes de la auditoría — NO pasar a REAL antes de esto
+
+- **#7 `guardian_riesgo.py`:** `_obtener_precio()` devuelve `0.0` si falla la API y
+  `cargar_billetera()` multiplica igual → un timeout de red valoriza la cripto en cero, dispara un
+  falso drawdown del 10% y deja `bloqueado = True`, que **no se resetea nunca** (solo
+  `bloqueado_dia` se limpia al cambiar de fecha). Además `ZeroDivisionError` en las líneas del
+  cálculo de drawdown si `max_hist` o `inicio_dia` valen 0, y `esta_bloqueado()` solo captura
+  `RuntimeError`. Es el pendiente más grave.
+- **#8 gate de bajistas a manual** (ver sección siguiente).
+- **#9 `auto_reconciliar()`:** hoy **no vende de verdad** (pone `billetera[moneda] = 0.0` y suma el
+  USDT teórico, mismo bug que tenía `/cerrar`), escribe `billetera.json` sin `flock` ni
+  `os.replace` (líneas 131 y 253), y `CANTIDAD_MINIMA = 0.000001` está muy por debajo del
+  `minNotional`. No lo llama nadie: la única referencia es `supervisor_v2.py:255`, que no corre.
+- **Validación obligatoria antes de dinero real:** correr el stack contra el testnet de Binance
+  (`testnet.binance.vision`) y verificar que un ciclo abrir → SL → cerrar deja `billetera.json`
+  cuadrado contra el saldo que reporta la API. Ese test no existe hoy.
 
 ## Dirección de operación — SPOT solo-LONG (desde jun 2026)
 - El bot opera **solo ALCISTA y LATERAL**. Los 5 francotiradores bajistas están desactivados.
@@ -120,7 +243,7 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
 - Cambios en francotiradores requieren backtest previo con umbral PF ≥ 1.6
 - Los 15 francotiradores tienen parámetros validados por backtest — no cambiar sin evidencia
 
-## Gestión de salidas vs gates de entrada (hallazgo jun 2026 — SOLO_SL aplicado jul 2026)
+## Gestión de salidas vs gates de entrada (hallazgo jun 2026 — SOLO_SL jul 2026, extendido a los 6 gates ago 2026)
 - En `evaluar()` de los 15 francotiradores, `revisar_cierres()` (que evalúa SL/TP de
   posiciones abiertas) se llama **después** de los 6 gates de entrada (guardian, termómetro,
   spread, horario, límite diario, eventos). Si cualquiera hace `return`, el SL/TP **no se
@@ -142,8 +265,25 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   `puede_operar_horario()` corta, se llama igual con el SL activo (`evaluar_tp=False`) antes
   del `return` — el TP sigue exigiendo ventana horaria, el SL ya se evalúa 24h. Los otros 5
   gates (guardian, termómetro, spread, límite diario, eventos) no se tocaron.
+- **Extendido a los 5 gates restantes (2026-08-12, commit `37fdf5b`, punto 2 de la auditoría
+  pre-REAL):** guardian, termómetro, spread, límite diario y eventos también llaman
+  `revisar_cierres(precio_actual, evaluar_tp=False)` antes del `return`. 75 inserciones en los
+  15 francotiradores; el TP sigue exigiendo que pasen **todos** los gates.
+  **Frecuencia medida** (`reports/2026-08-12_frecuencia-gates-salida.md`): eventos macro es el
+  único recurrente — 153 min/día (10.6%), en las ventanas 13:15-14:45, 17:45-18:15 y
+  19:45-20:15 UTC, o sea la franja CPI/Fed, la más volátil del día. Guardian: 0 disparos en 782
+  snapshots (DD máx real 0.97%) pero su bloqueo es **permanente**. Límite diario: 1 día de 19.
+  Spread: 0 disparos por spread real (el book de los 5 pares está siempre a 1 tick, entre 30x y
+  30.000x bajo el límite de 0.48%) — en la práctica solo dispara ante fallo de la API.
+  Costo estimado ~1.1 pp/año (extrapolación del backtest de julio, **no** backtest propio).
+- **El termómetro está muerto desde marzo 2026.** Nadie llama `clasificar_mercado()` fuera del
+  `if __name__ == "__main__"` del propio `termometro.py`; el estado en la DB tiene timestamp
+  2026-03-04 y `puede_operar_termometro()` lee ese estado congelado, así que **siempre devuelve
+  True**. Si alguien reconecta el módulo, pasaría a bloquear ~29.5% del tiempo de golpe
+  (`MERCADO_MUERTO`). Por eso el fix se aplicó también ahí, aunque hoy sea inerte. Decidir si se
+  conecta o se elimina es un punto abierto.
 
-## Asimetría TP/SL en el registro de cierres (hallazgo jun 2026 — corregido jul 2026)
+## Asimetría TP/SL en el registro de cierres (hallazgo jun 2026 — corregido jul 2026, superado por el fill real ago 2026)
 - En `revisar_cierres()` de los **15 francotiradores** (alcista/bajista/lateral × 5 activos), el
   cierre por **SL se registra al precio teórico `sl_efectivo`, NO al `precio_actual` real**:
   `registrar_sl(precio_entrada, sl_efectivo, ...)` en las 3 ramas (BE, trailing, SL normal) y el
@@ -161,6 +301,9 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   `registrar_sl(precio_entrada, precio_actual, ...)` — igual que ya hacía `registrar_tp`. El
   aviso y el registro contable reflejan el precio real de cierre, no el nominal `sl_efectivo`.
   Aplicado junto con SOLO_SL (ver sección anterior), como estaba planeado.
+- **Superado por el fix #4 (2026-08-12, commit `49b1e55`):** ya no se usa `precio_actual` (el
+  cierre de la última vela) sino el **fill real que devuelve Binance**. Ver la sección
+  "Camino de dinero" abajo — `registrar_tp/sl` reciben `qty` y `usdt` del fill.
 
 ## Oscilación de detectar_fase() — causa raíz y fix (jul 2026)
 - **Síntoma:** en julio 2026, 96.7% de los trades LATERAL y 100% de los ALCISTA cerraban por FASE_CAMBIO,
@@ -257,3 +400,10 @@ De lo contrario queda un zombie haciendo polling doble → error 409 en Telegram
   - `engine.py:enviar_aviso()` → **avisos de trades** (entradas, TP, SL, errores de cierre). Lo usan los 15 francotiradores y `director_orquesta`.
 - **Bug histórico (jun 2026):** `engine.cargar_token()` buscaba `TELEGRAM_TOKEN=` (clave inexistente) en vez de `TELEGRAM_BOT_TOKEN=`, así que los avisos de trades nunca salían — se abrían posiciones sin notificación. El polling sí funcionaba porque leía la clave correcta. Corregido.
 - **Log de fallos:** `engine.enviar_aviso()` registra cualquier fallo de envío en `memoria/telegram.log` (token ausente, rechazo de la API con `ok:false`, o excepción de red). Antes solo se imprimían al stdout del screen y se perdían. Si no llega un aviso, revisar **primero** ese archivo. Si está vacío, el envío salió bien y el problema es del lado de Telegram/cliente.
+- **`/cerrar` no cerraba nada (bug encontrado y corregido el 2026-08-12, commit `49b1e55`):**
+  `cerrar_operacion_manual()` marcaba la fila como `MANUAL_WIN`/`MANUAL_LOSS`, calculaba una
+  ganancia y la reportaba — pero **nunca llamaba a `cerrar_posicion` ni tocaba
+  `billetera.json`**. En SIMULADOR era cosmético; en REAL apretabas "🚪 Salir", el bot
+  contestaba que cerró con +$X y la cripto seguía en la cuenta, ya fuera del estado `ABIERTA`
+  que vigila `revisar_cierres` — posición sin stop y sin registro. Ahora manda la orden real,
+  deja la posición `ABIERTA` si Binance la rechaza, y contabiliza con el fill.

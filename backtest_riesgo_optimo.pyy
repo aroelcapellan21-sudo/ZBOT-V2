@@ -1,0 +1,194 @@
+# ============================================================
+# backtest_riesgo_optimo.py
+# Encuentra el % de riesgo por trade que maximiza ganancia
+# con capital inicial de $20 sin destruir el capital
+# SOLO LECTURA — no toca nada del bot
+# ============================================================
+
+import csv, os, json
+
+SIMBOLOS = ["BTCUSDT", "ETHUSDT", "BNBUSDT", "AVAXUSDT", "SOLUSDT"]
+RUTA     = "/home/ariel/bot-padre-v3-backup/data/historico_4h/{}_4h.csv"
+
+CONFIGS = {
+    "BTCUSDT": {"sl": 2.0, "tp": 10.0, "mom_v": 4, "mom_m": 3},
+    "ETHUSDT": {"sl": 2.5, "tp": 20.0, "mom_v": 5, "mom_m": 3},
+    "SOLUSDT": {"sl": 1.5, "tp": 20.0, "mom_v": 5, "mom_m": 4},
+    "BNBUSDT": {"sl": 5.0, "tp": 20.0, "mom_v": 2, "mom_m": 2},
+    "AVAXUSDT":{"sl": 4.0, "tp": 15.0, "mom_v": 3, "mom_m": 3},
+}
+
+CAPITAL_INICIAL = 20.0
+RIESGOS = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+
+def cargar_velas(symbol):
+    velas = []
+    with open(RUTA.format(symbol), newline='') as f:
+        for row in csv.DictReader(f):
+            try:
+                velas.append({
+                    'ts':    row['timestamp'],
+                    'open':  float(row['open']),
+                    'high':  float(row['high']),
+                    'low':   float(row['low']),
+                    'close': float(row['close']),
+                })
+            except: continue
+    return velas
+
+def precalcular_rsi(velas, periodo=14):
+    cierres = [v['close'] for v in velas]
+    rsi_arr = [None] * len(cierres)
+    if len(cierres) < periodo + 1: return rsi_arr
+    g = [max(cierres[i]-cierres[i-1],0) for i in range(1,len(cierres))]
+    p = [max(cierres[i-1]-cierres[i],0) for i in range(1,len(cierres))]
+    ag = sum(g[:periodo])/periodo
+    ap = sum(p[:periodo])/periodo
+    rsi_arr[periodo] = round(100-(100/(1+ag/ap)),1) if ap else 100.0
+    for i in range(periodo, len(g)):
+        ag = (ag*(periodo-1)+g[i])/periodo
+        ap = (ap*(periodo-1)+p[i])/periodo
+        rsi_arr[i+1] = round(100-(100/(1+ag/ap)),1) if ap else 100.0
+    return rsi_arr
+
+def tiene_momentum(velas, idx, n_velas, n_minimas):
+    if idx < n_velas: return False
+    return sum(1 for j in range(idx-n_velas, idx)
+               if velas[j]['close'] > velas[j]['open']) >= n_minimas
+
+def simular_trade(velas, idx, sl_pct, tp_pct):
+    precio_entrada = velas[idx]['close']
+    precio_tp = precio_entrada * (1 + tp_pct/100)
+    precio_sl = precio_entrada * (1 - sl_pct/100)
+    for i in range(idx+1, min(idx+201, len(velas))):
+        if velas[i]['high'] >= precio_tp: return 'TP', i-idx
+        if velas[i]['low']  <= precio_sl: return 'SL', i-idx
+    return 'TIMEOUT', 200
+
+def backtest(velas, rsi_arr, sl, tp, mom_v, mom_m, capital_ini, riesgo_pct):
+    capital     = capital_ini
+    capital_max = capital_ini
+    dd_max      = 0.0
+    tp_c = sl_c = 0
+    en_trade    = False
+    idx_salida  = 0
+    capital_min = capital_ini
+
+    for i in range(20, len(velas)):
+        if capital <= 0: break
+        if en_trade and i <= idx_salida:
+            continue
+        en_trade = False
+
+        rsi = rsi_arr[i]
+        if rsi is None or not (70 <= rsi <= 80):
+            continue
+        if not tiene_momentum(velas, i, mom_v, mom_m):
+            continue
+
+        monto    = capital * (riesgo_pct/100)
+        resultado, duracion = simular_trade(velas, i, sl, tp)
+
+        if resultado == 'TP':
+            capital += monto * (tp/sl)
+            tp_c += 1
+        elif resultado == 'SL':
+            capital -= monto
+            sl_c += 1
+
+        if capital < capital_min:
+            capital_min = capital
+        if capital > capital_max:
+            capital_max = capital
+        dd = (capital_max - capital) / capital_max * 100
+        if dd > dd_max:
+            dd_max = dd
+
+        idx_salida = i + duracion
+        en_trade   = True
+
+    total   = tp_c + sl_c
+    wr      = round(tp_c/total*100,1) if total else 0
+    retorno = round((capital - capital_ini)/capital_ini*100,1)
+    años    = (len(velas)*4)/(365*24)
+    ganancia_anual = round((capital - capital_ini)/años, 2)
+
+    return {
+        'capital_final':   round(capital, 2),
+        'capital_min':     round(capital_min, 2),
+        'retorno_pct':     retorno,
+        'dd_max':          round(dd_max, 2),
+        'wr':              wr,
+        'tp':              tp_c,
+        'sl':              sl_c,
+        'ganancia_anual':  ganancia_anual,
+    }
+
+def main():
+    print("="*75)
+    print(f"BACKTEST RIESGO OPTIMO — Capital inicial ${CAPITAL_INICIAL}")
+    print("RSI 70-80 + MOMENTUM — 9 AÑOS DATOS REALES")
+    print("="*75)
+
+    reporte = {}
+
+    for symbol in SIMBOLOS:
+        cfg = CONFIGS[symbol]
+        print(f"\nCargando {symbol}...", flush=True)
+        try:
+            velas = cargar_velas(symbol)
+        except FileNotFoundError:
+            print(f"  No encontrado"); continue
+
+        años = round((len(velas)*4)/(365*24),1)
+        print(f"  {len(velas)} velas ({años} años)", flush=True)
+        rsi_arr = precalcular_rsi(velas)
+
+        print(f"\n  {symbol} — Impacto del % de riesgo por trade:")
+        print(f"  {'Riesgo%':<10} {'Capital$':<12} {'MinCapital':<12} "
+              f"{'DD Max%':<10} {'Retorno%':<12} {'$/año'}")
+        print("  "+"-"*65)
+
+        resultados = []
+        for r in RIESGOS:
+            res = backtest(velas, rsi_arr,
+                          cfg['sl'], cfg['tp'],
+                          cfg['mom_v'], cfg['mom_m'],
+                          CAPITAL_INICIAL, r)
+            marca = ""
+            if res['capital_min'] > 0 and res['dd_max'] < 30:
+                marca = " ✅"
+            elif res['capital_min'] <= 0:
+                marca = " ❌ QUIEBRA"
+            print(f"  {r}%{'':<7} ${res['capital_final']:<10} "
+                  f"${res['capital_min']:<10} {res['dd_max']:<10} "
+                  f"{res['retorno_pct']:<12} ${res['ganancia_anual']}{marca}")
+            resultados.append((r, res))
+
+        reporte[symbol] = resultados
+
+    print("\n"+"="*75)
+    print("MEJOR RIESGO POR MONEDA — Máxima ganancia sin quiebra")
+    print("="*75)
+    print(f"{'Moneda':<12} {'Riesgo%':<10} {'Capital final':<15} "
+          f"{'DD Max%':<10} {'$/año'}")
+    print("-"*58)
+
+    for symbol, resultados in reporte.items():
+        viables = [(r, res) for r, res in resultados
+                   if res['capital_min'] > 1 and res['dd_max'] < 50]
+        if viables:
+            mejor = max(viables, key=lambda x: x[1]['capital_final'])
+            r, res = mejor
+            print(f"{symbol:<12} {r}%{'':<7} ${res['capital_final']:<13} "
+                  f"{res['dd_max']:<10} ${res['ganancia_anual']}")
+
+    os.makedirs('/home/ariel/bot-padre-v2/reports', exist_ok=True)
+    with open('/home/ariel/bot-padre-v2/reports/backtest_riesgo_optimo.json','w') as f:
+        json.dump({s: [(r, res) for r, res in rs]
+                   for s, rs in reporte.items()}, f, indent=2)
+    print("\nReporte guardado en reports/backtest_riesgo_optimo.json")
+
+if __name__ == "__main__":
+    main()
+

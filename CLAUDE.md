@@ -466,3 +466,57 @@ Los 9 puntos del plan están cerrados. Lo que falta **no es código**:
   contestaba que cerró con +$X y la cripto seguía en la cuenta, ya fuera del estado `ABIERTA`
   que vigila `revisar_cierres` — posición sin stop y sin registro. Ahora manda la orden real,
   deja la posición `ABIERTA` si Binance la rechaza, y contabiliza con el fill.
+
+## Investigación de estrategia de entrada — ago 2026
+
+Sesión exhaustiva de backtesting sobre datos históricos reales (2017-2026, 18,677 velas 4H por activo).
+Reportes completos en `reports/backtest_*.json`. Resumen de evidencia acumulada:
+
+### Lo que se probó y descartó (con evidencia)
+- RSI solo (cualquier rango) → PF máx 1.60, insuficiente
+- RSI + EMA20 → idéntico a RSI solo, EMA no filtra nada adicional
+- RSI + RSI semanal → PF 2.61 pero solo 7 trades/año, inviable
+- RSI + BTC semanal EMA200 → PF 1.58, empeora el resultado
+- FASE_CAMBIO eliminado → WR cae a 41.4%, PnL -$25 vs +$45 real. FASE_CAMBIO protege capital.
+
+### Hallazgo crítico — FASE_CAMBIO
+FASE_CAMBIO no es el enemigo. Con 376 cierres generó +$45 real vs -$25 simulado sin él.
+El problema no está en las salidas sino en las entradas.
+
+### Mejor combinación encontrada con evidencia
+**BTC: RSI 65-80 + momentum 3de4 + cuerpo vela <40%**
+- PF: 2.12 | WR: 29.7% | T/mes: 1.5
+
+**ETH: RSI 70-80 + momentum 3de5**
+- PF: 1.93 | WR: 19.5% | T/mes: 1.9
+
+### Anatomía TP vs SL (evidencia de 9 años)
+Las entradas ganadoras tienen consistentemente:
+- Cuerpo de vela de entrada < 50% (consolidación, no euforia)
+- Volumen relativo menor (1.59-1.88 vs 1.78-1.91 en perdedoras)
+- Precio no sobreextendido en últimas 20 velas
+
+### Limitación real con $20 de capital
+Con 1% de riesgo por trade y mejor configuración BTC:
+- Ganancia: $0.48-$0.66/mes
+- Para generar $2-3/mes se necesita capital de $200-300
+- El bot es rentable — el límite es el capital inicial, no la estrategia
+
+### Fondeo.xyz — criterios reales (verificados ago 2026)
+- One-Step: WR ≥50%, profit target 10%, drawdown diario 5%, max loss 10%, **mínimo 3 trades/DÍA**
+- Subscription $49/mes: sin WR mínimo, sin profit target, sin mínimo trades/día — solo no violar drawdown 10%
+- Opera en Bybit (no Binance) — requeriría adaptar el bot
+- El bot actual hace ~3 trades/MES, incompatible con One-Step (3/día)
+- Modelo Subscription es el único compatible con la frecuencia actual
+
+### Plan acordado
+1. Depositar $20 en Binance y activar REAL pasado mañana (ago 2026)
+2. Operar con configuración actual del bot — no implementar nuevos filtros sin backtest aprobado
+3. Reinvertir ganancias para crecer el capital gradualmente
+4. Escalar cuando se confirme rentabilidad real
+
+### Comandos para activar REAL
+```bash
+screen -r v2_main
+export BOT_REAL_CONFIRMADO=true
+echo '{"modo":"REAL","intervalo_velas":"4h","sleep_segundos":240}' > ~/bot-padre-v2/signals/modo.json

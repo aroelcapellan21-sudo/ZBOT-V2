@@ -355,8 +355,7 @@ def evaluar():
             print("  [CORRELACION] ❌ Bloqueado.")
             return
 
-        monto_base = capital * CAPITAL_MAX_POR_OP
-        monto_op   = round(monto_base * factor_mem, 2)
+        monto_op = 5.0
 
         fila_id = reservar_operacion("ALCISTA", precio_actual, rsi, monto_op)
         if fila_id is None:

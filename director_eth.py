@@ -10,7 +10,6 @@
 
 from datetime import datetime
 from francotirador_alcista_eth import evaluar as evaluar_alcista
-from francotirador_bajista_eth import evaluar as evaluar_bajista
 from francotirador_lateral_eth import evaluar as evaluar_lateral
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
@@ -48,8 +47,7 @@ def dirigir(fase_global=None):
         print(f"  ✅ Activando FRANCOTIRADOR ALCISTA ETH")
         evaluar_alcista()
     elif fase == "BAJISTA":
-        print(f"  🔻 Activando FRANCOTIRADOR BAJISTA ETH")
-        evaluar_bajista()
+        print(f"  ⏸️ BAJISTA desactivado — solo ALCISTA y LATERAL.")
     elif fase == "LATERAL":
         print(f"  ⚖️ Activando FRANCOTIRADOR LATERAL ETH")
         evaluar_lateral()

@@ -15,11 +15,7 @@ import time
 import os
 import fcntl
 from datetime import datetime
-from director_btc import dirigir as dirigir_btc
 from director_eth import dirigir as dirigir_eth
-from director_sol import dirigir as dirigir_sol
-from director_bnb import dirigir as dirigir_bnb
-from director_avax import dirigir as dirigir_avax
 from engine import enviar_aviso
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
@@ -244,28 +240,16 @@ def ejecutar_ciclo():
 
     # Directores solo se activan segun fase global
     if fase_global == "ALCISTA":
-        print(f"  🟢 Activando Directores en modo ALCISTA")
-        dirigir_btc("ALCISTA")
+        print(f"  🟢 Activando Director ETH en modo ALCISTA")
         dirigir_eth("ALCISTA")
-        dirigir_sol("ALCISTA")
-        dirigir_bnb("ALCISTA")
-        dirigir_avax("ALCISTA")
 
     elif fase_global == "BAJISTA":
-        print(f"  🔻 Activando Directores en modo BAJISTA")
-        dirigir_btc("BAJISTA")
+        print(f"  ⏸️ Fase BAJISTA — solo ETH activo, bajista desactivado.")
         dirigir_eth("BAJISTA")
-        dirigir_sol("BAJISTA")
-        dirigir_bnb("BAJISTA")
-        dirigir_avax("BAJISTA")
 
     else:
-        print(f"  ⚖️ Mercado lateral. Directores en modo proteccion.")
-        dirigir_btc("LATERAL")
+        print(f"  ⚖️ Mercado lateral. Director ETH en modo proteccion.")
         dirigir_eth("LATERAL")
-        dirigir_sol("LATERAL")
-        dirigir_bnb("LATERAL")
-        dirigir_avax("LATERAL")
 
     print(f"{'='*60}\n")
 

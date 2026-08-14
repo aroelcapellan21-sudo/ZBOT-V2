@@ -844,3 +844,51 @@ la moneda actual antes de pasar a la siguiente, salvo decisión explícita de ca
 
 Consultar primero este documento y los reportes existentes antes de crear una nueva prueba.
 No asumir que una moneda está descartada o aprobada sin revisar su historial completo.
+
+---
+
+## Estado de investigación de francotiradores — actualizado 2026-08-14
+
+### Punto 13 — Estado actual de investigación
+
+BNB ALCISTA: 🟡 EN INVESTIGACIÓN — Prueba #1 completada. Resultado: insuficiente para concluir. Producción intacta. Candidato no activado.
+
+ETH ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
+BTC ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
+SOL ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
+AVAX ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
+
+Las demás monedas: ⚪ PENDIENTES DE INVESTIGACIÓN FORMAL
+
+### Estado de los francotiradores
+
+Los 15 francotiradores originales: 🟢 PRESERVADOS
+Segunda lista de 5: 🔒 TODAVÍA NO DEFINIDA
+
+### Investigación futura y sistemas complementarios
+
+Calendario inteligente: 🔒 PENDIENTE DE COMPLETAR LAS 5 MONEDAS
+Sistema externo de inteligencia: 🔒 DISEÑO FUTURO
+Integración Telegram: 🔒 FASE FUTURA
+
+### Regla derivada de la Prueba #1 de BNB
+
+La Prueba #1 de BNB ALCISTA fue una prueba controlada acumulativa en SIMULADOR
+(2026-01-01 → 2026-08-14).
+
+Resultado:
+- Producción: PF 0.681, 20 trades, P/L -$0.9000
+- Candidato: PF 0.619, 19 trades, P/L -$1.1650
+- Veredicto: INSUFICIENTE PARA CONCLUIR
+- Umbral interno establecido: mínimo 30 trades para emitir un veredicto formal.
+- Producción permanece intacta.
+- Candidato permanece desactivado.
+- No se modifican parámetros de producción como consecuencia de esta prueba.
+- La prueba no constituye evidencia suficiente para reemplazar Producción por el Candidato.
+
+Esta prueba amplía la evidencia disponible pero NO modifica la arquitectura,
+los parámetros validados ni las reglas de producción.
+
+Siguiente paso: investigar formalmente los restantes activos ALCISTAS,
+manteniendo aisladas las pruebas y sin activar candidatos hasta contar con
+evidencia suficiente.

@@ -746,3 +746,101 @@ Reportes completos en `reports/2026-08-13_auditoria-forense-expectancy.md`,
   Con $5 de valor de posición y comisiones reales el resultado es −10.2%.
 - **Fase alcista es rentable en aislamiento.** Fase lateral destruye capital con las comisiones actuales.
 - Sistema sigue en **SIMULADOR**. No se modificó ningún parámetro de producción.
+
+---
+
+## Plan Maestro — Investigación y selección de 5 monedas / francotiradores
+
+### Objetivo general
+
+No reemplazar los 15 francotiradores existentes. Investigar, uno por uno y de manera ordenada,
+las 5 monedas seleccionadas para determinar qué configuración funciona mejor y bajo qué
+condiciones conviene activar o desactivar cada una. Meta: construir una segunda lista de 5
+monedas/configuraciones respaldadas por evidencia. Los 15 francotiradores originales se
+preservan sin modificar durante toda la investigación.
+
+### Regla fundamental
+
+NO hacer pruebas al azar. Cada moneda tiene un expediente propio. Cada prueba queda
+identificada y numerada (ej. BNB ALCISTA Prueba #1, Prueba #2…). No saltar a otra
+modificación sin documentar qué se aprendió de la anterior. Antes de comenzar una nueva prueba
+indicar: qué prueba anterior se continúa, qué se aprendió, qué hipótesis se prueba, qué
+parámetros cambian, qué permanecen, qué datos se usan y qué criterio determinará el resultado.
+
+### Aislamiento permanente durante la investigación
+
+- NO modificar `config_cartera.py`, francotiradores de producción, `auditoria.csv` ni
+  `billetera.json`.
+- Los scripts experimentales son independientes y no activan candidatos en producción.
+- Todo resultado queda en reporte propio en `reports/`.
+- Toda prueba indica explícitamente que está en SIMULADOR.
+- La producción permanece intacta hasta decisión explícita de activación.
+
+### Metodología por moneda
+
+**Fase A — Baseline:** ejecutar/revisar config actual de producción, obtener datos históricos
+comparables, registrar resultados base.
+
+**Fase B — Candidatos:** probar modificaciones razonables de RSI, TP y SL de a una variable
+por vez; comparar siempre contra Producción.
+
+**Fase C — Análisis profundo** (para candidatos prometedores): trades compartidos/exclusivos,
+efecto del TP/SL, comportamiento mensual y por régimen, estabilidad, DD, sensibilidad a
+parámetros, robustez frente a variaciones pequeñas.
+
+**Fase D — Validación:** un candidato no se aprueba con una sola prueba. Umbral mínimo de
+referencia: 30 trades antes de declarar veredicto. El umbral se define antes de cada evaluación.
+
+### Campos mínimos por prueba documentada
+
+Config producción · candidatos probados · parámetros · período · fuente de datos · N velas ·
+N trades · TP count · SL count · WR · Expectancy · PF · DD máx · capital inicial/final ·
+trades compartidos · trades exclusivos · comportamiento mensual · comportamiento por régimen ·
+limitaciones · conclusión · siguiente prueba recomendada.
+
+### Objetivo final: matriz de activación
+
+Al terminar las 5 monedas, construir una matriz histórica (moneda × mes × régimen) que permita
+reglas del estilo "BNB bajo estas condiciones históricamente tiene mejor comportamiento".
+Las reglas deben surgir de los datos, no de intuición. Posteriormente se diseñará un sistema
+externo de inteligencia separado del bot principal (base de datos de evidencia: backtests,
+forwards, reales, métricas mensuales, régimen, estado de candidatos) y, en fase futura, comandos
+Telegram (/activar, /desactivar, /estado, /recomendaciones) — sin implementar todavía.
+
+### Principio de conservación
+
+Ninguna prueba experimental destruye información anterior. Cada prueba deja script, reporte,
+parámetros, fecha, datos, resultado, conclusión y siguiente paso. No sobrescribir reportes
+importantes.
+
+### 13. Estado actual de la investigación (2026-08-14)
+
+| Moneda | Estado | Pruebas completadas | Nota |
+|--------|--------|---------------------|------|
+| BNB ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 (forward ene–ago 2026) | Insuficiente para concluir. Producción intacta. Candidato RSI 60–68/TP 6.5% no activado. |
+| ETH ALCISTA | ⚪ PENDIENTE | — | — |
+| BTC ALCISTA | ⚪ PENDIENTE | — | — |
+| SOL ALCISTA | ⚪ PENDIENTE | — | — |
+| AVAX ALCISTA | ⚪ PENDIENTE | — | — |
+
+Los 15 francotiradores originales: 🟢 PRESERVADOS — no modificar durante esta investigación.
+
+Segunda lista de 5: 🔒 TODAVÍA NO DEFINIDA.
+Matriz calendario/régimen: 🔒 PENDIENTE DE COMPLETAR LAS 5 MONEDAS.
+Sistema externo de inteligencia: 🔒 DISEÑO FUTURO.
+Integración Telegram: 🔒 FASE FUTURA.
+
+**Orden de investigación:**
+1. BNB ALCISTA — 🟡 EN INVESTIGACIÓN
+2. ETH ALCISTA — ⚪ PENDIENTE
+3. BTC ALCISTA — ⚪ PENDIENTE
+4. SOL ALCISTA — ⚪ PENDIENTE
+5. AVAX ALCISTA — ⚪ PENDIENTE
+
+No avanzar a la siguiente moneda de forma aleatoria. Completar y documentar cada etapa de
+la moneda actual antes de pasar a la siguiente, salvo decisión explícita de cambiar el orden.
+
+### Regla para retomar el proyecto
+
+Consultar primero este documento y los reportes existentes antes de crear una nueva prueba.
+No asumir que una moneda está descartada o aprobada sin revisar su historial completo.

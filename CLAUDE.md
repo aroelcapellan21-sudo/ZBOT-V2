@@ -747,6 +747,38 @@ Reportes completos en `reports/2026-08-13_auditoria-forense-expectancy.md`,
 - **Fase alcista es rentable en aislamiento.** Fase lateral destruye capital con las comisiones actuales.
 - Sistema sigue en **SIMULADOR**. No se modificó ningún parámetro de producción.
 
+## Investigación BTC ALCISTA — ago 2026
+
+### Sistema C — definición
+
+- **Sistema C:** RSI 55–60 + gate SOBRE EMA200d (diaria, anti-lookahead: se usa EMA del día D−1 para señales del día D)
+- **Parámetros:** RSI 55–60, SL 5.0%, TP 6.0%, sin trailing (igual que Producción en SL/TP)
+- **Producción BTC:** RSI 55–75, SL 5.0%, TP 6.0%, sin gate EMA
+
+### Resumen de evidencia acumulada (2026-08-14)
+
+Reportes: `reports/2026-08-14_btc-alcista-*.md`, `reports/2026-08-14_btc-*.md`
+
+| Estudio | Prod PF | SistC PF | Trades SistC | Veredicto |
+|---------|---------|---------|-------------|-----------|
+| Train 2021–2023 | 1.101 | 1.177 | 74 | ✅ |
+| OOS 2024–2025 | 1.201 | 1.322 | 59 | ✅ PROMETEDOR |
+| Robustez EMA100–250 (OOS) | — | 1.264–1.322 | 52–64 | ✅ 4/4 EMAs positivas |
+| Bootstrap ΔExp OOS | — | P(Δ>0)=61.6% | — | ⚠️ IC95% cruza 0 |
+| ETH Sistema C (mismo gate) | — | PF OOS 0.960 | 67 | 🔴 DESCARTADO (0/4 EMAs) |
+| Forward ene–ago 2026 | PF 0.637 | 0 trades | 0 | ⚠️ NO OPERA |
+
+### Hallazgo crítico del forward 2026
+
+En ene–ago 2026, BTC estuvo **por debajo de su EMA200d** durante todos los momentos en que RSI tocó 55–60. Sistema C quedó inactivo — diseñado correctamente para no operar en régimen bajista macro. Producción generó 22 trades (PF 0.637, negativo), todos en RSI 60–75 o RSI 55–60 con macro bajista.
+
+Esto puede ser **fortaleza** (evita pérdidas en corrección) o **limitación** (períodos sin actividad). Cuando BTC recupere EMA200d, Sistema C volverá a activarse.
+
+### Veredicto BTC Sistema C: 🟡 PROMETEDOR — NO ACTIVAR hasta 30+ trades reales
+
+- Producción BTC: preservada sin cambios
+- Sistema C: no activado, pendiente de acumular datos en régimen alcista macro
+
 ---
 
 ## Plan Maestro — Investigación y selección de 5 monedas / francotiradores
@@ -818,8 +850,8 @@ importantes.
 | Moneda | Estado | Pruebas completadas | Nota |
 |--------|--------|---------------------|------|
 | BNB ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 (forward ene–ago 2026) | Insuficiente para concluir. Producción intacta. Candidato RSI 60–68/TP 6.5% no activado. |
-| ETH ALCISTA | ⚪ PENDIENTE | — | — |
-| BTC ALCISTA | ⚪ PENDIENTE | — | — |
+| ETH ALCISTA | 🔴 CANDIDATO DESCARTADO | Baseline forward 2026 + Sistema C | ETH Sistema C descartado (PF OOS 0.960, 0/4 EMAs). Producción sigue activa (PF 1.105 histórico). |
+| BTC ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 completada (múltiples fases) | Sistema C PROMETEDOR OOS (PF 1.322, 4/4 EMAs). Forward 2026: NO OPERA (BTC < EMA200d en régimen bajista). |
 | SOL ALCISTA | ⚪ PENDIENTE | — | — |
 | AVAX ALCISTA | ⚪ PENDIENTE | — | — |
 
@@ -831,9 +863,9 @@ Sistema externo de inteligencia: 🔒 DISEÑO FUTURO.
 Integración Telegram: 🔒 FASE FUTURA.
 
 **Orden de investigación:**
-1. BNB ALCISTA — 🟡 EN INVESTIGACIÓN
-2. ETH ALCISTA — ⚪ PENDIENTE
-3. BTC ALCISTA — ⚪ PENDIENTE
+1. BNB ALCISTA — 🟡 EN INVESTIGACIÓN (Prueba #1 cerrada, insuficiente)
+2. ETH ALCISTA — 🔴 Sistema C descartado · Producción preservada
+3. BTC ALCISTA — 🟡 EN INVESTIGACIÓN (Sistema C prometedor OOS · no opera en régimen bajista 2026)
 4. SOL ALCISTA — ⚪ PENDIENTE
 5. AVAX ALCISTA — ⚪ PENDIENTE
 
@@ -851,10 +883,12 @@ No asumir que una moneda está descartada o aprobada sin revisar su historial co
 
 ### Punto 13 — Estado actual de investigación
 
-BNB ALCISTA: 🟡 EN INVESTIGACIÓN — Prueba #1 completada. Resultado: insuficiente para concluir. Producción intacta. Candidato no activado.
+BNB ALCISTA: 🟡 EN INVESTIGACIÓN — Prueba #1 completada. Resultado: insuficiente para concluir. Producción intacta. Candidato RSI 60–68/TP 6.5% no activado.
 
-ETH ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
-BTC ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
+ETH ALCISTA: 🔴 SISTEMA C DESCARTADO — Baseline forward 2026 completado (PF 0.721, 29 trades). Sistema C (RSI 55–60 + EMA200d) descartado: PF OOS 0.960, 0/4 EMAs positivas en OOS. Producción ETH preservada sin cambios.
+
+BTC ALCISTA: 🟡 EN INVESTIGACIÓN — Prueba #1 completada (múltiples fases: forense, RSI, EMA200d, robustez, walkforward, bootstrap, forward 2026). Sistema C PROMETEDOR en OOS (PF 1.322, 4/4 EMAs). Forward 2026: 0 trades — BTC estuvo bajo EMA200d todo el período de señales RSI 55–60. Producción intacta. Sistema C no activado.
+
 SOL ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
 AVAX ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
 

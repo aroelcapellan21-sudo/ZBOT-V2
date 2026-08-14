@@ -543,12 +543,30 @@ Reporte: `reports/2026-08-13_robustez-bnb-alcista.md`.
 | Mejor vecino (65–68/4.5/6.5) | 1.385 | $22.72 | ✅ destacado |
 | RSI-min 55 | 0.973 | $19.61 | ❌ único negativo |
 
-**Hallazgo BTC macro:** señales BNB cuando BTC está *bajo* su EMA200 semanal tienen WR 58.1%
-y PF 1.856 vs WR 44.5% / PF 1.075 cuando BTC está sobre la EMA. Contraintuitivo y con muestra
-pequeña (31 trades bajo EMA) — requiere estudio dedicado antes de implementar.
+~~**Hallazgo BTC macro (2026-08-13, INVALIDADO por backtest aislado 2026-08-14):**~~
+~~señales BNB cuando BTC está *bajo* su EMA200 semanal tienen WR 58.1% y PF 1.856.~~
+Ver sección siguiente.
 
 **Estado:** solo investigación. No se modificó config_cartera.py ni ningún francotirador.
 Cualquier cambio de parámetros requiere OK explícito de Ariel.
+
+### Backtest aislado filtro BTC/EMA200w (2026-08-14) — resultado invalidado
+
+Reporte: `reports/2026-08-14_filtro-btc-ema200w-bnb.md`. Commit: `8dcd302`.
+
+| Escenario | Trades val 2024 | Trades val 2025 | Veredicto |
+|-----------|-----------------|-----------------|-----------|
+| SIN FILTRO | 51 | 37 | — (base) |
+| BTC SOBRE EMA200w | 51 (= SIN FILTRO) | 37 (= SIN FILTRO) | ⚪ C) No aporta mejora |
+| BTC BAJO EMA200w | **0** | **0** | ⚠️ Evidencia insuficiente |
+
+**Causa:** BTC estuvo sobre su EMA200w el **100% del tiempo** en 2024 y 2025.
+- El filtro SOBRE no descarta ninguna señal en validación → idéntico a SIN FILTRO.
+- El filtro BAJO no genera ningún trade en validación → no evaluable out-of-sample.
+- Los 31 trades "bajo EMA" con WR 58.1% eran **100% in-sample** del bear market 2021–2023.
+
+**Conclusión:** filtro BTC/EMA200w descartado como mejora. Para reevaluar se necesita
+que BTC vuelva a operar bajo su EMA200w durante suficiente tiempo (≥10 trades).
 
 ## Estado técnico verificado — 2026-08-13
 

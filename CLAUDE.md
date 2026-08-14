@@ -663,6 +663,44 @@ y que 2026 no favorece a ninguno de los dos.
 **Siguiente paso: activar REAL y acumular 30+ trades reales.**
 No autoriza ningún cambio a producción.
 
+### Análisis acumulativo ampliado — trades compartidos/exclusivos y desglose mensual (2026-08-14)
+
+Reporte: `reports/2026-08-14_bnb-alcista-acumulativo.md`. Commit: `fb63738`.
+Script: `forward_bnb_analisis.py` — analiza los 20/19 trades del simulador previo sin re-simular.
+**0 archivos de producción tocados.**
+
+**Trades compartidos vs exclusivos:**
+
+| Categoría | Trades | TP | SL | P/L acum |
+|-----------|--------|----|----|----------|
+| Compartidos — Producción | 15 | 6 | 9 | −$0.675 |
+| Compartidos — Candidato  | 15 | 6 | 9 | −$0.225 |
+| Exclusivos Producción    |  5 | 2 | 3 | −$0.225 |
+| Exclusivos Candidato     |  4 | 0 | 4 | −$0.940 |
+
+**Hallazgo clave:** en los 15 trades compartidos (misma señal RSI 60–68) ambos sistemas
+tienen idéntico ratio TP/SL (6/9). El candidato supera a producción por cobrar más en cada TP
+($0.315 vs $0.240). La desventaja del candidato viene de sus 4 exclusivos: 0 TP / 4 SL (−$0.94).
+Esos 4 aparecen porque el TP más alto (6.5%) mantiene la posición abierta más tiempo; cuando
+cierra por SL, la siguiente señal también resulta SL (mercado ya en tendencia bajista).
+
+**Desglose mensual (meses con ambos sistemas activos: 7):**
+
+| Mes | Ganador | Nota |
+|-----|---------|------|
+| Enero 2026 | Producción | PF 1.02 vs 0.67 |
+| Febrero 2026 | Empate | 3 SL cada uno |
+| Marzo 2026 | Candidato | PF 0.45 vs 0.34 |
+| Abril 2026 | Producción | 1 trade (TP) vs 2 trades (1 TP) — muestra mínima |
+| Mayo 2026 | Producción | PF 1.02 vs 0.89 |
+| Junio 2026 | Empate | 1 SL cada uno |
+| Julio 2026 | Empate | 1 TP cada uno; candidato cobra más |
+
+Producción gana 3/7 meses · Candidato gana 1/7 · Empate 3/7.
+
+**Veredicto: INSUFICIENTE PARA CONCLUIR** — 19 trades vs umbral mínimo de 30.
+No se implementa ningún cambio. Re-evaluar cuando Producción tenga ≥30 trades reales.
+
 ## Estado técnico verificado — 2026-08-13
 
 ### Cadena ETH verificada en esta sesión

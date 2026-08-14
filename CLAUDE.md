@@ -11,6 +11,12 @@ automáticamente como archivo en `~/bot-padre-v2/reports/`, sin pedir permiso, y
 - Contenido del archivo: el análisis completo (números, tablas, conclusiones), en Markdown.
 - Aplica siempre, sin que Ariel lo pida cada vez — incluida esta misma regla y cualquier respuesta futura.
 - `reports/` no se commitea a git (ver `.gitignore`) — son notas de trabajo, no código ni datos operativos.
+- **Regla reforzada (2026-08-13):** siempre terminar la respuesta mostrando la ruta exacta y el comando
+  `less` listo para copiar, incluso si el resultado ya se mostró parcialmente en pantalla:
+  ```
+  Resultado en: ~/bot-padre-v2/reports/YYYY-MM-DD_tema.md
+  less ~/bot-padre-v2/reports/YYYY-MM-DD_tema.md
+  ```
 
 ## Proyecto
 **Z-Bot Padre v2** — bot de trading algorítmico sobre Binance.

@@ -520,3 +520,50 @@ Con 1% de riesgo por trade y mejor configuración BTC:
 screen -r v2_main
 export BOT_REAL_CONFIRMADO=true
 echo '{"modo":"REAL","intervalo_velas":"4h","sleep_segundos":240}' > ~/bot-padre-v2/signals/modo.json
+```
+
+## Estado técnico verificado — 2026-08-13
+
+### Cadena ETH verificada en esta sesión
+
+- `director_orquesta.py` → `director_eth.py` → `francotirador_alcista_eth.py` / `francotirador_lateral_eth.py`:
+  cadena completa compilada y ejecutada sin errores.
+- Un ciclo completo de la orquesta fue ejecutado correctamente en SIMULADOR.
+- La fase global fue probada: `detectar_fase()` puede detectar LATERAL con velas 4H actuales.
+- Ambas fases ETH están conectadas a `config_cartera.py` y leen parámetros desde ahí.
+
+### Parámetros efectivos ETH (leídos de config_cartera.py, verificados 2026-08-13)
+
+| Fase | RSI entrada | SL | TP | EMA | Trailing activación / distancia |
+|------|------------|----|----|-----|--------------------------------|
+| ALCISTA | 60–75 | 4.5% | 5.0% | 20/100 | 0.5% / 1.0% |
+| LATERAL | 43–57 | 4.5% | 6.0% | 20/100 | 0.5% / 1.0% |
+
+### Hallazgos de backtest forense — 2026-08-13 (ETHUSDT 4H, 2021–2026, $5/trade, com. 0.1%)
+
+Reportes completos en `reports/2026-08-13_auditoria-forense-expectancy.md`,
+`reports/2026-08-13_expectancy-real.md` y `reports/2026-08-13_alcista-vs-lateral.md`.
+
+**Resultado global (alcista + lateral combinados):**
+
+| Métrica | Valor |
+|---------|-------|
+| Total trades (TP+SL) | 630 (TP:291 / SL:339) |
+| Win rate real | 46.19% |
+| Expectancy/trade | −$0.003 |
+| Profit factor real | 0.9765 |
+| Capital final desde $20 | $17.95 |
+| Racha máx SL | 11 |
+
+**Por fase — diferencia crítica:**
+
+| Fase | Trades | WR | Expect/trade | PF | Capital final |
+|------|--------|----|--------------|----|---------------|
+| ALCISTA | 254 | 51.97% | **+$0.012** | **1.105** | **$23.01** ✅ |
+| LATERAL | 376 | 42.29% | **−$0.013** | **0.904** | **$15.12** ❌ |
+
+- El script original (`backtest_perfil_comparativo.py`) reportaba capital $118.33 usando un modelo
+  de riesgo-fijo (`ganancia = $5 × tp/sl`) que no es equivalente a operar $5 de posición real.
+  Con $5 de valor de posición y comisiones reales el resultado es −10.2%.
+- **Fase alcista es rentable en aislamiento.** Fase lateral destruye capital con las comisiones actuales.
+- Sistema sigue en **SIMULADOR**. No se modificó ningún parámetro de producción.

@@ -614,9 +614,34 @@ Commits: `b4a8f6e`, pendiente.
 | Estabilidad anual 2021–2025 | **B) PROMETEDOR** | 3/5 años, 4/5 (80%) con PF>1 y exp>0 |
 | Filtro BTC/EMA200w | Descartado | In-sample; 0 trades en validación 2024–2025 |
 
+### Análisis de significancia y robustez (2026-08-14)
+
+Reporte: `reports/2026-08-14_bnb-alcista-significancia-robustez.md`. Commit: `f11290e`.
+
+**Consistencia anual (5 años válidos, 2021–2025):**
+- PF > 1.0: **5/5 años (100%)**
+- Expectancy > 0: **5/5 años (100%)**
+- DD ≤ producción: 4/5 años (80%)
+- Supera en expectancy: 4/5 años (80%)
+- Gana en capital: 3/5 años (60%)
+
+**Bootstrap 10,000 muestras:**
+- P(diff > 0): 72.0% — no es concluyente (umbral orientativo ~85%)
+- IC 95%: [−$0.029, +$0.056] — **cruza cero** → varianza aleatoria no descartable
+- Limitación: trades serialmente dependientes → bootstrap subestima varianza real.
+  No interpretar como prueba estadística formal.
+
+**Sensibilidad de vecindad (6 vecinos, 2021–2025):**
+- **6/6 vecinos** con PF > 1.0 → zona robusta total, candidato no es pico aislado
+
+**Veredicto: 🟡 B) PROMETEDOR** (igual en los 6 estudios independientes)
+El IC95 del bootstrap cruza cero y solo gana 3/5 años en capital — evidencia
+insuficiente para A sin trades reales.
+
 **Conclusión consolidada:** evidencia múltiple e independiente apunta a una mejora real
-del candidato sobre producción. El freno al veredicto A es un año negativo y la cantidad
-limitada de ventanas temporales. **Siguiente paso: activar REAL y acumular trades reales.**
+del candidato sobre producción. El freno al veredicto A es un año negativo, IC95 bootstrap
+cruzando cero y cantidad limitada de ventanas temporales.
+**Siguiente paso: activar REAL y acumular 30+ trades reales.**
 No autoriza ningún cambio a producción.
 
 ## Estado técnico verificado — 2026-08-13

@@ -578,6 +578,37 @@ Reporte: `reports/2026-08-14_filtro-btc-ema200w-bnb.md`. Commit: `8dcd302`.
 **Conclusión:** filtro BTC/EMA200w descartado como mejora. Para reevaluar se necesita
 que BTC vuelva a operar bajo su EMA200w durante suficiente tiempo (≥10 trades).
 
+### Estabilidad anual y rolling walk-forward (2026-08-14) — resumen acumulado
+
+Reportes: `reports/2026-08-14_estabilidad-anual-bnb.md`, `reports/2026-08-14_rolling-bnb-alcista.md`.
+Commits: `b4a8f6e`, pendiente.
+
+**Estabilidad anual 2021–2025 (5 años, todos válidos ≥10 trades):**
+
+| Métrica | Producción | Candidato |
+|---------|-----------|-----------|
+| Años ganados | 2/5 | **3/5** |
+| PF promedio | 1.106 | **1.240** |
+| Expectancy promedio | +$0.0115 | **+$0.0284** |
+| Capital promedio | $20.78 | **$21.25** |
+| DD promedio | 8.7% | **7.1%** |
+
+- PF candidato > 1.0 en 4/5 años (80%)
+- PF candidato > PF producción en 4/5 años (80%)
+- Expectancy candidato > 0 en 4/5 años (80%)
+- DD candidato ≤ DD producción en 4/5 años (80%)
+- **Veredicto: 🟡 B) PROMETEDOR PERO INSUFICIENTEMENTE CONSISTENTE**
+  Hay un año negativo (candidato PF < 1.0) que impide declarar robustez plena.
+
+**Rolling walk-forward 24m/12m (ventanas 2023/2024/2025):**
+- Candidato gana 2/3 ventanas · PF prom 1.297 vs 1.133 · Expect +$0.0343 vs +$0.0143
+- **Veredicto: 🟡 B) PROMETEDOR PERO INSUFICIENTE** (solo 3 ventanas disponibles)
+
+**Estado de la investigación BNB:** el candidato RSI 60–68/SL 4.5/TP 6.5 tiene evidencia
+consistente de mejora en múltiples análisis independientes, pero sin llegar a A) ROBUSTO
+por un año negativo y cantidad limitada de ventanas. Siguiente paso natural: activar REAL
+y evaluar con trades reales. No autoriza ningún cambio a producción.
+
 ## Estado técnico verificado — 2026-08-13
 
 ### Cadena ETH verificada en esta sesión

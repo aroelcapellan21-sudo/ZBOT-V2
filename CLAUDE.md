@@ -604,10 +604,20 @@ Commits: `b4a8f6e`, pendiente.
 - Candidato gana 2/3 ventanas · PF prom 1.297 vs 1.133 · Expect +$0.0343 vs +$0.0143
 - **Veredicto: 🟡 B) PROMETEDOR PERO INSUFICIENTE** (solo 3 ventanas disponibles)
 
-**Estado de la investigación BNB:** el candidato RSI 60–68/SL 4.5/TP 6.5 tiene evidencia
-consistente de mejora en múltiples análisis independientes, pero sin llegar a A) ROBUSTO
-por un año negativo y cantidad limitada de ventanas. Siguiente paso natural: activar REAL
-y evaluar con trades reales. No autoriza ningún cambio a producción.
+**Cuadro acumulado de evidencia BNB candidato (RSI 60–68 / SL 4.5% / TP 6.5%):**
+
+| Estudio | Veredicto | Detalle |
+|---------|-----------|---------|
+| Robustez vecindad (10 combinaciones) | Zona amplia | 9/10 positivos en val 2024–2026 |
+| Walk-forward 3yr/1yr (2 ventanas) | **A) ROBUSTO** | 2/2 ventanas positivas, PF 1.185 vs 1.137 |
+| Walk-forward 24m/12m (3 ventanas) | **B) PROMETEDOR** | 2/3 ventanas ganadas, PF 1.297 vs 1.133 |
+| Estabilidad anual 2021–2025 | **B) PROMETEDOR** | 3/5 años, 4/5 (80%) con PF>1 y exp>0 |
+| Filtro BTC/EMA200w | Descartado | In-sample; 0 trades en validación 2024–2025 |
+
+**Conclusión consolidada:** evidencia múltiple e independiente apunta a una mejora real
+del candidato sobre producción. El freno al veredicto A es un año negativo y la cantidad
+limitada de ventanas temporales. **Siguiente paso: activar REAL y acumular trades reales.**
+No autoriza ningún cambio a producción.
 
 ## Estado técnico verificado — 2026-08-13
 

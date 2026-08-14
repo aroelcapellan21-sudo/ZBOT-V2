@@ -528,6 +528,28 @@ export BOT_REAL_CONFIRMADO=true
 echo '{"modo":"REAL","intervalo_velas":"4h","sleep_segundos":240}' > ~/bot-padre-v2/signals/modo.json
 ```
 
+## Investigación de parámetros BNB ALCISTA — ago 2026
+
+### Hallazgo de robustez (2026-08-13)
+
+Análisis de sensibilidad sobre 10 combinaciones vecinas al candidato `RSI 60–68 / SL 4.5% / TP 6.5%`.
+9 de 10 combinaciones validan positivo en 2024–2026 → **zona robusta confirmada**.
+Reporte: `reports/2026-08-13_robustez-bnb-alcista.md`.
+
+| Config | PF val 2024–2026 | Capital | Nota |
+|--------|-----------------|---------|------|
+| **ACTUAL producción** (60–75/4.5/5.0) | 1.057 | $20.77 | ✅ |
+| **Candidato** (60–68/4.5/6.5) | 1.078 | $20.93 | ✅ |
+| Mejor vecino (65–68/4.5/6.5) | 1.385 | $22.72 | ✅ destacado |
+| RSI-min 55 | 0.973 | $19.61 | ❌ único negativo |
+
+**Hallazgo BTC macro:** señales BNB cuando BTC está *bajo* su EMA200 semanal tienen WR 58.1%
+y PF 1.856 vs WR 44.5% / PF 1.075 cuando BTC está sobre la EMA. Contraintuitivo y con muestra
+pequeña (31 trades bajo EMA) — requiere estudio dedicado antes de implementar.
+
+**Estado:** solo investigación. No se modificó config_cartera.py ni ningún francotirador.
+Cualquier cambio de parámetros requiere OK explícito de Ariel.
+
 ## Estado técnico verificado — 2026-08-13
 
 ### Cadena ETH verificada en esta sesión

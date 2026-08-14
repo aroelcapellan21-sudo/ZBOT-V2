@@ -286,6 +286,12 @@ def evaluar():
 
     precio_actual = cierres[-1]
 
+    # LATERAL DESACTIVADO 2026-08-13: backtest forense confirma PF 0.90, expectancy -$0.013.
+    # revisar_cierres queda activo para proteger posiciones abiertas si las hubiera.
+    revisar_cierres(precio_actual, evaluar_tp=True)
+    print("  [LATERAL ETH] Fase desactivada — sin entradas nuevas.")
+    return
+
     if esta_bloqueado():
         print("  🚨 Guardian activo.")
         revisar_cierres(precio_actual, evaluar_tp=False)

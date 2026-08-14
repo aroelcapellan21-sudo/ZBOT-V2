@@ -638,9 +638,28 @@ Reporte: `reports/2026-08-14_bnb-alcista-significancia-robustez.md`. Commit: `f1
 El IC95 del bootstrap cruza cero y solo gana 3/5 años en capital — evidencia
 insuficiente para A sin trades reales.
 
+### Prueba controlada en SIMULADOR — ene–ago 2026 (2026-08-14)
+
+Reporte: `reports/2026-08-14_bnb-alcista-prueba-simulador.md`. Commit: `a6d366f`.
+Datos reales Binance API · Script aislado · **0 archivos de producción tocados.**
+
+| Métrica | Producción | Candidato | Δ |
+|---------|-----------|-----------|---|
+| Trades | 20 | 19 | −1 |
+| WR | 40.0% | 31.6% | −8.4 pp |
+| Expectancy | −$0.0450 | −$0.0613 | −$0.016 |
+| PF | 0.681 | 0.619 | −0.062 |
+| Capital | $19.10 | $18.84 | −$0.26 |
+| DD máx | 8.0% | 8.8% | +0.8 pp |
+
+**Resultado:** ambos sistemas negativos en 2026 ene–ago. Producción gana levemente.
+Consistente con los backtests: 2026 tiene muestra insuficiente y ambos pierden en ese período.
+No invalida el cuadro histórico 2021–2025 (candidato PF>1 en 5/5 años).
+
 **Conclusión consolidada:** evidencia múltiple e independiente apunta a una mejora real
-del candidato sobre producción. El freno al veredicto A es un año negativo, IC95 bootstrap
-cruzando cero y cantidad limitada de ventanas temporales.
+del candidato sobre producción en el período 2021–2025. En 2026 ambos sistemas son negativos.
+El freno al veredicto A es un año negativo en el histórico, IC95 bootstrap cruzando cero
+y que 2026 no favorece a ninguno de los dos.
 **Siguiente paso: activar REAL y acumular 30+ trades reales.**
 No autoriza ningún cambio a producción.
 

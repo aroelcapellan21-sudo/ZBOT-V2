@@ -259,6 +259,16 @@ Los 9 puntos del plan están cerrados. Lo que falta **no es código**:
   crezcan.
 - **52 sesiones de screen** contra las 29 documentadas — duplicados de julio, sin limpiar.
 
+## Pendiente futuro — Sistema de gestión estacional por comandos Telegram
+Implementar después de validar REAL con 30+ trades. Comandos propuestos:
+/pausar_[moneda] — detiene una moneda en meses históricamente malos
+/activar_[moneda] — reactiva cuando llega mes favorable
+/estado_estacional — muestra mes actual y comportamiento histórico de cada moneda activa
+Basado en análisis de estacionalidad 2021-2025 guardado en reports/2026-08-13_estacionalidad.md
+Meses malos confirmados: abril, mayo, junio (todas las monedas negativas en junio)
+Meses buenos confirmados: julio, octubre
+NO implementar antes de tener 30+ trades reales en REAL.
+
 ## Dirección de operación — SPOT solo-LONG (desde jun 2026)
 - El bot opera **solo ALCISTA y LATERAL**. Los 5 francotiradores bajistas están desactivados.
 - Razón: hacer SHORT es imposible en cuenta SPOT. En SIMULADOR generaba balances de cripto negativos (causa raíz de los negativos en billetera).

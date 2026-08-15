@@ -849,7 +849,7 @@ importantes.
 
 | Moneda | Estado | Pruebas completadas | Nota |
 |--------|--------|---------------------|------|
-| BNB ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 (forward ene–ago 2026) | Insuficiente para concluir. Producción intacta. Candidato RSI 60–68/TP 6.5% no activado. |
+| BNB ALCISTA | 🟡 PROMETEDOR | Prueba #1 (forward ene–ago 2026) + Prueba #2 (Sistema C bootstrap exhaustivo) | Sistema C RSI 55–60 + EMA200d: PF OOS 1.318, 4/4 EMAs positivas, pero EMA200 NO la mejor (EMA250 mejor). IC95% cruza cero. Forward 2026: 3 trades (89% bajo EMA200d). Producción intacta. Sistema C NO activado. |
 | ETH ALCISTA | 🔴 SISTEMA C DESCARTADO | Baseline forward 2026 + Sistema C | ETH Sistema C descartado (PF OOS 0.960, 0/4 EMAs). Producción sigue activa (PF 1.105 histórico). |
 | BTC ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 completada (múltiples fases) | Sistema C PROMETEDOR OOS (PF 1.322, 4/4 EMAs). Forward 2026: NO OPERA (BTC < EMA200d en régimen bajista). |
 | SOL ALCISTA | 🔴 SISTEMA C DESCARTADO | Prueba #1 completada (bootstrap + vecindad EMA) | PF OOS 0.984, 0/4 EMAs positivas. Patrón RSI 55–60 + gate EMA no funciona en SOL. Producción intacta. |
@@ -858,12 +858,12 @@ importantes.
 Los 15 francotiradores originales: 🟢 PRESERVADOS — no modificar durante esta investigación.
 
 Segunda lista de 5: 🔒 TODAVÍA NO DEFINIDA.
-Matriz calendario/régimen: 🔒 PENDIENTE (Sistema C completo — BNB pendiente de segunda investigación).
+Matriz calendario/régimen: 🔒 PENDIENTE (Sistema C completo — 5 activos investigados).
 Sistema externo de inteligencia: 🔒 DISEÑO FUTURO.
 Integración Telegram: 🔒 FASE FUTURA.
 
 **Orden de investigación:**
-1. BNB ALCISTA — 🟡 EN INVESTIGACIÓN (Prueba #1 cerrada, insuficiente)
+1. BNB ALCISTA — 🟡 PROMETEDOR (Prueba #2 Sistema C cerrada — PF OOS 1.318, 4/4 EMAs, IC95% cruza cero)
 2. ETH ALCISTA — 🔴 Sistema C descartado · Producción preservada
 3. BTC ALCISTA — 🟡 EN INVESTIGACIÓN (Sistema C prometedor OOS · no opera en régimen bajista 2026)
 4. SOL ALCISTA — 🔴 Sistema C descartado (PF OOS 0.984, 0/4 EMAs) · Producción preservada
@@ -871,15 +871,16 @@ Integración Telegram: 🔒 FASE FUTURA.
 
 **Conclusión del experimento Sistema C (2026-08-14):**
 El patrón RSI 55–60 + gate EMA diaria NO es generalizable entre altcoins.
-Únicamente BTC muestra evidencia OOS positiva (4/4 EMAs, PF 1.322).
+BTC y BNB muestran evidencia OOS positiva (4/4 EMAs cada uno), pero IC95% cruza cero en ambos.
 ETH, SOL y AVAX: 0/4 EMAs positivas en los tres casos.
 
-| Activo | PF OOS | Exp OOS | EMAs>1 | Trades OOS | Veredicto |
-|--------|--------|---------|--------|-----------|-----------|
-| BTC | 1.322 | +$0.0383 | 4/4 | 59 | 🟡 PROMETEDOR |
-| ETH | 0.960 | −$0.0055 | 0/4 | 67 | 🔴 DESCARTADO |
-| SOL | 0.984 | −$0.0022 | 0/4 | 96 | 🔴 DESCARTADO |
-| AVAX | 0.707 | −$0.0466 | 0/4 | 67 | 🔴 DESCARTADO |
+| Activo | PF OOS | Exp OOS | EMAs>1 | EMA200 mejor | Trades OOS | Forward 2026 | Veredicto |
+|--------|--------|---------|--------|-------------|-----------|-------------|-----------|
+| BTC | 1.322 | +$0.0383 | 4/4 | ✅ | 59 | 0 trades (100% bajo EMA200d) | 🟡 PROMETEDOR |
+| BNB | 1.318 | +$0.0379 | 4/4 | ❌ (mejor EMA250) | 72 | 3 trades (89% bajo EMA200d) | 🟡 PROMETEDOR |
+| ETH | 0.960 | −$0.0055 | 0/4 | — | 67 | N/A | 🔴 DESCARTADO |
+| SOL | 0.984 | −$0.0022 | 0/4 | — | 96 | 0 trades | 🔴 DESCARTADO |
+| AVAX | 0.707 | −$0.0466 | 0/4 | — | 67 | 0 trades | 🔴 DESCARTADO |
 
 No avanzar a la siguiente moneda de forma aleatoria. Completar y documentar cada etapa de
 la moneda actual antes de pasar a la siguiente, salvo decisión explícita de cambiar el orden.
@@ -895,7 +896,7 @@ No asumir que una moneda está descartada o aprobada sin revisar su historial co
 
 ### Punto 13 — Estado actual de investigación
 
-BNB ALCISTA: 🟡 EN INVESTIGACIÓN — Prueba #1 completada. Resultado: insuficiente para concluir. Producción intacta. Candidato RSI 60–68/TP 6.5% no activado.
+BNB ALCISTA: 🟡 PROMETEDOR — Prueba #2 (Sistema C bootstrap exhaustivo) completada (2026-08-14). Sistema C RSI 55–60 + gate EMA200d diaria: PF OOS 1.318 (72 trades), WR 54.2%, Exp +$0.0379. Vecindad 4/4 EMAs positivas pero EMA200 NO la mejor (EMA250 mejor → PARCIALMENTE_ROBUSTA). IC95% bootstrap cruza cero [−$0.0644, +$0.0933], P(D>0) = 63.9%. Forward 2026: 3 trades, BNB 89% bajo EMA200d (gate activo, comportamiento esperado). Producción intacta. Sistema C NO activado.
 
 ETH ALCISTA: 🔴 SISTEMA C DESCARTADO — Baseline forward 2026 completado (PF 0.721, 29 trades). Sistema C (RSI 55–60 + EMA200d) descartado: PF OOS 0.960, 0/4 EMAs positivas en OOS. Producción ETH preservada sin cambios.
 
@@ -923,17 +924,31 @@ La Prueba #1 de BNB ALCISTA fue una prueba controlada acumulativa en SIMULADOR
 
 Resultado:
 - Producción: PF 0.681, 20 trades, P/L -$0.9000
-- Candidato: PF 0.619, 19 trades, P/L -$1.1650
+- Candidato RSI 60–68/TP 6.5%: PF 0.619, 19 trades, P/L -$1.1650
 - Veredicto: INSUFICIENTE PARA CONCLUIR
 - Umbral interno establecido: mínimo 30 trades para emitir un veredicto formal.
-- Producción permanece intacta.
-- Candidato permanece desactivado.
+- Producción permanece intacta. Candidato permanece desactivado.
 - No se modifican parámetros de producción como consecuencia de esta prueba.
-- La prueba no constituye evidencia suficiente para reemplazar Producción por el Candidato.
 
-Esta prueba amplía la evidencia disponible pero NO modifica la arquitectura,
-los parámetros validados ni las reglas de producción.
+### Regla derivada de la Prueba #2 de BNB (Sistema C)
 
-Siguiente paso: investigar formalmente los restantes activos ALCISTAS,
-manteniendo aisladas las pruebas y sin activar candidatos hasta contar con
-evidencia suficiente.
+La Prueba #2 de BNB ALCISTA fue un bootstrap exhaustivo del Sistema C
+(RSI 55–60 + gate EMA200 diaria anti-lookahead) sobre datos Binance reales.
+Train: 2021–2023 | OOS: 2024–2025 | Forward: 2026-01-01 → 2026-08-14.
+
+Resultado:
+- Producción OOS: PF 1.230, 108 trades, WR 54.6%, Exp +$0.0245
+- Sistema C OOS:  PF 1.318, 72 trades,  WR 54.2%, Exp +$0.0379
+- Vecindad EMA: 4/4 positivas (EMA100 1.308 · EMA150 1.376 · EMA200 1.318 · EMA250 1.420)
+- EMA200 NO es la mejor → PARCIALMENTE_ROBUSTA
+- Bootstrap Delta Exp: +$0.0134 | IC95% [−$0.0644, +$0.0933] cruza cero | P(D>0) = 63.9%
+- Forward 2026: 3 trades (89% del tiempo BNB bajo EMA200d — gate bloqueado)
+- Veredicto: 🟡 PROMETEDOR
+
+- Producción permanece intacta. Sistema C NO activado.
+- No se modifican parámetros de producción como consecuencia de esta prueba.
+- La prueba no constituye evidencia suficiente para activar Sistema C en BNB.
+- Diferencia clave con BTC: en BTC la EMA200 sí es la mejor vecina (ROBUSTA_POSITIVA);
+  en BNB la mejor es EMA250 → menor robustez de diseño.
+
+Siguiente paso: acumular 30+ trades reales en REAL antes de re-evaluar cualquier candidato.

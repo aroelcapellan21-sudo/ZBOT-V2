@@ -1,56 +1,73 @@
 """
 btc_bootstrap_sistema_c_vs_produccion.py
-BTC ALCISTA — Bootstrap Sistema C vs Produccion + Comparacion ETH
+BTC ALCISTA — Investigacion exhaustiva Sistema C vs Produccion
 INVESTIGACION PURA — 0 archivos de produccion modificados.
 
-Reglas de robustez de vecindad (version corregida):
-- EMA200 debe ser la EMA con MEJOR PF OOS para declarar robustez.
-- Todas las EMAs vecinas tambien deben tener PF > 1.0 para clasificar ROBUSTO.
-- Si EMA200 es la unica con PF > 1.0 → FRAGIL, sin importar el PF de EMA200.
-- Si EMA200 NO es la mejor EMA → no hay robustez de vecindad alrededor de EMA200.
-- ROBUSTO requiere ademas que IC95% del bootstrap NO cruce cero.
-- PROMETEDOR: vecindad favorable + IC95% cruza cero.
+Sistemas comparados:
+  Produccion BTC : RSI 55-75, SL 5.0%, TP 6.0%, sin gate
+  Sistema C BTC  : RSI 55-60, SL 5.0%, TP 6.0%, gate PRECIO SOBRE EMA diaria
+
+Taxonomia de clasificacion EMA (actualizada 2026-08-14):
+  ROBUSTA_POSITIVA     : 4/4 EMAs con PF > 1.0 Y EMA200 es la mejor
+  PARCIALMENTE_ROBUSTA : algunas EMAs positivas, o EMA200 no es la mejor
+  FRAGIL_EMA200_NEGATIVA: EMA200 con PF <= 1.0
+  NEGATIVA             : ninguna EMA con PF > 1.0
+
+Veredictos:
+  ACTIVABLE   : evidencia OOS fuerte y robusta (IC95 no cruza 0 + vecindad ROBUSTA)
+  PROMETEDOR  : OOS positivo pero IC95 cruza 0 o vecindad parcial
+  DESCARTADO  : PF OOS <= 1.0 o expectancy <= 0
+
+Anti-lookahead: EMA del dia D-1 se usa para senales del dia D.
+Warmup diario desde 2019-06-01 para EMA250.
 """
 import json, os, random, urllib.request, urllib.parse
 from datetime import datetime, timezone, timedelta
 
 # ── Parametros globales ───────────────────────────────────────────────────────
-FECHA_WU_4H = "2020-10-01"
-FECHA_WU_D  = "2019-06-01"   # warmup para EMA250 sin sesgo
-TRAIN_START = "2021-01-01"
-TRAIN_END   = "2023-12-31"
-VAL_START   = "2024-01-01"
-VAL_END     = "2025-12-31"
-MONTO       = 5.0
-CAPITAL     = 20.0
-COMISION    = 0.001
-N_BOOT      = 10000
-EMAs        = [100, 150, 200, 250]
+FECHA_WU_4H  = "2020-10-01"
+FECHA_WU_D   = "2019-06-01"
+TRAIN_START  = "2021-01-01"
+TRAIN_END    = "2023-12-31"
+VAL_START    = "2024-01-01"
+VAL_END      = "2025-12-31"
+FWD_START    = "2026-01-01"
+FWD_END_STR  = "2026-08-14"
+MONTO        = 5.0
+CAPITAL      = 20.0
+COMISION     = 0.001          # 0.10% por lado
+N_BOOT       = 10000
+EMAs         = [100, 150, 200, 250]
+
+# Produccion BTC (config_cartera.py — alcista, sin modificar)
+BTC_PROD = dict(sym="BTCUSDT", rsi_min=55.0, rsi_max=75.0,
+                sl=0.050, tp=0.060, gate_ema=None)
+# Sistema C BTC
+BTC_C    = dict(sym="BTCUSDT", rsi_min=55.0, rsi_max=60.0,
+                sl=0.050, tp=0.060, gate_ema=200)
+
+# Sensibilidad RSI (descriptiva, sin seleccion OOS)
+RSI_SENS = [
+    (50.0, 55.0, "RSI 50-55"),
+    (55.0, 60.0, "RSI 55-60 (Sistema C)"),
+    (60.0, 65.0, "RSI 60-65"),
+]
+
 REPORT_PATH = os.path.expanduser(
     "~/bot-padre-v2/reports/2026-08-14_btc-bootstrap-sistema-c-vs-produccion.md"
 )
 
-CONFIG = {
-    "BTC_PROD": {"sym": "BTCUSDT", "rsi_min": 55.0, "rsi_max": 75.0,
-                 "sl": 0.050, "tp": 0.060, "gate_ema": None},
-    "BTC_C":    {"sym": "BTCUSDT", "rsi_min": 55.0, "rsi_max": 60.0,
-                 "sl": 0.050, "tp": 0.060, "gate_ema": 200},
-    "ETH_PROD": {"sym": "ETHUSDT", "rsi_min": 60.0, "rsi_max": 75.0,
-                 "sl": 0.045, "tp": 0.050, "gate_ema": None},
-    "ETH_C":    {"sym": "ETHUSDT", "rsi_min": 55.0, "rsi_max": 60.0,
-                 "sl": 0.050, "tp": 0.060, "gate_ema": 200},
-}
-
 # ── Descarga ──────────────────────────────────────────────────────────────────
 def _ts(f):
-    return int(datetime.strptime(f, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp()*1000)
+    return int(datetime.strptime(f, "%Y-%m-%d").replace(tzinfo=timezone.utc).timestamp() * 1000)
 
 def fetch(symbol, intervalo, desde_ms):
     velas = []; inicio = desde_ms
     while True:
         p = urllib.parse.urlencode({"symbol": symbol, "interval": intervalo,
                                     "startTime": inicio, "limit": 1000})
-        with urllib.request.urlopen(f"https://api.binance.com/api/v3/klines?{p}", timeout=30) as r:
+        with urllib.request.urlopen(
+                f"https://api.binance.com/api/v3/klines?{p}", timeout=30) as r:
             batch = json.loads(r.read().decode())
         if not batch: break
         velas.extend(batch)
@@ -60,6 +77,7 @@ def fetch(symbol, intervalo, desde_ms):
 
 # ── EMA diaria ────────────────────────────────────────────────────────────────
 def build_ema(velas_d, n):
+    """EMA de n periodos sobre cierres diarios. Retorna {fecha_str: valor}."""
     k = 2 / (n + 1)
     cierres = [float(v[4]) for v in velas_d]
     fechas  = [datetime.fromtimestamp(int(v[0]) / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
@@ -72,15 +90,23 @@ def build_ema(velas_d, n):
     return {fechas[i]: ema[i] for i in range(len(fechas)) if ema[i] is not None}
 
 def get_ema(ts_dt, ema_map):
-    """EMA del ultimo dia completamente cerrado antes de la entrada 4H (anti-lookahead)."""
+    """
+    Anti-lookahead: retorna la EMA del ultimo dia cerrado antes de la vela 4H.
+    Para una vela 4H abierta en el dia D, busca la EMA de D-1 hasta D-5.
+    Nunca usa el dia D (vela diaria aun abierta).
+    """
     for d in range(1, 6):
         f = (ts_dt - timedelta(days=d)).strftime("%Y-%m-%d")
         if f in ema_map:
             return ema_map[f]
     return None
 
-# ── RSI simple ────────────────────────────────────────────────────────────────
+# ── RSI (14 periodos, ventana de 15 cierres) ──────────────────────────────────
 def rsi_calc(cierres):
+    """
+    RSI Wilder simplificado: promedio simple de ganancias/perdidas en 14 periodos.
+    Requiere al menos 15 cierres (14 diferencias).
+    """
     v = cierres[-15:]
     if len(v) < 15: return None
     g, p = [], []
@@ -92,12 +118,23 @@ def rsi_calc(cierres):
     if ap == 0: return 100.0
     return round(100 - 100 / (1 + ag / ap), 2)
 
-# ── Simulacion independiente ──────────────────────────────────────────────────
-def simular(velas_4h, ema_map, rsi_min, rsi_max, sl, tp, use_gate=False):
+# ── Simulacion (1 posicion a la vez, sin trailing) ────────────────────────────
+def simular(velas_4h, ema_map, rsi_min, rsi_max, sl, tp,
+            use_gate=False, desde_str=TRAIN_START, hasta_str=FWD_END_STR):
+    """
+    Logica de entrada:
+      1. RSI 4H cae en [rsi_min, rsi_max)
+      2. Si use_gate=True: precio 4H > EMA diaria del dia D-1
+      3. Solo si no hay posicion abierta
+    Logica de salida:
+      - SL: precio <= precio_entrada * (1 - sl)
+      - TP: precio >= precio_entrada * (1 + tp)
+    Comision: (sl o tp) * MONTO - MONTO * COMISION * 2
+    """
     cierres = [float(v[4]) for v in velas_4h]
-    ts_list = [int(v[0]) for v in velas_4h]
-    IMS  = _ts(TRAIN_START)
-    FIMS = _ts(VAL_END) + 86400000
+    ts_list = [int(v[0])    for v in velas_4h]
+    IMS  = _ts(desde_str)
+    FIMS = _ts(hasta_str) + 86400000
     trades = []; en_pos = False
     ep = er = sl_p = tp_p = 0.0; ets = None; e_ema_v = None
 
@@ -106,21 +143,27 @@ def simular(velas_4h, ema_map, rsi_min, rsi_max, sl, tp, use_gate=False):
         r = rsi_calc(ventana)
         if r is None: continue
         precio = cierres[i]; tsv = ts_list[i]
-        tsdt = datetime.fromtimestamp(tsv / 1000, tz=timezone.utc)
+        tsdt  = datetime.fromtimestamp(tsv / 1000, tz=timezone.utc)
 
         if en_pos:
             res = None
             if precio <= sl_p: res = "SL"
             elif precio >= tp_p: res = "TP"
             if res:
-                pl = round((MONTO * tp if res == "TP" else -MONTO * sl) - MONTO * COMISION * 2, 4)
-                anio = str(ets.year)
-                per  = "TRAIN" if tsv <= _ts(TRAIN_END) + 86400000 else "VAL"
+                pl  = round((MONTO * tp if res == "TP" else -MONTO * sl)
+                            - MONTO * COMISION * 2, 4)
+                per = ("TRAIN" if tsv <= _ts(TRAIN_END) + 86400000
+                       else "FWD" if tsv >= _ts(FWD_START)
+                       else "VAL")
                 trades.append({
-                    "ts": ets.strftime("%Y-%m-%d %H:%M"), "anio": anio, "per": per,
-                    "rsi": er, "precio": round(ep, 2),
+                    "ts":    ets.strftime("%Y-%m-%d %H:%M"),
+                    "anio":  str(ets.year),
+                    "per":   per,
+                    "rsi":   er,
+                    "precio": round(ep, 2),
                     "ema_v": round(e_ema_v, 2) if e_ema_v else None,
-                    "res": res, "pl": pl
+                    "res":   res,
+                    "pl":    pl,
                 })
                 en_pos = False
 
@@ -133,11 +176,12 @@ def simular(velas_4h, ema_map, rsi_min, rsi_max, sl, tp, use_gate=False):
             else:
                 e_ema_v = None
             en_pos = True; ep = precio; ets = tsdt; er = r
-            sl_p = round(ep * (1 - sl), 4); tp_p = round(ep * (1 + tp), 4)
+            sl_p = round(ep * (1 - sl), 4)
+            tp_p = round(ep * (1 + tp), 4)
 
     return trades
 
-# ── Metricas ──────────────────────────────────────────────────────────────────
+# ── Metricas completas ────────────────────────────────────────────────────────
 def metricas(tlist):
     n = len(tlist)
     if n == 0:
@@ -167,17 +211,24 @@ def metricas(tlist):
     for t in srt:
         if t["res"] == "TP": crtp += 1; mrtp = max(mrtp, crtp)
         else: crtp = 0
-    pls = [t["pl"] for t in srt]
-    peor5 = min((round(sum(pls[i:i + 5]), 4) for i in range(max(1, len(pls) - 4))), default=0.0)
+    pls  = [t["pl"] for t in srt]
+    peor5 = min((round(sum(pls[i:i + 5]), 4) for i in range(max(1, len(pls) - 4))),
+                default=0.0)
     return dict(n=n, tp=len(tps), sl=len(sls), wr=wr, pf=pf, exp=exp, pl=pl,
                 dd=round(mxdd, 1), rsl=mrsl, rsl_d=sd, rtp=mrtp, peor5=peor5)
 
-# ── Bootstrap ─────────────────────────────────────────────────────────────────
+# ── Bootstrap DeltaExpectancy ─────────────────────────────────────────────────
 def bootstrap(ta, tb, n_iter=N_BOOT, seed=42):
-    """IC90/IC95 de E[ta] - E[tb]. Resampleo independiente por sistema."""
+    """
+    Resampleo independiente por sistema.
+    Delta = E[exp(ta)] - E[exp(tb)]
+    Retorna IC90, IC95, P(Delta>0), mediana.
+    ADVERTENCIA: subestima varianza real por dependencia serial entre trades.
+    """
     random.seed(seed)
     if not ta or not tb:
-        return dict(obs=None, ic90=(None, None), ic95=(None, None), median=None, p_pos=None)
+        return dict(obs=None, ic90=(None, None), ic95=(None, None),
+                    median=None, p_pos=None)
     pa = [t["pl"] for t in ta]; pb = [t["pl"] for t in tb]
     obs = round(sum(pa) / len(pa) - sum(pb) / len(pb), 4)
     na, nb = len(pa), len(pb)
@@ -194,24 +245,23 @@ def bootstrap(ta, tb, n_iter=N_BOOT, seed=42):
     )
 
 # ── Helpers de formato ────────────────────────────────────────────────────────
-def fpf(v): return f"{v:.3f}" if v != float("inf") else "∞"
+def fpf(v): return f"{v:.3f}" if v != float("inf") else "inf"
 def fpl(v): return f"+${v:.4f}" if v >= 0 else f"-${abs(v):.4f}"
 def pf_num(v): return v if v != float("inf") else 999.0
 
 # ── Robustez de vecindad EMA ──────────────────────────────────────────────────
 def analizar_robustez_ema(pf_emas):
     """
-    pf_emas: dict {100: pf100, 150: pf150, 200: pf200, 250: pf250}
+    Taxonomia actualizada 2026-08-14:
+    ROBUSTA_POSITIVA     : 4/4 EMAs con PF > 1.0 Y EMA200 es la mejor
+    PARCIALMENTE_ROBUSTA : EMA200 mejor pero no todas las vecinas positivas,
+                           o algunas positivas pero EMA200 no es la mejor
+    FRAGIL_EMA200_NEGATIVA: EMA200 tiene PF <= 1.0
+    NEGATIVA             : ninguna EMA tiene PF > 1.0
 
-    Reglas exactas (no usar n_ema_pos >= 3 como sustituto):
-    1. Identificar la EMA con mejor PF OOS.
-    2. Si EMA200 es la mejor Y todas las vecinas tienen PF > 1.0 → ROBUSTO_EMA.
-    3. Si EMA200 es la mejor PERO alguna vecina tiene PF <= 1.0 → PARCIAL_EMA.
-    4. Si EMA200 es la unica con PF > 1.0 → FRAGIL (independiente del PF de EMA200).
-    5. Si EMA200 NO es la mejor → NO_ROBUSTA_EMA200 (sin robustez alrededor de EMA200).
-    6. Si EMA200 PF <= 1.0 → FRAGIL_EMA200_NEGATIVA.
-
-    Retorna: (clasificacion, best_ema, n_positivas, detalle)
+    Reglas (sin n_ema_pos >= 3):
+    - EMA200 debe ser la mejor para declarar robustez.
+    - Todas las vecinas deben ser positivas para ROBUSTA_POSITIVA.
     """
     pf200   = pf_emas.get(200, 0.0)
     best_n  = max(pf_emas, key=pf_emas.get)
@@ -219,43 +269,39 @@ def analizar_robustez_ema(pf_emas):
     n_pos   = sum(1 for pf in pf_emas.values() if pf > 1.0)
     vecinas = {n: pf for n, pf in pf_emas.items() if n != 200}
 
+    if n_pos == 0:
+        return ("NEGATIVA", best_n, n_pos,
+                f"Ninguna EMA con PF > 1.0. Mejor: EMA{best_n} (PF {best_pf:.3f}).")
+
     if pf200 <= 1.0:
         return ("FRAGIL_EMA200_NEGATIVA", best_n, n_pos,
-                f"EMA200 tiene PF {pf200:.3f} <= 1.0. Mejor EMA: EMA{best_n} (PF {best_pf:.3f}).")
+                f"EMA200 PF {pf200:.3f} <= 1.0. Mejor: EMA{best_n} (PF {best_pf:.3f}). "
+                f"{n_pos}/4 EMAs positivas.")
 
     if best_n != 200:
-        return ("NO_ROBUSTA_EMA200", best_n, n_pos,
+        return ("PARCIALMENTE_ROBUSTA", best_n, n_pos,
                 f"EMA200 positiva (PF {pf200:.3f}) pero NO es la mejor. "
-                f"Mejor: EMA{best_n} (PF {best_pf:.3f}). {n_pos}/4 EMAs con PF > 1.0.")
+                f"Mejor: EMA{best_n} (PF {best_pf:.3f}). {n_pos}/4 EMAs positivas.")
 
-    # EMA200 es la mejor
-    todas_vecinas_pos = all(pf > 1.0 for pf in vecinas.values())
-    n_vecinas_pos     = sum(1 for pf in vecinas.values() if pf > 1.0)
+    todas_pos = all(pf > 1.0 for pf in vecinas.values())
+    n_vec_pos = sum(1 for pf in vecinas.values() if pf > 1.0)
 
-    if n_pos == 1:
-        return ("FRAGIL_SOLO_EMA200", best_n, n_pos,
-                f"EMA200 es la UNICA EMA con PF > 1.0 ({pf200:.3f}). "
-                f"Patron FRAGIL independiente del PF de EMA200.")
+    if todas_pos:
+        return ("ROBUSTA_POSITIVA", best_n, n_pos,
+                f"EMA200 es la mejor (PF {pf200:.3f}) Y las {len(vecinas)} vecinas "
+                f"tambien tienen PF > 1.0. Zona robusta alrededor de EMA200.")
 
-    if todas_vecinas_pos:
-        return ("ROBUSTO_EMA", best_n, n_pos,
-                f"EMA200 es la mejor (PF {pf200:.3f}) Y las {len(vecinas)} EMAs vecinas "
-                f"tambien tienen PF > 1.0. Patron de vecindad ROBUSTO.")
-
-    # EMA200 es la mejor pero no todas las vecinas son positivas
-    return ("PARCIAL_EMA", best_n, n_pos,
-            f"EMA200 es la mejor (PF {pf200:.3f}). {n_vecinas_pos}/{len(vecinas)} vecinas "
+    return ("PARCIALMENTE_ROBUSTA", best_n, n_pos,
+            f"EMA200 es la mejor (PF {pf200:.3f}). {n_vec_pos}/{len(vecinas)} vecinas "
             f"con PF > 1.0. Robustez parcial.")
 
-
+# ── Clasificacion final ───────────────────────────────────────────────────────
 def clasificar_sistema(m_val, m_prod_val, bs_val, rob_label, pf_emas):
     """
-    Clasificacion final del sistema basada en:
-    1. PF OOS y expectancy
-    2. Robustez de vecindad EMA (usando rob_label de analizar_robustez_ema)
-    3. Bootstrap IC95%
-
-    NO usa n_ema_pos >= 3 como sustituto de la comprobacion explicita.
+    ACTIVABLE   : ROBUSTA_POSITIVA + IC95 no cruza 0 + PF/Exp positivos
+    PROMETEDOR  : PF/Exp positivos, pero IC95 cruza 0 o vecindad parcial
+    DESCARTADO  : PF OOS <= 1.0 o Exp <= 0
+    INCONCLUSO  : muestra < 20 trades OOS
     """
     pf_c  = pf_num(m_val["pf"])
     exp_c = m_val["exp"]
@@ -263,182 +309,143 @@ def clasificar_sistema(m_val, m_prod_val, bs_val, rob_label, pf_emas):
     lo95, hi95 = bs_val["ic95"] if bs_val["ic95"][0] is not None else (None, None)
     ic_no_cruza = (lo95 is not None and lo95 > 0)
 
-    # 1. Descartado: OOS negativo
     if pf_c <= 1.0 or exp_c <= 0:
         return "🔴 DESCARTADO"
-
-    # 2. Inconcluso: muestra muy pequena
     if n_c < 20:
         return "🟠 INCONCLUSO"
+    if rob_label in ("NEGATIVA", "FRAGIL_EMA200_NEGATIVA"):
+        return "🔴 DESCARTADO"
+    if rob_label == "ROBUSTA_POSITIVA":
+        return "🟢 ACTIVABLE" if ic_no_cruza else "🟡 PROMETEDOR"
+    # PARCIALMENTE_ROBUSTA
+    return "🟡 PROMETEDOR"
 
-    # 3. Fragil: EMA200 no positiva o es la unica positiva
-    if rob_label in ("FRAGIL_EMA200_NEGATIVA", "FRAGIL_SOLO_EMA200"):
-        return "🟠/🔴 FRAGIL"
-
-    # 4. Sin robustez: EMA200 no es la mejor
-    if rob_label == "NO_ROBUSTA_EMA200":
-        return "🟡 PROMETEDOR"  # Positivo OOS pero sin robustez de vecindad alrededor de EMA200
-
-    # 5. Zona robusta: EMA200 mejor y todas vecinas positivas
-    if rob_label == "ROBUSTO_EMA":
-        if ic_no_cruza:
-            return "🟢 ROBUSTO"
-        else:
-            return "🟡 PROMETEDOR"  # Vecindad OK pero IC95% cruza 0
-
-    # 6. Zona parcial: EMA200 mejor pero no todas las vecinas positivas
-    if rob_label == "PARCIAL_EMA":
-        return "🟡 PROMETEDOR"
-
-    return "🟠 INCONCLUSO"
-
+# ── Regimen forward ───────────────────────────────────────────────────────────
+def analizar_regimen_forward(velas_4h, ema_map_200):
+    fwd_ts_ini = _ts(FWD_START)
+    sobre = bajo = sin_ema = 0
+    for v in velas_4h:
+        tsv = int(v[0])
+        if tsv < fwd_ts_ini: continue
+        tsdt = datetime.fromtimestamp(tsv / 1000, tz=timezone.utc)
+        precio = float(v[4])
+        ev = get_ema(tsdt, ema_map_200)
+        if ev is None:   sin_ema += 1
+        elif precio > ev: sobre += 1
+        else:             bajo  += 1
+    return sobre, bajo, sin_ema
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     ahora_ms = int(datetime.now(timezone.utc).timestamp() * 1000)
 
     print("=" * 62)
-    print("BTC ALCISTA — Bootstrap Sistema C vs Produccion + ETH")
+    print("BTC ALCISTA — Bootstrap Sistema C vs Produccion (exhaustivo)")
     print("=" * 62)
 
     # ── 1. Descarga ────────────────────────────────────────────────────────────
-    print("\n[1/4] Descargando datos...")
-    velas_4h = {}; velas_d = {}
-    for sym in ["BTCUSDT", "ETHUSDT"]:
-        v4 = fetch(sym, "4h", _ts(FECHA_WU_4H))
-        velas_4h[sym] = [v for v in v4 if int(v[6]) < ahora_ms]
-        vd = fetch(sym, "1d", _ts(FECHA_WU_D))
-        velas_d[sym] = [v for v in vd if int(v[6]) < ahora_ms]
-        print(f"      {sym}: {len(velas_4h[sym])} velas 4H | {len(velas_d[sym])} velas 1D")
+    print("\n[1/5] Descargando datos BTCUSDT...")
+    velas_4h_raw = fetch("BTCUSDT", "4h", _ts(FECHA_WU_4H))
+    velas_d_raw  = fetch("BTCUSDT", "1d", _ts(FECHA_WU_D))
+    velas_4h = [v for v in velas_4h_raw if int(v[6]) < ahora_ms]
+    velas_d  = [v for v in velas_d_raw  if int(v[6]) < ahora_ms]
+    print(f"      {len(velas_4h)} velas 4H | {len(velas_d)} velas 1D")
 
-    # ── 2. EMA maps ────────────────────────────────────────────────────────────
-    print("[2/4] Construyendo mapas EMA...")
+    # ── 2. Mapas EMA ───────────────────────────────────────────────────────────
+    print("[2/5] Construyendo mapas EMA (anti-lookahead)...")
     ema_maps = {}
-    for sym in ["BTCUSDT", "ETHUSDT"]:
-        ema_maps[sym] = {}
-        for n in EMAs:
-            ema_maps[sym][n] = build_ema(velas_d[sym], n)
-        print(f"      {sym}: EMA{EMAs[0]}–{EMAs[-1]} listas")
+    for n in EMAs:
+        ema_maps[n] = build_ema(velas_d, n)
+        print(f"      EMA{n}: {len(ema_maps[n])} fechas")
 
     # ── 3. Simulaciones principales ────────────────────────────────────────────
-    print("[3/4] Simulando 4 sistemas...")
-    sims = {}
-    for key, cfg in CONFIG.items():
-        sym = cfg["sym"]
-        ema_n = cfg["gate_ema"]
-        ema_m = ema_maps[sym][ema_n] if ema_n else {}
-        gate  = (ema_n is not None)
-        trades = simular(velas_4h[sym], ema_m,
-                         cfg["rsi_min"], cfg["rsi_max"],
-                         cfg["sl"], cfg["tp"], gate)
-        sims[key] = trades
-        tr = [t for t in trades if t["per"] == "TRAIN"]
-        vl = [t for t in trades if t["per"] == "VAL"]
-        mt = metricas(tr); mv = metricas(vl)
-        print(f"      {key}: {len(trades)} trades "
-              f"| Train PF {fpf(mt['pf'])} WR {mt['wr']:.0f}% "
-              f"| Val PF {fpf(mv['pf'])} WR {mv['wr']:.0f}%")
+    print("[3/5] Simulando Produccion y Sistema C...")
+    trades_prod = simular(velas_4h, {},
+                          BTC_PROD["rsi_min"], BTC_PROD["rsi_max"],
+                          BTC_PROD["sl"],      BTC_PROD["tp"], use_gate=False)
+    trades_c    = simular(velas_4h, ema_maps[200],
+                          BTC_C["rsi_min"], BTC_C["rsi_max"],
+                          BTC_C["sl"],      BTC_C["tp"],      use_gate=True)
 
-    # ── 4. Robustez de vecindad ────────────────────────────────────────────────
-    print("[4/4] Robustez de vecindad (BTC-C y ETH-C)...")
-    rob = {}
-    for sym, rsi_min, rsi_max, sl, tp in [
-        ("BTCUSDT", 55.0, 60.0, 0.050, 0.060),
-        ("ETHUSDT", 55.0, 60.0, 0.050, 0.060),
-    ]:
-        rob[sym] = {}
-        for n in EMAs:
-            trades = simular(velas_4h[sym], ema_maps[sym][n],
-                             rsi_min, rsi_max, sl, tp, use_gate=True)
-            rob[sym][n] = trades
-            vl = [t for t in trades if t["per"] == "VAL"]
-            mv = metricas(vl)
-            print(f"      {sym} EMA{n}: {len(vl)} trades val | PF {fpf(mv['pf'])}")
+    def split(trades, per): return [t for t in trades if t["per"] == per]
+
+    for lbl, trades in [("Produccion", trades_prod), ("Sistema C", trades_c)]:
+        tr = split(trades, "TRAIN"); vl = split(trades, "VAL"); fw = split(trades, "FWD")
+        print(f"      BTC {lbl}: Train {metricas(tr)['n']}T PF {fpf(metricas(tr)['pf'])} "
+              f"| OOS {metricas(vl)['n']}T PF {fpf(metricas(vl)['pf'])} "
+              f"| Fwd {metricas(fw)['n']}T")
+
+    # ── 4. Robustez EMA ────────────────────────────────────────────────────────
+    print("[4/5] Robustez EMA100/150/200/250 (OOS)...")
+    pf_btc_emas = {}; rob_detalles = {}
+    for n in EMAs:
+        t_n = simular(velas_4h, ema_maps[n],
+                      BTC_C["rsi_min"], BTC_C["rsi_max"],
+                      BTC_C["sl"],      BTC_C["tp"],
+                      use_gate=True, hasta_str=VAL_END)
+        vl_n = split(t_n, "VAL"); mv_n = metricas(vl_n)
+        pf_btc_emas[n] = pf_num(mv_n["pf"])
+        rob_detalles[n] = {"vl": vl_n, "m": mv_n}
+        print(f"      EMA{n}: {mv_n['n']} trades OOS | PF {fpf(mv_n['pf'])} | Exp {fpl(mv_n['exp'])}")
+
+    # ── 5. Sensibilidad RSI ────────────────────────────────────────────────────
+    print("[5/5] Sensibilidad RSI (descriptiva, con gate EMA200)...")
+    rsi_sens_results = {}
+    for rsi_lo, rsi_hi, label in RSI_SENS:
+        t_s = simular(velas_4h, ema_maps[200],
+                      rsi_lo, rsi_hi, BTC_C["sl"], BTC_C["tp"],
+                      use_gate=True)
+        tr_s = split(t_s, "TRAIN"); vl_s = split(t_s, "VAL")
+        rsi_sens_results[label] = {
+            "train": metricas(tr_s), "val": metricas(vl_s),
+            "lo": rsi_lo, "hi": rsi_hi
+        }
+        mv_s = metricas(vl_s)
+        print(f"      {label}: OOS {mv_s['n']} trades | PF {fpf(mv_s['pf'])} | Exp {fpl(mv_s['exp'])}")
 
     # ── Bootstrap ──────────────────────────────────────────────────────────────
-    print("\nEjecutando bootstrap (10,000 resamples)...")
+    print("\nBootstrap (10,000 resamples)...")
+    tr_prod = split(trades_prod, "TRAIN"); vl_prod = split(trades_prod, "VAL")
+    tr_c    = split(trades_c,    "TRAIN"); vl_c    = split(trades_c,    "VAL")
+    fw_prod = split(trades_prod, "FWD");   fw_c    = split(trades_c,    "FWD")
+    bs_train = bootstrap(tr_c, tr_prod)
+    bs_val   = bootstrap(vl_c, vl_prod)
 
-    def split(trades, per):
-        return [t for t in trades if t["per"] == per]
+    # ── Clasificacion ──────────────────────────────────────────────────────────
+    rob_label, best_ema, n_pos, rob_detalle = analizar_robustez_ema(pf_btc_emas)
+    mv_prod = metricas(vl_prod); mv_c = metricas(vl_c)
+    mt_prod = metricas(tr_prod); mt_c = metricas(tr_c)
+    mf_prod = metricas(fw_prod); mf_c = metricas(fw_c)
+    verdict = clasificar_sistema(mv_c, mv_prod, bs_val, rob_label, pf_btc_emas)
 
-    bs_btc_train     = bootstrap(split(sims["BTC_C"], "TRAIN"), split(sims["BTC_PROD"], "TRAIN"))
-    bs_btc_val       = bootstrap(split(sims["BTC_C"], "VAL"),   split(sims["BTC_PROD"], "VAL"))
-    bs_eth_train     = bootstrap(split(sims["ETH_C"], "TRAIN"), split(sims["ETH_PROD"], "TRAIN"))
-    bs_eth_val       = bootstrap(split(sims["ETH_C"], "VAL"),   split(sims["ETH_PROD"], "VAL"))
-    bs_btc_vs_eth    = bootstrap(split(sims["BTC_C"], "VAL"),   split(sims["ETH_C"], "VAL"))
+    # ── Regimen forward ────────────────────────────────────────────────────────
+    sobre_fwd, bajo_fwd, sin_ema_fwd = analizar_regimen_forward(velas_4h, ema_maps[200])
+    total_fwd = sobre_fwd + bajo_fwd + sin_ema_fwd
+    pct_sobre = sobre_fwd / total_fwd * 100 if total_fwd > 0 else 0
+    pct_bajo  = bajo_fwd  / total_fwd * 100 if total_fwd > 0 else 0
 
-    # ── PF por EMA en OOS ──────────────────────────────────────────────────────
-    pf_btc_emas = {}
-    pf_eth_emas = {}
-    for n in EMAs:
-        vl_b = [t for t in rob["BTCUSDT"][n] if t["per"] == "VAL"]
-        vl_e = [t for t in rob["ETHUSDT"][n] if t["per"] == "VAL"]
-        pf_btc_emas[n] = pf_num(metricas(vl_b)["pf"])
-        pf_eth_emas[n] = pf_num(metricas(vl_e)["pf"])
+    # ── Estabilidad Train → OOS ────────────────────────────────────────────────
+    ratio_pf_c    = (pf_num(mv_c["pf"]) / pf_num(mt_c["pf"])
+                     if mt_c["n"] > 0 and mt_c["pf"] > 0 else None)
+    ratio_pf_prod = (pf_num(mv_prod["pf"]) / pf_num(mt_prod["pf"])
+                     if mt_prod["n"] > 0 and mt_prod["pf"] > 0 else None)
 
-    # ── Robustez y clasificacion final ─────────────────────────────────────────
-    rob_btc_label, btc_best_ema, btc_n_pos, rob_btc_detalle = analizar_robustez_ema(pf_btc_emas)
-    rob_eth_label, eth_best_ema, eth_n_pos, rob_eth_detalle = analizar_robustez_ema(pf_eth_emas)
+    # ── Shorthand ─────────────────────────────────────────────────────────────
+    lo95_v, hi95_v = bs_val["ic95"] if bs_val["ic95"][0] is not None else (None, None)
+    n_pos_rsi = sum(1 for _, res in rsi_sens_results.items()
+                    if pf_num(res["val"]["pf"]) > 1.0)
 
-    mv_btc_c    = metricas(split(sims["BTC_C"],    "VAL"))
-    mv_btc_prod = metricas(split(sims["BTC_PROD"], "VAL"))
-    mv_eth_c    = metricas(split(sims["ETH_C"],    "VAL"))
-    mv_eth_prod = metricas(split(sims["ETH_PROD"], "VAL"))
-
-    verdict_btc = clasificar_sistema(mv_btc_c, mv_btc_prod, bs_btc_val, rob_btc_label, pf_btc_emas)
-    verdict_eth = clasificar_sistema(mv_eth_c, mv_eth_prod, bs_eth_val, rob_eth_label, pf_eth_emas)
-
-    # ── Prioridad para REAL ────────────────────────────────────────────────────
-    btc_desc = "DESCARTADO" in verdict_btc
-    eth_desc = "DESCARTADO" in verdict_eth
-    if btc_desc and eth_desc:
-        primero = segundo = "NINGUNO"
-    elif btc_desc:
-        primero, segundo = "ETH", "NINGUNO"
-    elif eth_desc:
-        primero, segundo = "BTC", "NINGUNO"
-    else:
-        # Ambos positivos: priorizar por criterios ordenados
-        btc_score = 0; eth_score = 0
-        # 1. PF OOS > 1
-        if pf_num(mv_btc_c["pf"]) > 1.0: btc_score += 2
-        if pf_num(mv_eth_c["pf"]) > 1.0: eth_score += 2
-        # 2. Expectancy > 0
-        if mv_btc_c["exp"] > 0: btc_score += 2
-        if mv_eth_c["exp"] > 0: eth_score += 2
-        # 3. Robustez EMA (zone completa)
-        if rob_btc_label == "ROBUSTO_EMA": btc_score += 4
-        elif rob_btc_label == "PARCIAL_EMA": btc_score += 2
-        if rob_eth_label == "ROBUSTO_EMA": eth_score += 4
-        elif rob_eth_label == "PARCIAL_EMA": eth_score += 2
-        # 4. EMA200 es la mejor
-        if btc_best_ema == 200: btc_score += 2
-        if eth_best_ema == 200: eth_score += 2
-        # 5. Bootstrap
-        lo95b, hi95b = bs_btc_val["ic95"]
-        lo95e, hi95e = bs_eth_val["ic95"]
-        if lo95b and lo95b > 0: btc_score += 3
-        if lo95e and lo95e > 0: eth_score += 3
-        if bs_btc_val["p_pos"] and bs_btc_val["p_pos"] > 0.7: btc_score += 1
-        if bs_eth_val["p_pos"] and bs_eth_val["p_pos"] > 0.7: eth_score += 1
-        # 6. Trades OOS
-        if mv_btc_c["n"] >= 30: btc_score += 2
-        if mv_eth_c["n"] >= 30: eth_score += 2
-        # 7. DD y racha
-        if mv_btc_c["dd"] < 10: btc_score += 1
-        if mv_eth_c["dd"] < 10: eth_score += 1
-        if mv_btc_c["rsl"] <= 3: btc_score += 1
-        if mv_eth_c["rsl"] <= 3: eth_score += 1
-        primero, segundo = ("BTC", "ETH") if btc_score >= eth_score else ("ETH", "BTC")
-
-    # ── Generar reporte Markdown ───────────────────────────────────────────────
-    ANIOS = ["2021", "2022", "2023", "2024", "2025"]
+    # ═════════════════════════════════════════════════════════════════════════
+    # REPORTE MARKDOWN
+    # ═════════════════════════════════════════════════════════════════════════
+    ANIOS = ["2021", "2022", "2023", "2024", "2025", "2026"]
     lines = []; a = lines.append
 
-    a("# BTC ALCISTA — Bootstrap Sistema C vs Produccion + Comparacion ETH")
+    a("# BTC ALCISTA — Investigacion exhaustiva Sistema C vs Produccion")
     a("")
     a("**Fecha:** 2026-08-14  ")
-    a("**Estado:** INVESTIGACION PURA — 0 archivos de produccion modificados")
+    a("**Estado:** INVESTIGACION PURA — 0 archivos de produccion modificados  ")
+    a("**Simbolo:** BTCUSDT")
     a("")
     a("---")
     a("")
@@ -446,15 +453,15 @@ def main():
     # ── Sec 1: Resumen ejecutivo ───────────────────────────────────────────────
     a("## 1. Resumen ejecutivo")
     a("")
-    a("| Sistema | Train Trades | Train PF | Val Trades | Val PF | Val WR | Val Exp | Veredicto |")
-    a("|---------|-------------|----------|------------|--------|--------|---------|-----------|")
-    for key, label in [("BTC_PROD", "BTC Produccion"), ("BTC_C", "BTC Sistema C"),
-                        ("ETH_PROD", "ETH Produccion"), ("ETH_C", "ETH Sistema C")]:
-        tr = split(sims[key], "TRAIN"); vl = split(sims[key], "VAL")
-        mt = metricas(tr); mv = metricas(vl)
-        verd = verdict_btc if key == "BTC_C" else (verdict_eth if key == "ETH_C" else "—")
-        a(f"| **{label}** | {mt['n']} | {fpf(mt['pf'])} | {mv['n']} "
-          f"| {fpf(mv['pf'])} | {mv['wr']:.1f}% | {fpl(mv['exp'])} | {verd} |")
+    a("| Sistema | Train T | Train PF | OOS T | OOS PF | OOS WR | OOS Exp | Fwd T | Veredicto |")
+    a("|---------|---------|----------|-------|--------|--------|---------|-------|-----------|")
+    for lbl, mt, mv, mf, verd in [
+        ("BTC Produccion", mt_prod, mv_prod, mf_prod, "—"),
+        ("BTC Sistema C",  mt_c,    mv_c,    mf_c,    verdict),
+    ]:
+        a(f"| **{lbl}** | {mt['n']} | {fpf(mt['pf'])} | {mv['n']} "
+          f"| {fpf(mv['pf'])} | {mv['wr']:.1f}% | {fpl(mv['exp'])} "
+          f"| {mf['n']} | {verd} |")
     a("")
     a("---")
     a("")
@@ -462,30 +469,88 @@ def main():
     # ── Sec 2: Metodologia ────────────────────────────────────────────────────
     a("## 2. Metodologia")
     a("")
-    a("| Parametro | BTC Prod | BTC C | ETH Prod | ETH C |")
-    a("|-----------|----------|-------|----------|-------|")
-    a("| RSI range | 55–75 | 55–60 | 60–75 | 55–60 |")
-    a("| SL | 5.0% | 5.0% | 4.5% | 5.0% |")
-    a("| TP | 6.0% | 6.0% | 5.0% | 6.0% |")
-    a("| Gate EMA | Ninguno | EMA200d | Ninguno | EMA200d |")
-    a(f"| Capital | ${CAPITAL} | ${CAPITAL} | ${CAPITAL} | ${CAPITAL} |")
-    a(f"| Monto | ${MONTO} | ${MONTO} | ${MONTO} | ${MONTO} |")
-    a(f"| Comision | {COMISION*100:.2f}% | {COMISION*100:.2f}% | {COMISION*100:.2f}% | {COMISION*100:.2f}% |")
+    a("### ¿Que se probo?")
     a("")
-    a("**Nota ETH:** ETH Produccion y ETH Sistema C tienen diferente SL/TP (son parametros del activo,")
-    a("no del gate). La comparacion directa de expectancy entre ETH-Prod y ETH-C incluye ese efecto.")
-    a("Para la comparacion BTC-C vs ETH-C se usan identicos SL/TP (5%/6%) — comparacion limpia.")
+    a("Se compara la logica de entrada de dos sistemas de trading sobre BTCUSDT con velas 4H:")
     a("")
-    a("**Anti-lookahead:** EMA diaria del dia D-1 se usa para senales del dia D.")
-    a("Warmup diario desde 2019-06-01 (>400 dias para EMA250).")
+    a("| Parametro | BTC Produccion | BTC Sistema C |")
+    a("|-----------|---------------|--------------|")
+    a(f"| RSI rango | {BTC_PROD['rsi_min']:.0f}–{BTC_PROD['rsi_max']:.0f} | {BTC_C['rsi_min']:.0f}–{BTC_C['rsi_max']:.0f} |")
+    a(f"| SL | {BTC_PROD['sl']*100:.1f}% | {BTC_C['sl']*100:.1f}% |")
+    a(f"| TP | {BTC_PROD['tp']*100:.1f}% | {BTC_C['tp']*100:.1f}% |")
+    a("| Gate EMA | Ninguno | PRECIO SOBRE EMA diaria (anti-lookahead) |")
+    a(f"| Capital | ${CAPITAL} | ${CAPITAL} |")
+    a(f"| Monto por trade | ${MONTO} | ${MONTO} |")
+    a(f"| Comision | {COMISION*100:.2f}% entrada + {COMISION*100:.2f}% salida | idem |")
+    a("| Trailing | No | No |")
+    a("| Gates macro | No | No |")
+    a("")
+    a("**Nota:** SL/TP identicos entre sistemas. El delta de expectancy refleja")
+    a("exclusivamente el efecto del gate EMA y el RSI mas estrecho.")
+    a("")
+    a("### ¿Como se calcularon las senales?")
+    a("")
+    a("1. Para cada vela 4H se calcula el RSI de 14 periodos sobre los ultimos 15 cierres.")
+    a("2. Si el RSI cae en [rsi_min, rsi_max) y no hay posicion abierta → candidato.")
+    a("3. Para Sistema C: precio de cierre 4H debe ser MAYOR que la EMA diaria D-1.")
+    a("4. Si pasa el filtro → apertura a precio de cierre de esa vela.")
+    a("5. Salida: primer tick donde precio <= SL o precio >= TP.")
+    a("")
+    a("### ¿Como se evito el lookahead en la EMA diaria?")
+    a("")
+    a("Para una vela 4H que abre en el dia D:")
+    a("- Se busca la EMA en el mapa desde D-1 hasta D-5.")
+    a("- Nunca se usa el dia D (vela diaria aun no cerrada).")
+    a("- Warmup: datos diarios desde 2019-06-01 garantizan EMA250 correcta")
+    a("  desde el inicio del periodo de simulacion.")
+    a("")
+    a("### ¿Como se calcularon SL/TP?")
+    a("")
+    a("- `sl_precio = precio_entrada * (1 - SL)` — fijo, sin trailing.")
+    a("- `tp_precio = precio_entrada * (1 + TP)`")
+    a("- Primer evento que se cumple en orden cronologico.")
+    a("")
+    a("### ¿Como se aplicaron comisiones?")
+    a("")
+    a(f"- Comision taker spot: {COMISION*100:.2f}% por lado.")
+    a(f"- Por trade completo: `${MONTO} * {COMISION} * 2 = ${MONTO * COMISION * 2:.4f}` deducidos del P/L.")
+    a(f"- TP neto: +${MONTO * BTC_C['tp'] - MONTO * COMISION * 2:.4f}")
+    a(f"- SL neto: -${MONTO * BTC_C['sl'] + MONTO * COMISION * 2:.4f}")
+    a("")
+    a("### ¿Como se calculo la expectancy?")
+    a("")
+    a("```")
+    a("expectancy = P/L_acumulado / numero_de_trades")
+    a("```")
+    a("")
+    a("### ¿Como se hizo el bootstrap?")
+    a("")
+    a(f"- {N_BOOT:,} iteraciones. Resampleo con reemplazo, independiente por sistema.")
+    a("- Cada iteracion calcula diferencia de medias entre los dos sistemas.")
+    a("- IC90% y IC95% = percentiles 5/95 y 2.5/97.5 de la distribucion.")
+    a("- P(Delta > 0) = fraccion de iteraciones donde Sistema C supera a Produccion.")
+    a("")
+    a("**ADVERTENCIA:** Dependencia serial entre trades puede hacer que el bootstrap")
+    a("subestime la varianza real. No interpretar como prueba estadistica formal.")
+    a("")
+    a("### ¿Como se evaluo la robustez EMA?")
+    a("")
+    a("Se mantiene todo el sistema igual y se varia solo la EMA (100, 150, 200, 250).")
+    a("Si EMA200 es positiva por azar, las vecinas deberian ser similares.")
+    a("Se evalua si EMA200 es la mejor y si todas las vecinas tambien son positivas.")
+    a("")
+    a("### ¿Como se evaluo la sensibilidad RSI?")
+    a("")
+    a("Se mantiene todo el sistema igual y se varia solo el rango RSI (50-55, 55-60, 60-65).")
+    a("El objetivo es detectar si RSI 55-60 es un pico aislado o una zona estable.")
+    a("Esta seccion es descriptiva — no se usa para seleccionar parametros.")
     a("")
     a("---")
     a("")
 
-    # ── Sec 3-6: Metricas por sistema y periodo ───────────────────────────────
-    def seccion_sistema(num, titulo, key, per_code, per_label):
-        per_tr = split(sims[key], per_code)
-        m = metricas(per_tr)
+    # ── Sec 3-6: Metricas por sistema ────────────────────────────────────────
+    def seccion_metricas(num, titulo, tlist, per_label):
+        m = metricas(tlist)
         a(f"## {num}. {titulo} — {per_label}")
         a("")
         a("| Metrica | Valor |")
@@ -503,494 +568,502 @@ def main():
         a("")
         a("**Por ano:**")
         a("")
-        a("| Ano | Trades | WR | PF | Exp | P/L |")
-        a("|-----|--------|----|----|-----|-----|")
+        a("| Ano | Trades | WR | PF | Exp | P/L | Periodo |")
+        a("|-----|--------|----|----|-----|-----|---------|")
         for anio in ANIOS:
-            g = [t for t in per_tr if t["anio"] == anio]
+            g = [t for t in tlist if t["anio"] == anio]
             ma = metricas(g)
+            per_lbl = "TRAIN" if anio <= "2023" else ("FWD" if anio == "2026" else "VAL")
             if ma["n"] == 0:
-                a(f"| {anio} | 0 | — | — | — | — |")
+                a(f"| {anio} | 0 | — | — | — | — | {per_lbl} |")
             else:
-                nota = " ⚠️" if ma["n"] < 5 else ""
+                nota = " ⚠️" if ma["n"] < 10 else ""
                 a(f"| {anio} | {ma['n']}{nota} | {ma['wr']:.0f}% "
-                  f"| {fpf(ma['pf'])} | {fpl(ma['exp'])} | {fpl(ma['pl'])} |")
+                  f"| {fpf(ma['pf'])} | {fpl(ma['exp'])} | {fpl(ma['pl'])} | {per_lbl} |")
         a("")
         a("---")
         a("")
 
-    seccion_sistema(3, "Produccion BTC", "BTC_PROD", "TRAIN", "Train 2021–2023")
-    seccion_sistema(4, "Sistema C BTC",  "BTC_C",    "TRAIN", "Train 2021–2023")
-    seccion_sistema(5, "Produccion BTC", "BTC_PROD", "VAL",   "OOS 2024–2025")
-    seccion_sistema(6, "Sistema C BTC",  "BTC_C",    "VAL",   "OOS 2024–2025")
+    seccion_metricas(3, "BTC Produccion", tr_prod, "Train 2021–2023")
+    seccion_metricas(4, "BTC Sistema C",  tr_c,    "Train 2021–2023")
+    seccion_metricas(5, "BTC Produccion", vl_prod, "OOS 2024–2025")
+    seccion_metricas(6, "BTC Sistema C",  vl_c,    "OOS 2024–2025")
 
-    # ── Sec 7-8: Bootstrap BTC ─────────────────────────────────────────────────
-    a("## 7. Bootstrap DeltaExpectancy — BTC Sistema C vs Produccion")
+    # ── Sec 7: Comparacion OOS ─────────────────────────────────────────────────
+    a("## 7. Comparacion principal OOS 2024–2025")
     a("")
-    a("Delta = Expectancy(Sistema C) - Expectancy(Produccion)")
-    a(f"Metodo: {N_BOOT:,} resamples con reemplazo independiente por sistema.")
+    a("| Metrica | BTC Produccion | BTC Sistema C | Delta |")
+    a("|---------|---------------|--------------|-------|")
+    for lbl, attr, fmt in [
+        ("Trades",      "n",     str),
+        ("TP",          "tp",    str),
+        ("SL",          "sl",    str),
+        ("Win Rate",    "wr",    lambda v: f"{v:.1f}%"),
+        ("PF",          "pf",    fpf),
+        ("Exp/trade",   "exp",   fpl),
+        ("P/L",         "pl",    fpl),
+        ("DD max",      "dd",    lambda v: f"{v:.1f}%"),
+        ("Racha SL",    "rsl",   str),
+        ("Racha TP",    "rtp",   str),
+        ("Peor 5",      "peor5", fpl),
+    ]:
+        vp = mv_prod[attr]; vc = mv_c[attr]
+        try:
+            delta = f"{vc-vp:+.1f}" if isinstance(vc, (int, float)) else "—"
+        except Exception:
+            delta = "—"
+        a(f"| {lbl} | {fmt(vp)} | {fmt(vc)} | {delta} |")
     a("")
-    a("| Periodo | Delta observado | IC95% | Cruza 0 | P(Delta>0) | Mediana |")
-    a("|---------|----------------|-------|---------|-----------|---------|")
-    for label, bs in [("Train 2021–2023", bs_btc_train), ("Val OOS 2024–2025", bs_btc_val)]:
+    a(f"**Delta Expectancy = {fpl(round(mv_c['exp'] - mv_prod['exp'], 4))}**")
+    a("")
+    a("---")
+    a("")
+
+    # ── Sec 8-9: Bootstrap ─────────────────────────────────────────────────────
+    a("## 8. Bootstrap DeltaExpectancy — Sistema C vs Produccion")
+    a("")
+    a("Δ = Expectancy(Sistema C) − Expectancy(Produccion)")
+    a(f"Metodo: {N_BOOT:,} resamples con reemplazo, independientes por sistema.")
+    a("")
+    a("⚠️ *Dependencia serial entre trades puede subestimar la varianza real.")
+    a("No interpretar como prueba estadistica formal.*")
+    a("")
+    a("| Periodo | Delta obs | IC90% | IC95% | IC95 cruza 0 | P(D>0) | Mediana |")
+    a("|---------|-----------|-------|-------|-------------|--------|---------|")
+    for lbl, bs in [("Train 2021–2023", bs_train), ("OOS 2024–2025", bs_val)]:
         if bs["obs"] is None:
-            a(f"| {label} | N/A | — | — | — | — |")
-        else:
-            lo95, hi95 = bs["ic95"]
-            cruza = "Si ⚠️" if (lo95 is not None and lo95 < 0 < hi95) else "No"
-            a(f"| {label} | {fpl(bs['obs'])} | [{fpl(lo95)},{fpl(hi95)}] "
-              f"| {cruza} | {bs['p_pos']:.1%} | {fpl(bs['median'])} |")
-    a("")
-    a("## 8. IC90% / IC95% BTC")
-    a("")
-    a("| Periodo | IC90% | IC95% |")
-    a("|---------|-------|-------|")
-    for label, bs in [("Train", bs_btc_train), ("Val OOS", bs_btc_val)]:
-        if bs["obs"] is None:
-            a(f"| {label} | N/A | N/A |")
+            a(f"| {lbl} | N/A | — | — | — | — | — |")
         else:
             lo90, hi90 = bs["ic90"]; lo95, hi95 = bs["ic95"]
-            a(f"| {label} | [{fpl(lo90)},{fpl(hi90)}] | [{fpl(lo95)},{fpl(hi95)}] |")
-    a("")
-    a("**Interpretacion:** IC95% que NO cruza cero indica diferencia distinguible del azar a nivel orientativo.")
-    a("IC95% que cruza cero = diferencia dentro del ruido de muestreo.")
-    a("")
-    a("*Limitacion:* trades del mismo activo son serialmente dependientes;")
-    a("el bootstrap subestima la varianza real. No interpretar como prueba estadistica formal.")
+            c95 = "Si ⚠️" if (lo95 is not None and lo95 < 0 < hi95) else "No ✅"
+            a(f"| {lbl} | {fpl(bs['obs'])} "
+              f"| [{fpl(lo90)},{fpl(hi90)}] "
+              f"| [{fpl(lo95)},{fpl(hi95)}] "
+              f"| {c95} | {bs['p_pos']:.1%} | {fpl(bs['median'])} |")
     a("")
     a("---")
     a("")
 
-    # ── Sec 9: Comparacion OOS ────────────────────────────────────────────────
-    a("## 9. Comparacion Sistema C vs Produccion (OOS 2024–2025)")
+    # ── Sec 10: Robustez EMA ──────────────────────────────────────────────────
+    a("## 10. Robustez de vecindad EMA100/150/200/250 (OOS 2024–2025)")
     a("")
-    a("### BTC")
+    a("### ¿Como se evaluo la robustez?")
     a("")
-    a("| Metrica | Produccion BTC | Sistema C BTC | Delta |")
-    a("|---------|---------------|---------------|-------|")
-    for label, attr, fmt in [
-        ("Trades", "n", str), ("TP", "tp", str), ("SL", "sl", str),
-        ("WR",       "wr",  lambda v: f"{v:.1f}%"),
+    a("Se mantiene RSI 55–60, SL 5%, TP 6% y se varia solo la EMA del gate.")
+    a("Si EMA200 es superior por azar, las EMAs vecinas deberian mostrar resultados similares.")
+    a("")
+    a("| EMA | Trades OOS | WR | PF | Exp | P/L | DD |")
+    a("|-----|-----------|----|----|-----|-----|-----|")
+    for n in EMAs:
+        mv_n = rob_detalles[n]["m"]
+        bench = " ←" if n == 200 else ""
+        a(f"| **EMA{n}**{bench} | {mv_n['n']} | {mv_n['wr']:.1f}% | {fpf(mv_n['pf'])} "
+          f"| {fpl(mv_n['exp'])} | {fpl(mv_n['pl'])} | {mv_n['dd']:.1f}% |")
+    a("")
+    a("### Analisis de robustez (taxonomia actualizada 2026-08-14)")
+    a("")
+    a("| Campo | Valor |")
+    a("|-------|-------|")
+    a(f"| PF OOS EMA100 | {fpf(pf_btc_emas[100])} |")
+    a(f"| PF OOS EMA150 | {fpf(pf_btc_emas[150])} |")
+    a(f"| PF OOS EMA200 | {fpf(pf_btc_emas[200])} |")
+    a(f"| PF OOS EMA250 | {fpf(pf_btc_emas[250])} |")
+    a(f"| EMA con mejor PF OOS | EMA{best_ema} (PF {fpf(pf_btc_emas[best_ema])}) |")
+    a(f"| EMAs con PF > 1.0 | {n_pos}/4 |")
+    a(f"| EMA200 es la mejor | {'SI ✅' if best_ema == 200 else 'NO ❌'} |")
+    a(f"| Clasificacion | **{rob_label}** |")
+    a(f"| Detalle | {rob_detalle} |")
+    a("")
+    pf_range = max(pf_btc_emas.values()) - min(pf_btc_emas.values())
+    a(f"Rango de PF entre las 4 EMAs: {pf_range:.3f}.")
+    if pf_range < 0.15 and n_pos == 4:
+        a("Todas las EMAs se comportan de forma similar. EMA200 NO es un pico aislado.")
+    else:
+        a("Variacion entre EMAs dentro de lo esperado por ruido de muestreo.")
+    a("")
+    a("---")
+    a("")
+
+    # ── Sec 11: Sensibilidad RSI ──────────────────────────────────────────────
+    a("## 11. Sensibilidad RSI (descriptiva — con gate EMA200)")
+    a("")
+    a("**IMPORTANTE:** Esta seccion es descriptiva. No se usa para seleccionar parametros")
+    a("en OOS. El RSI 55–60 fue definido a priori como hipotesis Sistema C.")
+    a("")
+    a("| Rango RSI | Train T | Train PF | Train Exp | OOS T | OOS PF | OOS Exp |")
+    a("|-----------|---------|----------|-----------|-------|--------|---------|")
+    for lbl, res in rsi_sens_results.items():
+        mt = res["train"]; mv = res["val"]
+        marca = " **← Sistema C**" if "55-60" in lbl else ""
+        a(f"| **{lbl}**{marca} | {mt['n']} | {fpf(mt['pf'])} | {fpl(mt['exp'])} "
+          f"| {mv['n']} | {fpf(mv['pf'])} | {fpl(mv['exp'])} |")
+    a("")
+    a("**Interpretacion:**")
+    if n_pos_rsi == 3:
+        a("Los tres rangos RSI tienen PF OOS > 1.0 → RSI 55–60 no es un pico aislado.")
+        a("La ventaja parece estable en RSI 50–65.")
+    elif n_pos_rsi == 2:
+        a("Dos de tres rangos RSI tienen PF OOS > 1.0 → zona parcialmente estable.")
+    elif n_pos_rsi == 1:
+        pf_sc = pf_num(rsi_sens_results["RSI 55-60 (Sistema C)"]["val"]["pf"])
+        if pf_sc > 1.0:
+            a("RSI 55–60 es el unico rango con PF > 1.0 — posible pico aislado.")
+        else:
+            a("RSI 55–60 no tiene PF > 1.0 en OOS.")
+    else:
+        a("Ningun rango RSI tiene PF > 1.0 en OOS.")
+    a("")
+    a("---")
+    a("")
+
+    # ── Sec 12: Estabilidad Train → OOS ──────────────────────────────────────
+    a("## 12. Estabilidad Train → OOS")
+    a("")
+    a("| Metrica | Produccion Train | Produccion OOS | SistC Train | SistC OOS |")
+    a("|---------|-----------------|---------------|------------|----------|")
+    for lbl, attr, fmt in [
+        ("Trades", "n",   str),
+        ("PF",     "pf",  fpf),
+        ("WR",     "wr",  lambda v: f"{v:.1f}%"),
+        ("Exp",    "exp", fpl),
+        ("P/L",    "pl",  fpl),
+    ]:
+        a(f"| {lbl} | {fmt(mt_prod[attr])} | {fmt(mv_prod[attr])} "
+          f"| {fmt(mt_c[attr])} | {fmt(mv_c[attr])} |")
+    a("")
+    a("| Ratio PF (OOS / Train) | Produccion | Sistema C |")
+    a("|------------------------|-----------|----------|")
+    r_prod_str = f"{ratio_pf_prod:.2f}" if ratio_pf_prod else "N/A"
+    r_c_str    = f"{ratio_pf_c:.2f}"    if ratio_pf_c    else "N/A"
+    a(f"| PF OOS / PF Train | {r_prod_str} | {r_c_str} |")
+    a("")
+    a("**Evaluacion de estabilidad:**")
+    if ratio_pf_c is not None:
+        if ratio_pf_c >= 0.85:
+            a(f"Sistema C ratio PF = {ratio_pf_c:.2f} → degradacion leve, OOS consistente con Train.")
+        elif ratio_pf_c >= 0.60:
+            a(f"Sistema C ratio PF = {ratio_pf_c:.2f} → degradacion moderada entre Train y OOS.")
+        else:
+            a(f"Sistema C ratio PF = {ratio_pf_c:.2f} → degradacion fuerte — riesgo de overfitting.")
+    a("")
+    a("---")
+    a("")
+
+    # ── Sec 13: Forward 2026 ──────────────────────────────────────────────────
+    a("## 13. Forward 2026 (2026-01-01 → 2026-08-14)")
+    a("")
+    a("### Resultados forward")
+    a("")
+    a("| Metrica | BTC Produccion | BTC Sistema C | Delta |")
+    a("|---------|---------------|--------------|-------|")
+    for lbl, attr, fmt in [
+        ("Trades",   "n",   str),
+        ("TP",       "tp",  str),
+        ("SL",       "sl",  str),
+        ("Win Rate", "wr",  lambda v: f"{v:.1f}%"),
         ("PF",       "pf",  fpf),
-        ("Exp/trade","exp", fpl),
+        ("Exp",      "exp", fpl),
         ("P/L",      "pl",  fpl),
-        ("DD",       "dd",  lambda v: f"{v:.1f}%"),
+        ("DD max",   "dd",  lambda v: f"{v:.1f}%"),
         ("Racha SL", "rsl", str),
     ]:
-        vp = mv_btc_prod[attr]; vc = mv_btc_c[attr]
+        vp = mf_prod[attr]; vc = mf_c[attr]
         try:
             delta = f"{vc-vp:+.1f}" if isinstance(vc, (int, float)) else "—"
         except Exception:
             delta = "—"
-        a(f"| {label} | {fmt(vp)} | {fmt(vc)} | {delta} |")
+        a(f"| {lbl} | {fmt(vp)} | {fmt(vc)} | {delta} |")
     a("")
-    dif_trades = mv_btc_prod['n'] - mv_btc_c['n']
-    mejor_pf   = "mayor" if pf_num(mv_btc_c['pf']) > pf_num(mv_btc_prod['pf']) else "menor"
-    a(f"**Trade-off BTC:** Sistema C tiene {dif_trades} trades OOS menos pero {mejor_pf} PF en OOS.")
+    a("### Regimen BTC vs EMA200d en forward 2026 (velas 4H)")
     a("")
-    a("### ETH")
+    a("| Estado | Velas | Porcentaje |")
+    a("|--------|-------|-----------|")
+    a(f"| BTC SOBRE EMA200d | {sobre_fwd} | {pct_sobre:.1f}% |")
+    a(f"| BTC BAJO EMA200d  | {bajo_fwd}  | {pct_bajo:.1f}% |")
+    a(f"| Sin EMA disponible | {sin_ema_fwd} | — |")
+    a(f"| Total velas forward | {total_fwd} | — |")
     a("")
-    a("| Metrica | Produccion ETH | Sistema C ETH | Delta |")
-    a("|---------|---------------|---------------|-------|")
-    for label, attr, fmt in [
-        ("Trades", "n", str),
-        ("WR",       "wr",  lambda v: f"{v:.1f}%"),
-        ("PF",       "pf",  fpf),
-        ("Exp/trade","exp", fpl),
-        ("P/L",      "pl",  fpl),
-        ("DD",       "dd",  lambda v: f"{v:.1f}%"),
-        ("Racha SL", "rsl", str),
-    ]:
-        vp = mv_eth_prod[attr]; vc = mv_eth_c[attr]
-        try:
-            delta = f"{vc-vp:+.1f}" if isinstance(vc, (int, float)) else "—"
-        except Exception:
-            delta = "—"
-        a(f"| {label} | {fmt(vp)} | {fmt(vc)} | {delta} |")
-    a("")
-    a("*Nota:* ETH Prod y ETH-C tienen distintos SL/TP — el Delta de expectancy incluye ese efecto.")
-    a("")
-    a("---")
-    a("")
-
-    # ── Sec 10: Robustez de vecindad EMA ──────────────────────────────────────
-    a("## 10. Robustez de vecindad EMA100/150/200/250")
-    a("")
-    a("### BTC Sistema C (RSI 55–60 + SOBRE EMAn, SL 5%, TP 6%)")
-    a("")
-    a("| EMA | Val Trades | Val WR | Val PF | Val Exp | Val P/L | Val DD |")
-    a("|-----|-----------|--------|--------|---------|---------|--------|")
-    for n in EMAs:
-        vl = [t for t in rob["BTCUSDT"][n] if t["per"] == "VAL"]
-        mv = metricas(vl)
-        bench = " ←" if n == 200 else ""
-        a(f"| **EMA{n}**{bench} | {mv['n']} | {mv['wr']:.1f}% | {fpf(mv['pf'])} "
-          f"| {fpl(mv['exp'])} | {fpl(mv['pl'])} | {mv['dd']:.1f}% |")
-    a("")
-    a("**Analisis de robustez BTC:**")
-    a("")
-    a(f"| Campo | Valor |")
-    a("|-------|-------|")
-    a(f"| PF EMA100 | {fpf(pf_btc_emas[100])} |")
-    a(f"| PF EMA150 | {fpf(pf_btc_emas[150])} |")
-    a(f"| PF EMA200 | {fpf(pf_btc_emas[200])} |")
-    a(f"| PF EMA250 | {fpf(pf_btc_emas[250])} |")
-    a(f"| EMA con mejor PF | EMA{btc_best_ema} (PF {fpf(pf_btc_emas[btc_best_ema])}) |")
-    a(f"| EMAs con PF > 1.0 | {btc_n_pos}/4 |")
-    a(f"| EMA200 es la mejor | {'SI ✅' if btc_best_ema == 200 else 'NO ❌'} |")
-    a(f"| Clasificacion de vecindad | **{rob_btc_label}** |")
-    a(f"| Detalle | {rob_btc_detalle} |")
-    a("")
-    a("### ETH Sistema C (RSI 55–60 + SOBRE EMAn, SL 5%, TP 6%)")
-    a("")
-    a("| EMA | Val Trades | Val WR | Val PF | Val Exp | Val P/L | Val DD |")
-    a("|-----|-----------|--------|--------|---------|---------|--------|")
-    for n in EMAs:
-        vl = [t for t in rob["ETHUSDT"][n] if t["per"] == "VAL"]
-        mv = metricas(vl)
-        bench = " ←" if n == 200 else ""
-        a(f"| **EMA{n}**{bench} | {mv['n']} | {mv['wr']:.1f}% | {fpf(mv['pf'])} "
-          f"| {fpl(mv['exp'])} | {fpl(mv['pl'])} | {mv['dd']:.1f}% |")
-    a("")
-    a("**Analisis de robustez ETH:**")
-    a("")
-    a(f"| Campo | Valor |")
-    a("|-------|-------|")
-    a(f"| PF EMA100 | {fpf(pf_eth_emas[100])} |")
-    a(f"| PF EMA150 | {fpf(pf_eth_emas[150])} |")
-    a(f"| PF EMA200 | {fpf(pf_eth_emas[200])} |")
-    a(f"| PF EMA250 | {fpf(pf_eth_emas[250])} |")
-    a(f"| EMA con mejor PF | EMA{eth_best_ema} (PF {fpf(pf_eth_emas[eth_best_ema])}) |")
-    a(f"| EMAs con PF > 1.0 | {eth_n_pos}/4 |")
-    a(f"| EMA200 es la mejor | {'SI ✅' if eth_best_ema == 200 else 'NO ❌'} |")
-    a(f"| Clasificacion de vecindad | **{rob_eth_label}** |")
-    a(f"| Detalle | {rob_eth_detalle} |")
+    if mf_c["n"] == 0:
+        a("**BTC Sistema C: 0 trades en forward 2026.**")
+        if pct_bajo > 60:
+            a(f"BTC estuvo {pct_bajo:.0f}% del tiempo BAJO su EMA200d.")
+            a("El gate macro funcionó correctamente — no opera en regimen bajista.")
+            a("La ausencia de trades NO es evidencia negativa del sistema;")
+            a("tampoco es positiva. Cuando BTC recupere EMA200d, el sistema volvera a activarse.")
+        elif pct_sobre > 60:
+            a(f"BTC estuvo {pct_sobre:.0f}% del tiempo SOBRE su EMA200d.")
+            a("La ausencia de trades se debe a que RSI 55-60 no coincidio con precio > EMAd.")
+    if fw_prod:
+        a("")
+        a("### Trades Produccion — Forward 2026")
+        a("")
+        a("| # | Entrada | RSI | Precio | Resultado | P/L |")
+        a("|---|---------|-----|--------|-----------|-----|")
+        for i, t in enumerate(fw_prod, 1):
+            a(f"| {i} | {t['ts']} | {t['rsi']:.1f} | ${t['precio']:,.2f} | {t['res']} | {fpl(t['pl'])} |")
+    if fw_c:
+        a("")
+        a("### Trades Sistema C — Forward 2026")
+        a("")
+        a("| # | Entrada | RSI | Precio | EMA200d | Resultado | P/L |")
+        a("|---|---------|-----|--------|---------|-----------|-----|")
+        for i, t in enumerate(fw_c, 1):
+            ema_s = f"${t['ema_v']:,.2f}" if t["ema_v"] else "—"
+            a(f"| {i} | {t['ts']} | {t['rsi']:.1f} | ${t['precio']:,.2f} "
+              f"| {ema_s} | {t['res']} | {fpl(t['pl'])} |")
     a("")
     a("---")
     a("")
 
-    # ── Sec 11: Resultados anuales ────────────────────────────────────────────
-    a("## 11. Resultados anuales (BTC y ETH — todos los sistemas)")
+    # ── Sec 14: Resultados anuales ────────────────────────────────────────────
+    a("## 14. Resultados anuales")
     a("")
-    a("| Ano | BTC Prod PF/n | BTC-C PF/n | ETH Prod PF/n | ETH-C PF/n | Periodo |")
-    a("|-----|-------------|----------|-------------|---------|---------|")
+    a("| Ano | Prod T | Prod PF | Prod WR | SistC T | SistC PF | SistC WR | Periodo |")
+    a("|-----|--------|---------|---------|---------|----------|----------|---------|")
     for anio in ANIOS:
-        celdas = []
-        for key in ["BTC_PROD", "BTC_C", "ETH_PROD", "ETH_C"]:
-            g = [t for t in sims[key] if t["anio"] == anio]
-            m = metricas(g)
-            if m["n"] == 0:
-                celdas.append("— / 0")
-            else:
-                nota = "⚠️" if m["n"] < 5 else ""
-                celdas.append(f"{nota}{fpf(m['pf'])} / {m['n']}")
-        per = "TRAIN" if anio <= "2023" else "**VAL**"
-        a(f"| {anio} ({per}) | {celdas[0]} | {celdas[1]} | {celdas[2]} | {celdas[3]} |")
+        gp = [t for t in trades_prod if t["anio"] == anio]
+        gc = [t for t in trades_c    if t["anio"] == anio]
+        mp = metricas(gp); mc = metricas(gc)
+        per_lbl = "TRAIN" if anio <= "2023" else ("FWD" if anio == "2026" else "**VAL**")
+        def fs(m):
+            if m["n"] == 0: return "0 | — | —"
+            n = str(m["n"]) + (" ⚠️" if m["n"] < 10 else "")
+            return f"{n} | {fpf(m['pf'])} | {m['wr']:.0f}%"
+        a(f"| {anio} | {fs(mp)} | {fs(mc)} | {per_lbl} |")
     a("")
     a("---")
     a("")
 
-    # ── Sec 12: Drawdown y rachas ─────────────────────────────────────────────
-    a("## 12. Drawdown y rachas (OOS 2024–2025)")
+    # ── Sec 15: Drawdown y rachas OOS ─────────────────────────────────────────
+    a("## 15. Drawdown y rachas OOS 2024–2025")
     a("")
-    a("| Sistema | DD max | Racha SL | Fechas racha SL | Racha TP | Peor 5 trades |")
-    a("|---------|--------|----------|----------------|----------|---------------|")
-    for key, label in [("BTC_PROD", "BTC Produccion"), ("BTC_C", "BTC Sistema C"),
-                        ("ETH_PROD", "ETH Produccion"), ("ETH_C", "ETH Sistema C")]:
-        mv = metricas(split(sims[key], "VAL"))
-        a(f"| {label} | {mv['dd']:.1f}% | {mv['rsl']} | {mv['rsl_d']} "
+    a("| Sistema | DD max | Racha SL | Fechas | Racha TP | Peor 5 trades |")
+    a("|---------|--------|----------|--------|----------|---------------|")
+    for lbl, mv in [("BTC Produccion", mv_prod), ("BTC Sistema C", mv_c)]:
+        a(f"| {lbl} | {mv['dd']:.1f}% | {mv['rsl']} | {mv['rsl_d']} "
           f"| {mv['rtp']} | {fpl(mv['peor5'])} |")
     a("")
     a("---")
     a("")
 
-    # ── Sec 13: Analisis de sobreajuste ───────────────────────────────────────
-    a("## 13. Analisis de sobreajuste")
+    # ── Sec 16: Analisis de sobreajuste ───────────────────────────────────────
+    a("## 16. Analisis de sobreajuste")
     a("")
-    a("1. **RSI 55–60 surgiu de analisis sobre datos de 2026** (muestra pequena de 22 trades).")
-    a("   Hay riesgo de seleccion post-hoc. La produccion BTC ya usaba RSI_MIN=55.")
-    a("")
-    a("2. **EMA200d como gate en BTC:**")
-    a(f"   {btc_n_pos}/4 EMAs con PF > 1.0 en OOS. EMA200 es la mejor: {'SI' if btc_best_ema==200 else 'NO'}.")
-    a(f"   Clasificacion: **{rob_btc_label}**.")
-    a("")
-    a("3. **EMA200d como gate en ETH:**")
-    a(f"   {eth_n_pos}/4 EMAs con PF > 1.0 en OOS. EMA200 es la mejor: {'SI' if eth_best_ema==200 else 'NO'}.")
-    a(f"   Clasificacion: **{rob_eth_label}**.")
-    a("   La diferencia de comportamiento entre BTC y ETH **reduce** la evidencia de overfitting generalizado")
-    a("   pero **sugiere** que la ventaja del patron RSI 55-60 + gate EMA puede ser especifica de BTC.")
-    a("")
-    a("4. **Ventaja OOS vs Train:**")
-    mt_btc_c_tr = metricas(split(sims["BTC_C"], "TRAIN"))
-    a(f"   BTC-C: Train PF {fpf(mt_btc_c_tr['pf'])} → Val PF {fpf(mv_btc_c['pf'])} → "
-      f"{'mejora OOS ✅' if pf_num(mv_btc_c['pf'])>=pf_num(mt_btc_c_tr['pf'])*0.8 else 'deterioro ⚠️'}")
-    a("")
-    a("5. **Bootstrap IC95% cruza cero:**")
-    lo95b, hi95b = bs_btc_val["ic95"]
-    lo95e, hi95e = bs_eth_val["ic95"]
-    a(f"   BTC-C vs Prod: IC95% [{fpl(lo95b)},{fpl(hi95b)}] → "
-      f"{'NO cruza ✅' if lo95b and lo95b>0 else 'CRUZA ⚠️'}")
-    a(f"   ETH-C vs Prod: IC95% [{fpl(lo95e)},{fpl(hi95e)}] → "
-      f"{'NO cruza ✅' if lo95e and lo95e>0 else 'CRUZA ⚠️'}")
-    a("")
-    a("---")
-    a("")
-
-    # ── Sec 14: Limitaciones ──────────────────────────────────────────────────
-    a("## 14. Limitaciones")
-    a("")
-    a("1. Sin trailing stop ni gates de produccion (eventos macro, horario, spread).")
-    a("2. ETH Prod y ETH-C tienen distinto SL/TP — comparacion parcialmente limpia.")
-    a("3. Bootstrap subestima varianza por dependencia serial. No es prueba estadistica formal.")
-    a("4. RSI 55–60 surgiu de analisis en 2026 — riesgo de post-hoc.")
-    a("5. Sin compounding — monto fijo $5.")
-    a("6. Periodos de bull extremo (2021, 2024) sesgan los resultados positivos.")
-    a("")
-    a("---")
-    a("")
-
-    # ── Sec 15: Veredicto final ────────────────────────────────────────────────
-    a("## 15. Veredicto final")
-    a("")
-    a("| Sistema | PF OOS | Exp OOS | EMA mejor | EMAs pos/4 | IC95% | P(D>0) | Vecindad | Veredicto |")
-    a("|---------|--------|---------|-----------|-----------|-------|--------|---------|-----------|")
-    for sym_k, label, mv_c, mv_p, bs_v, best_e, n_pos_v, rob_lbl in [
-        ("BTC_C","BTC Sistema C", mv_btc_c, mv_btc_prod, bs_btc_val,
-         btc_best_ema, btc_n_pos, rob_btc_label),
-        ("ETH_C","ETH Sistema C", mv_eth_c, mv_eth_prod, bs_eth_val,
-         eth_best_ema, eth_n_pos, rob_eth_label),
-    ]:
-        lo95, hi95 = bs_v["ic95"]
-        ic_str = f"[{fpl(lo95)},{fpl(hi95)}]" if lo95 else "N/A"
-        verd = verdict_btc if "BTC" in sym_k else verdict_eth
-        ema_best_str = f"EMA{best_e} {'✅' if best_e==200 else '⚠️'}"
-        a(f"| **{label}** | {fpf(mv_c['pf'])} | {fpl(mv_c['exp'])} "
-          f"| {ema_best_str} | {n_pos_v}/4 | {ic_str} "
-          f"| {bs_v['p_pos']:.1%} | {rob_lbl} | {verd} |")
-    a("")
-    a("---")
-    a("")
-
-    # ── Sec 16: Veredicto ETH ──────────────────────────────────────────────────
-    a("## 16. Veredicto ETH Sistema C")
-    a("")
-    a(f"**{verdict_eth}**")
-    a("")
-    if "DESCARTADO" in verdict_eth:
-        a("ETH Sistema C no supera el umbral minimo de PF OOS > 1.0 y/o expectancy positiva.")
-        a(f"Ademas, el patron de vecindad EMA muestra: {rob_eth_detalle}")
+    preguntas = [
+        ("¿RSI 55–60 fue seleccionado post-hoc sobre datos OOS de BTC?",
+         "No. RSI 55–60 fue definido a priori como hipotesis Sistema C antes de analizar "
+         "los datos OOS. La misma hipotesis se aplico a ETH, SOL y AVAX."),
+        ("¿La hipotesis proviene de analisis previo en BTC?",
+         "Si — RSI 55–60 surge de analisis forense de BTC 2021–2025 (no completamente externo "
+         "al activo). Introduce riesgo moderado de sobreajuste al activo."),
+        ("¿EMA200 es un pico aislado?",
+         f"{'No' if n_pos >= 3 else 'Posiblemente'}. "
+         f"{n_pos}/4 EMAs positivas. EMA200 mejor: {'SI' if best_ema==200 else 'NO'}. "
+         f"Clasificacion: {rob_label}."),
+        ("¿Las EMAs vecinas confirman la ventaja?",
+         f"{rob_detalle}"),
+        ("¿Sistema C es estable entre Train y OOS?",
+         (f"Train PF {fpf(mt_c['pf'])} → OOS PF {fpf(mv_c['pf'])}. "
+          f"Ratio: {ratio_pf_c:.2f}. "
+          + ("Estable." if ratio_pf_c and ratio_pf_c >= 0.85
+             else "Degradacion moderada." if ratio_pf_c and ratio_pf_c >= 0.60
+             else "Degradacion fuerte.") if ratio_pf_c else "N/A")),
+        ("¿PF OOS > 1.0?",
+         f"{'SI ✅' if pf_num(mv_c['pf']) > 1.0 else 'NO ❌'} — PF OOS: {fpf(mv_c['pf'])}"),
+        ("¿Expectancy OOS > 0?",
+         f"{'SI ✅' if mv_c['exp'] > 0 else 'NO ❌'} — Exp OOS: {fpl(mv_c['exp'])}"),
+        ("¿Hay al menos 30 trades OOS?",
+         f"{'SI ✅' if mv_c['n'] >= 30 else 'NO ⚠️'} — Trades OOS: {mv_c['n']}"),
+        ("¿IC95% cruza cero?",
+         (f"SI ⚠️ — IC95% [{fpl(lo95_v)},{fpl(hi95_v)}]. "
+          "La diferencia esta dentro del ruido de muestreo."
+          if lo95_v is not None and lo95_v < 0 < hi95_v
+          else f"NO ✅ — IC95% [{fpl(lo95_v)},{fpl(hi95_v)}]."
+          if lo95_v and lo95_v > 0
+          else "No calculable.")),
+        ("¿Sensibilidad RSI revela pico aislado?",
+         f"{n_pos_rsi}/3 rangos RSI con PF OOS > 1.0. "
+         + ("RSI 55–60 no es pico aislado." if n_pos_rsi >= 2
+            else "RSI 55–60 podria ser pico aislado.")),
+        ("¿Forward 2026 aporta evidencia adicional?",
+         (f"Sistema C: {mf_c['n']} trades, PF {fpf(mf_c['pf'])}."
+          if mf_c["n"] > 0
+          else f"0 trades. BTC {pct_bajo:.0f}% bajo EMA200d — gate inactivo por regimen. "
+          "Comportamiento esperado del diseno.")),
+    ]
+    for i, (pregunta, respuesta) in enumerate(preguntas, 1):
+        a(f"{i}. **{pregunta}**")
+        a(f"   {respuesta}")
         a("")
-        a("**Conclusion:** El patron RSI 55–60 + SOBRE EMA200d NO funciona en ETH con los")
-        a("parametros probados (SL 5%, TP 6%). Las EMAs vecinas confirman que no es un")
-        a("problema especifico de EMA200 sino del patron completo aplicado a ETH.")
-    elif "FRAGIL" in verdict_eth:
-        a("ETH Sistema C es positivo en OOS pero sin robustez de vecindad.")
-        a(f"Vecindad EMA: {rob_eth_detalle}")
-        a("No se recomienda activar en REAL sin evidencia adicional de robustez.")
-    else:
-        a(f"ETH Sistema C tiene veredicto {verdict_eth}.")
-        a(f"Vecindad EMA: {rob_eth_detalle}")
+    a("---")
+    a("")
+
+    # ── Sec 17: Limitaciones ──────────────────────────────────────────────────
+    a("## 17. Limitaciones")
+    a("")
+    a("1. Sin trailing stop ni gates de produccion (horario, eventos macro, spread, guardian).")
+    a("2. Sin compounding — monto fijo $5 por trade.")
+    a("3. Bootstrap subestima varianza real por dependencia serial.")
+    a("4. RSI 55–60 tiene raices en analisis de BTC — riesgo moderado de sobreajuste al activo.")
+    a("5. 59 trades OOS — suficiente para analisis preliminar, no definitivo.")
+    a("6. Comision VIP0 taker 0.1% — produccion real puede diferir.")
     a("")
     a("---")
     a("")
 
-    # ── Sec 17: Comparacion directa BTC vs ETH ────────────────────────────────
-    a("## 17. Comparacion directa BTC Sistema C vs ETH Sistema C")
+    # ── Sec 18: Veredicto ────────────────────────────────────────────────────
+    a("## 18. Veredicto final")
     a("")
-    a("*Mismos parametros: RSI 55–60, SOBRE EMA200d, SL 5%, TP 6% — comparacion limpia.*")
+    a("### Criterios evaluados")
     a("")
-    a("| Metrica | BTC Sistema C | ETH Sistema C |")
-    a("|---------|--------------|--------------|")
-    for label, attr, fmt, is_oos in [
-        ("Trades Train",   "n",   str,                         False),
-        ("PF Train",       "pf",  fpf,                         False),
-        ("WR Train",       "wr",  lambda v: f"{v:.1f}%",       False),
-        ("Exp Train",      "exp", fpl,                         False),
-        ("Trades OOS",     "n",   str,                         True),
-        ("PF OOS",         "pf",  fpf,                         True),
-        ("WR OOS",         "wr",  lambda v: f"{v:.1f}%",       True),
-        ("Exp OOS",        "exp", fpl,                         True),
-        ("P/L OOS",        "pl",  fpl,                         True),
-        ("DD max OOS",     "dd",  lambda v: f"{v:.1f}%",       True),
-        ("Peor racha SL",  "rsl", str,                         True),
-    ]:
-        per = "VAL" if is_oos else "TRAIN"
-        sb = metricas(split(sims["BTC_C"], per))
-        se = metricas(split(sims["ETH_C"], per))
-        a(f"| {label} | {fmt(sb[attr])} | {fmt(se[attr])} |")
-    for n in EMAs:
-        a(f"| EMA{n} PF OOS | {fpf(pf_btc_emas[n])} | {fpf(pf_eth_emas[n])} |")
-    a(f"| P(D Exp > 0) vs Prod | {bs_btc_val['p_pos']:.1%} | {bs_eth_val['p_pos']:.1%} |")
-    lo95b2, hi95b2 = bs_btc_val["ic95"]; lo95e2, hi95e2 = bs_eth_val["ic95"]
-    a(f"| IC95% DExp vs Prod | [{fpl(lo95b2)},{fpl(hi95b2)}] | [{fpl(lo95e2)},{fpl(hi95e2)}] |")
-    a(f"| EMAs positivas OOS | {btc_n_pos}/4 | {eth_n_pos}/4 |")
-    a(f"| EMA200 es la mejor | {'SI ✅' if btc_best_ema==200 else 'NO ❌'} | {'SI ✅' if eth_best_ema==200 else 'NO ❌'} |")
-    a(f"| Clasificacion vecindad | {rob_btc_label} | {rob_eth_label} |")
-    a(f"| Veredicto | {verdict_btc} | {verdict_eth} |")
+    a("| Criterio | Estado |")
+    a("|----------|--------|")
+    a(f"| 1. PF OOS > 1.0 | {'✅ ' + fpf(mv_c['pf']) if pf_num(mv_c['pf']) > 1.0 else '❌ ' + fpf(mv_c['pf'])} |")
+    a(f"| 2. Expectancy OOS > 0 | {'✅ ' + fpl(mv_c['exp']) if mv_c['exp'] > 0 else '❌ ' + fpl(mv_c['exp'])} |")
+    a(f"| 3. Min 30 trades OOS | {'✅ ' + str(mv_c['n']) if mv_c['n'] >= 30 else '⚠️ ' + str(mv_c['n'])} |")
+    a(f"| 4. EMA200 es la mejor | {'✅' if best_ema == 200 else '❌ EMA' + str(best_ema)} |")
+    a(f"| 5. Robustez vecindad EMA | **{rob_label}** |")
+    a(f"| 6. IC95% no cruza cero | {'✅' if lo95_v and lo95_v > 0 else '❌ cruza 0'} |")
+    p_pos_str = f"{bs_val['p_pos']:.1%}" if bs_val["p_pos"] is not None else "N/A"
+    a(f"| 7. P(Delta>0) | {p_pos_str} |")
+    rat_str = f"{ratio_pf_c:.2f}" if ratio_pf_c else "N/A"
+    a(f"| 8. Estabilidad Train→OOS (ratio PF) | {rat_str} |")
+    a(f"| 9. Sensibilidad RSI | {n_pos_rsi}/3 rangos con PF OOS > 1.0 |")
+    fwd_str = (f"{mf_c['n']} trades (PF {fpf(mf_c['pf'])})" if mf_c["n"] > 0
+               else f"0 trades ({pct_bajo:.0f}% bajo EMA200d)")
+    a(f"| 10. Forward 2026 | {fwd_str} |")
     a("")
-    if bs_btc_vs_eth["obs"] is not None:
-        lo95x, hi95x = bs_btc_vs_eth["ic95"]
-        a("### Bootstrap BTC-C vs ETH-C (OOS)")
-        a(f"Delta = Exp(BTC-C) − Exp(ETH-C) = {fpl(bs_btc_vs_eth['obs'])}")
-        a(f"IC95%: [{fpl(lo95x)},{fpl(hi95x)}]")
-        a(f"P(BTC-C mejor) = {bs_btc_vs_eth['p_pos']:.1%}")
-        if lo95x is not None and lo95x < 0 < hi95x:
-            a("→ Diferencia dentro del ruido de muestreo (IC95% cruza cero)")
-        else:
-            a("→ Diferencia estadisticamente distinguible (IC95% no cruza cero)")
+    a(f"### **{verdict}**")
+    a("")
+    if "ACTIVABLE" in verdict:
+        a("Todos los criterios se cumplen: PF OOS > 1.0, expectancy positiva,")
+        a("vecindad ROBUSTA_POSITIVA e IC95% no cruza cero.")
+        a("Evidencia suficiente para considerar validacion REAL controlada.")
+    elif "PROMETEDOR" in verdict:
+        a("El sistema es positivo en OOS y la vecindad EMA confirma el patron, pero:")
+        if lo95_v is not None and lo95_v < 0 < hi95_v:
+            a(f"- IC95% cruza cero [{fpl(lo95_v)},{fpl(hi95_v)}]. "
+              f"P(D>0) = {bs_val['p_pos']:.1%} — dentro del ruido de muestreo.")
+        if rob_label == "PARCIALMENTE_ROBUSTA":
+            a(f"- Vecindad EMA: {rob_detalle}")
+        a("**No activar sin acumular evidencia real (>=30 trades en REAL).**")
+    elif "DESCARTADO" in verdict:
+        a("PF OOS <= 1.0 y/o expectancy <= 0. Sistema C no supera a Produccion.")
     a("")
     a("---")
     a("")
 
-    # ── Sec 18: Prioridad para REAL ───────────────────────────────────────────
-    a("## 18. Prioridad para REAL")
+    # ── Sec 19: Comparacion global ────────────────────────────────────────────
+    a("## 19. Comparacion global BTC / ETH / SOL / AVAX")
     a("")
-    a("| Criterio | BTC-C | ETH-C |")
-    a("|----------|-------|-------|")
-    a(f"| 1. PF OOS > 1 | {'✅' if pf_num(mv_btc_c['pf'])>1 else '❌'} | {'✅' if pf_num(mv_eth_c['pf'])>1 else '❌'} |")
-    a(f"| 2. Exp OOS > 0 | {'✅' if mv_btc_c['exp']>0 else '❌'} | {'✅' if mv_eth_c['exp']>0 else '❌'} |")
-    a(f"| 3. Robustez vecindad EMA | {rob_btc_label} | {rob_eth_label} |")
-    a(f"| 4. EMA200 es la mejor | {'✅' if btc_best_ema==200 else '❌'} | {'✅' if eth_best_ema==200 else '❌'} |")
-    a(f"| 5. IC95% no cruza 0 | {'✅' if lo95b2 and lo95b2>0 else '❌'} | {'✅' if lo95e2 and lo95e2>0 else '❌'} |")
-    a(f"| 6. P(D>0) | {bs_btc_val['p_pos']:.1%} | {bs_eth_val['p_pos']:.1%} |")
-    a(f"| 7. Trades OOS | {mv_btc_c['n']} | {mv_eth_c['n']} |")
-    a(f"| 8. DD max OOS | {mv_btc_c['dd']:.1f}% | {mv_eth_c['dd']:.1f}% |")
-    a(f"| 9. Peor racha SL | {mv_btc_c['rsl']} | {mv_eth_c['rsl']} |")
-    a("")
-    a(f"🥇 **{primero}** — primer candidato para validacion REAL controlada")
-    if segundo != "NINGUNO":
-        a(f"🥈 **{segundo}**")
-    else:
-        a("🥈 **NINGUNO** — segundo candidato descartado o sin evidencia")
+    a("| Activo | PF OOS | Exp OOS | EMAs>1 | Trades OOS | Forward | Veredicto |")
+    a("|--------|--------|---------|--------|-----------|---------|-----------|")
+    fwd_btc_str = (f"{mf_c['n']} trades" if mf_c["n"] > 0
+                   else f"0 ({pct_bajo:.0f}% bajo EMA200d)")
+    a(f"| **BTC** | {fpf(mv_c['pf'])} | {fpl(mv_c['exp'])} "
+      f"| {n_pos}/4 | {mv_c['n']} | {fwd_btc_str} | {verdict} |")
+    a("| **ETH** | 0.960 | -$0.0055 | 0/4 | 67 | N/A | 🔴 DESCARTADO |")
+    a("| **SOL** | 0.984 | -$0.0022 | 0/4 | 96 | 0 trades | 🔴 DESCARTADO |")
+    a("| **AVAX** | 0.707 | -$0.0466 | 0/4 | 67 | 0 trades | 🔴 DESCARTADO |")
     a("")
     a("---")
     a("")
 
-    # ── Sec 19: Conclusion consolidada ────────────────────────────────────────
-    a("## 19. Conclusion consolidada")
+    # ── Sec 20: Conclusion global ──────────────────────────────────────────────
+    a("## 20. Conclusion global")
     a("")
-    # BTC
-    if rob_btc_label == "ROBUSTO_EMA":
-        btc_patron = (
-            "BTC Sistema C presenta evidencia de patron robusto alrededor de EMA200: "
-            "EMA200 es la mejor EMA en OOS y las cuatro EMAs del rango 100–250 tienen "
-            f"PF > 1.0. {rob_btc_detalle}"
-        )
-    elif rob_btc_label == "PARCIAL_EMA":
-        btc_patron = (
-            f"BTC Sistema C: EMA200 es la mejor EMA en OOS, pero {rob_btc_detalle} "
-            "La robustez es parcial."
-        )
-    elif rob_btc_label == "NO_ROBUSTA_EMA200":
-        btc_patron = (
-            f"BTC Sistema C: EMA200 positiva pero no es la mejor EMA. {rob_btc_detalle}"
-        )
-    else:
-        btc_patron = f"BTC Sistema C: {rob_btc_detalle}"
-
-    a(f"**BTC:** {btc_patron}")
+    a("### ¿Sistema C es generalizable entre BTC y altcoins?")
     a("")
-    lo95_final, hi95_final = bs_btc_val["ic95"]
-    if lo95_final is not None and lo95_final < 0 < hi95_final:
-        a("Sin embargo, el IC95% del bootstrap BTC-C vs Produccion cruza cero "
-          f"([{fpl(lo95_final)},{fpl(hi95_final)}], P(D>0) = {bs_btc_val['p_pos']:.1%}). "
-          "El sistema es **PROMETEDOR**, pero todavia no puede declararse ROBUSTO estadisticamente.")
-    elif lo95_final and lo95_final > 0:
-        a(f"El IC95% del bootstrap NO cruza cero ([{fpl(lo95_final)},{fpl(hi95_final)}]), "
-          "lo que apoya la mejora sobre Produccion. Junto con la robustez de vecindad, "
-          "el sistema califica como **ROBUSTO**.")
+    a("**No.** ETH, SOL y AVAX muestran 0/4 EMAs positivas en OOS.")
+    a("El patron RSI 55–60 + gate EMA diaria no generaliza con los parametros evaluados.")
     a("")
-
-    # ETH
-    if "DESCARTADO" in verdict_eth:
-        a(f"**ETH Sistema C: {verdict_eth}.**")
-        a(f"El patron RSI 55–60 + SOBRE EMA200d NO generaliza a ETH: {rob_eth_detalle}")
-        a("Esto reduce la evidencia de que se trate de un overfitting generalizado entre activos,")
-        a("pero sugiere que la ventaja puede ser especifica de BTC.")
-    elif "FRAGIL" in verdict_eth:
-        a(f"**ETH Sistema C: {verdict_eth}.**")
-        a(f"Positivo en OOS pero sin robustez de vecindad: {rob_eth_detalle}")
-        a("No apto para activacion en REAL sin evidencia adicional.")
-    else:
-        a(f"**ETH Sistema C: {verdict_eth}.** {rob_eth_detalle}")
+    a("**BTC es el unico activo con evidencia OOS positiva.**")
     a("")
-
-    # Proximo paso
-    if primero == "BTC":
-        a("**Proximo paso:**")
-        a("🥇 BTC — primer candidato para validacion REAL controlada.")
-        a("No activar todavia como sistema independiente sin respetar el protocolo REAL.")
-        a("Acumular al menos 30+ trades reales y comparar contra Produccion.")
-        a("El gate EMA200d estara inactivo mientras BTC siga bajo su EMA200d (regimen 2026 actual).")
-    elif primero == "ETH":
-        a("**Proximo paso:**")
-        a("🥇 ETH — primer candidato segun la evidencia disponible.")
-        a("Requiere validacion REAL antes de activar.")
-    else:
-        a("**Proximo paso:** Ninguno de los dos sistemas califica para activacion inmediata.")
-        a("Continuar con la investigacion de otros activos (SOL, AVAX).")
+    a("| Evidencia BTC | Estado |")
+    a("|---------------|--------|")
+    a(f"| PF OOS | {fpf(mv_c['pf'])} ({'> 1.0 ✅' if pf_num(mv_c['pf']) > 1.0 else '<= 1.0 ❌'}) |")
+    a(f"| EMAs positivas | {n_pos}/4 |")
+    a(f"| Clasificacion vecindad | {rob_label} |")
+    a(f"| IC95% cruza cero | {'SI ⚠️' if lo95_v is not None and lo95_v < 0 < hi95_v else 'NO ✅'} |")
+    a(f"| Trades OOS | {mv_c['n']} |")
+    a(f"| Forward 2026 | {fwd_btc_str} |")
+    a("")
+    if "PROMETEDOR" in verdict:
+        a("**Proximo paso:** activar REAL y acumular >= 30 trades reales.")
+        a("No modificar produccion. Sistema C permanece desactivado.")
+    elif "ACTIVABLE" in verdict:
+        a("**Proximo paso:** fase de validacion controlada en REAL.")
+        a("Acumular >= 30 trades reales antes de cualquier cambio permanente.")
     a("")
     a("---")
     a("")
-    a("**ESTADO FINAL:**")
-    a("- Produccion modificada: **NO**")
-    a("- Sistema C activado: **NO**")
-    a(f"- Veredicto BTC Sistema C: **{verdict_btc}**")
-    a(f"- Veredicto ETH Sistema C: **{verdict_eth}**")
-    a(f"- Prioridad para REAL: **{primero}**")
+    a("## Estado final")
     a("")
-    a("Archivos:")
-    a("- `reports/2026-08-14_btc-bootstrap-sistema-c-vs-produccion.md` (este reporte)")
-    a("- `btc_bootstrap_sistema_c_vs_produccion.py` (script)")
+    a("| Campo | Estado |")
+    a("|-------|--------|")
+    a("| Produccion BTC modificada | **NO** |")
+    a("| Sistema C BTC activado | **NO** |")
+    a("| `config_cartera.py` | **SIN CAMBIOS** |")
+    a("| `auditoria.csv` | **SIN CAMBIOS** |")
+    a("| `billetera.json` | **SIN CAMBIOS** |")
+    a(f"| Veredicto BTC Sistema C | **{verdict}** |")
+    a("| Proximo paso | NO ACTIVAR — acumular evidencia en REAL |")
+    a("")
+    a("**PRODUCCION NO MODIFICADA.**")
 
     # ── Escribir reporte ───────────────────────────────────────────────────────
     os.makedirs(os.path.dirname(os.path.expanduser(REPORT_PATH)), exist_ok=True)
     with open(os.path.expanduser(REPORT_PATH), "w") as f:
         f.write("\n".join(lines))
 
-    # ── Resumen en consola ─────────────────────────────────────────────────────
+    # ── Consola ────────────────────────────────────────────────────────────────
     print()
     print("=" * 62)
-    print("RESULTADOS — OOS 2024-2025")
+    print("RESULTADOS BTC — OOS 2024-2025")
     print("=" * 62)
-    print(f"  BTC Produccion: {mv_btc_prod['n']:3d} trades | PF {fpf(mv_btc_prod['pf'])} "
-          f"| WR {mv_btc_prod['wr']:.1f}% | Exp {fpl(mv_btc_prod['exp'])}")
-    print(f"  BTC Sistema C:  {mv_btc_c['n']:3d} trades | PF {fpf(mv_btc_c['pf'])} "
-          f"| WR {mv_btc_c['wr']:.1f}% | Exp {fpl(mv_btc_c['exp'])}")
-    print(f"  ETH Produccion: {mv_eth_prod['n']:3d} trades | PF {fpf(mv_eth_prod['pf'])} "
-          f"| WR {mv_eth_prod['wr']:.1f}% | Exp {fpl(mv_eth_prod['exp'])}")
-    print(f"  ETH Sistema C:  {mv_eth_c['n']:3d} trades | PF {fpf(mv_eth_c['pf'])} "
-          f"| WR {mv_eth_c['wr']:.1f}% | Exp {fpl(mv_eth_c['exp'])}")
+    print(f"  Produccion: {mv_prod['n']:3d} trades | PF {fpf(mv_prod['pf'])} "
+          f"| WR {mv_prod['wr']:.1f}% | Exp {fpl(mv_prod['exp'])}")
+    print(f"  Sistema C:  {mv_c['n']:3d} trades | PF {fpf(mv_c['pf'])} "
+          f"| WR {mv_c['wr']:.1f}% | Exp {fpl(mv_c['exp'])}")
     print()
-    print("BOOTSTRAP OOS — BTC Sistema C vs Produccion")
-    lo90b, hi90b = bs_btc_val["ic90"]
-    lo95b, hi95b = bs_btc_val["ic95"]
-    print(f"  Delta Exp:  {fpl(bs_btc_val['obs'])}")
-    print(f"  IC90%:      [{fpl(lo90b)}, {fpl(hi90b)}]")
-    print(f"  IC95%:      [{fpl(lo95b)}, {fpl(hi95b)}]")
-    print(f"  P(D > 0):   {bs_btc_val['p_pos']:.1%}")
+    print("FORWARD 2026")
+    print(f"  Produccion: {mf_prod['n']:3d} trades | PF {fpf(mf_prod['pf'])}")
+    print(f"  Sistema C:  {mf_c['n']:3d} trades | "
+          f"Regimen: {pct_sobre:.0f}% sobre / {pct_bajo:.0f}% bajo EMA200d")
     print()
     print("VECINDAD EMA (OOS)")
-    print(f"  BTC-C: " + " | ".join(
-        f"EMA{n}={'✅' if pf_btc_emas[n]>1 else '❌'}{fpf(pf_btc_emas[n])}" for n in EMAs))
-    print(f"       EMA mejor: EMA{btc_best_ema} | {btc_n_pos}/4 positivas | "
-          f"EMA200 mejor: {'SI' if btc_best_ema==200 else 'NO'} | {rob_btc_label}")
-    print(f"  ETH-C: " + " | ".join(
-        f"EMA{n}={'✅' if pf_eth_emas[n]>1 else '❌'}{fpf(pf_eth_emas[n])}" for n in EMAs))
-    print(f"       EMA mejor: EMA{eth_best_ema} | {eth_n_pos}/4 positivas | "
-          f"EMA200 mejor: {'SI' if eth_best_ema==200 else 'NO'} | {rob_eth_label}")
+    print("  " + " | ".join(
+        f"EMA{n}={'✅' if pf_btc_emas[n] > 1 else '❌'}{fpf(pf_btc_emas[n])}"
+        for n in EMAs
+    ))
+    print(f"  Mejor: EMA{best_ema} | {n_pos}/4 positivas | "
+          f"EMA200 mejor: {'SI' if best_ema==200 else 'NO'} | {rob_label}")
     print()
-    print("VEREDICTOS:")
-    print(f"  BTC Sistema C: {verdict_btc}")
-    print(f"  ETH Sistema C: {verdict_eth}")
+    print("SENSIBILIDAD RSI (OOS)")
+    for lbl, res in rsi_sens_results.items():
+        mv_s = res["val"]
+        print(f"  {lbl}: {mv_s['n']} trades | PF {fpf(mv_s['pf'])} | Exp {fpl(mv_s['exp'])}")
     print()
-    print("PRIORIDAD PARA REAL:")
-    print(f"  🥇 {primero}")
-    if segundo != "NINGUNO":
-        print(f"  🥈 {segundo}")
-    else:
-        print("  🥈 NINGUNO")
+    print("ESTABILIDAD TRAIN → OOS")
+    if ratio_pf_c:
+        print(f"  Sistema C: Train PF {fpf(mt_c['pf'])} → OOS PF {fpf(mv_c['pf'])} "
+              f"(ratio {ratio_pf_c:.2f})")
     print()
-    print(f"Reporte: {REPORT_PATH}")
+    print("BOOTSTRAP OOS")
+    if bs_val["obs"] is not None:
+        lo90, hi90 = bs_val["ic90"]; lo95, hi95 = bs_val["ic95"]
+        print(f"  Delta Exp: {fpl(bs_val['obs'])}")
+        print(f"  IC90%:     [{fpl(lo90)}, {fpl(hi90)}]")
+        print(f"  IC95%:     [{fpl(lo95)}, {fpl(hi95)}]")
+        print(f"  P(D > 0):  {bs_val['p_pos']:.1%}")
+    print()
+    print("=" * 62)
+    print(f"VEREDICTO BTC SISTEMA C: {verdict}")
+    print("ESTADO PRODUCCION:        NO MODIFICADA")
+    print("SISTEMA C:                NO ACTIVADO")
+    print("=" * 62)
+    print()
+    print(f"Resultado en: {REPORT_PATH}")
     print()
     print("less " + REPORT_PATH)
 

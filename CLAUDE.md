@@ -857,12 +857,12 @@ importantes.
 
 Los 15 francotiradores originales: 🟢 PRESERVADOS — no modificar durante esta investigación.
 
-Segunda lista de 5: 🔒 TODAVÍA NO DEFINIDA.
-Matriz calendario/régimen: 🔒 PENDIENTE (Sistema C completo — 5 activos investigados).
+Segunda lista de 5: ✅ DEFINIDA (2026-08-15) — ver sección "Segunda lista — Candidatas Sistema C".
+Matriz calendario/régimen: 🔒 PENDIENTE.
 Sistema externo de inteligencia: 🔒 DISEÑO FUTURO.
 Integración Telegram: 🔒 FASE FUTURA.
 
-**Orden de investigación:**
+**Orden de investigación (lista original — completa):**
 1. BNB ALCISTA — 🟡 PROMETEDOR (Prueba #2 Sistema C cerrada — PF OOS 1.318, 4/4 EMAs, IC95% cruza cero)
 2. ETH ALCISTA — 🔴 Sistema C descartado · Producción preservada
 3. BTC ALCISTA — 🟡 EN INVESTIGACIÓN (Sistema C prometedor OOS · no opera en régimen bajista 2026)
@@ -909,11 +909,11 @@ AVAX ALCISTA: 🔴 SISTEMA C DESCARTADO — Bootstrap + vecindad EMA completados
 ### Estado de los francotiradores
 
 Los 15 francotiradores originales: 🟢 PRESERVADOS
-Segunda lista de 5: 🔒 TODAVÍA NO DEFINIDA
+Segunda lista de 5: ✅ DEFINIDA (2026-08-15) — XRP, LINK, UNI, NEAR, ADA — ver sección siguiente.
 
 ### Investigación futura y sistemas complementarios
 
-Calendario inteligente: 🔒 PENDIENTE DE COMPLETAR LAS 5 MONEDAS
+Calendario inteligente: 🔒 PENDIENTE
 Sistema externo de inteligencia: 🔒 DISEÑO FUTURO
 Integración Telegram: 🔒 FASE FUTURA
 
@@ -952,3 +952,60 @@ Resultado:
   en BNB la mejor es EMA250 → menor robustez de diseño.
 
 Siguiente paso: acumular 30+ trades reales en REAL antes de re-evaluar cualquier candidato.
+
+## Segunda lista — Candidatas Sistema C (2026-08-15)
+
+### Metodología de selección
+
+Universo inicial: 39 pares USDT en Binance con historia disponible.
+Filtros de eliminación: historia anterior a 2021-01-01 en 4H, completeness ≥ 80%.
+MATICUSDT eliminado: 73.8% completeness (migración POL creó un hueco de datos).
+Resultado: 26 pares válidos. 5 seleccionados por scoring objetivo con datos reales Binance API.
+
+**Criterios de scoring (máx 100 pts):**
+- Volumen diario promedio USDT (0–30 pts): liquidez real para órdenes spot
+- Completeness de velas 4H (0–25 pts): calidad del historial para backtest
+- Correlación con BTC en retornos diarios 2021–2025 (0–15 pts): rango objetivo 0.55–0.75
+- Volatilidad anual (0–20 pts): rango objetivo 70–120% para frecuencia de señales
+- Trades por día en 24h (0–10 pts): proxy de actividad retail
+
+Criterio de exclusión adicional (no numérico): riesgo regulatorio/centralización.
+ZECUSDT (score 96): excluido por riesgo de delisting en múltiples jurisdicciones (privacidad).
+TRXUSDT (score 91): excluido por centralización (Justin Sun) y calidad de volumen cuestionable.
+
+Reporte completo: `reports/2026-08-15_segunda_lista_sistema_c.md`
+
+### Segunda lista — 5 candidatas aprobadas
+
+| # | Par | Score | Vol $M/día | Corr BTC | Vol Anual | Historia desde |
+|---|-----|-------|------------|----------|-----------|----------------|
+| 1 | XRPUSDT | 100 | $68.3M | 0.600 | 82% | 2018 |
+| 2 | LINKUSDT | 96 | $31.3M | 0.697 | 85% | 2019 |
+| 3 | UNIUSDT | 96 | $24.9M | 0.622 | 92% | 2020 |
+| 4 | NEARUSDT | 90 | $13.3M | 0.610 | 100% | 2020 |
+| 5 | ADAUSDT | 90 | $10.3M | 0.675 | 81% | 2018 |
+
+**Lista de espera (descartadas por factores no numéricos):**
+- ZECUSDT (96⚠️ — privacidad, riesgo delisting)
+- TRXUSDT (91⚠️ — centralización, calidad de volumen)
+- LTCUSDT (90 — en reserva)
+- AAVEUSDT (85 — en reserva)
+
+### Reglas para investigar estas candidatas
+
+- NO activar en producción ni en LIVE hasta acumular evidencia (umbral: 30 trades OOS ≥ 1.0 PF)
+- Cada candidata sigue la misma metodología Sistema C: RSI 55–60 + gate EMA200d anti-lookahead
+- Backtest en período 2021–2023 (train), 2024–2025 (OOS), forward desde disponibilidad
+- Antes de correr backtest: verificar en vivo si la moneda pasa el filtro EMA200d/EMA250d
+- Orden de investigación: XRP → LINK → UNI → NEAR → ADA (puede reordenarse con OK de Ariel)
+- Estado inicial de cada una: 🔒 SIN BACKTEST (no han sido investigadas con Sistema C)
+
+### Estado de las candidatas de la segunda lista
+
+| Par | Estado | Prueba | Nota |
+|-----|--------|--------|------|
+| XRPUSDT | 🔒 SIN BACKTEST | — | Primera en la lista |
+| LINKUSDT | 🔒 SIN BACKTEST | — | — |
+| UNIUSDT | 🔒 SIN BACKTEST | — | — |
+| NEARUSDT | 🔒 SIN BACKTEST | — | — |
+| ADAUSDT | 🔒 SIN BACKTEST | — | — |

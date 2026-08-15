@@ -850,15 +850,15 @@ importantes.
 | Moneda | Estado | Pruebas completadas | Nota |
 |--------|--------|---------------------|------|
 | BNB ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 (forward ene–ago 2026) | Insuficiente para concluir. Producción intacta. Candidato RSI 60–68/TP 6.5% no activado. |
-| ETH ALCISTA | 🔴 CANDIDATO DESCARTADO | Baseline forward 2026 + Sistema C | ETH Sistema C descartado (PF OOS 0.960, 0/4 EMAs). Producción sigue activa (PF 1.105 histórico). |
+| ETH ALCISTA | 🔴 SISTEMA C DESCARTADO | Baseline forward 2026 + Sistema C | ETH Sistema C descartado (PF OOS 0.960, 0/4 EMAs). Producción sigue activa (PF 1.105 histórico). |
 | BTC ALCISTA | 🟡 EN INVESTIGACIÓN | Prueba #1 completada (múltiples fases) | Sistema C PROMETEDOR OOS (PF 1.322, 4/4 EMAs). Forward 2026: NO OPERA (BTC < EMA200d en régimen bajista). |
-| SOL ALCISTA | ⚪ PENDIENTE | — | — |
-| AVAX ALCISTA | ⚪ PENDIENTE | — | — |
+| SOL ALCISTA | 🔴 SISTEMA C DESCARTADO | Prueba #1 completada (bootstrap + vecindad EMA) | PF OOS 0.984, 0/4 EMAs positivas. Patrón RSI 55–60 + gate EMA no funciona en SOL. Producción intacta. |
+| AVAX ALCISTA | 🔴 SISTEMA C DESCARTADO | Prueba #1 completada (bootstrap + vecindad EMA) | PF OOS 0.707, 0/4 EMAs positivas. EMA200 la peor de las cuatro. Delta bootstrap −$0.0352 (P(D>0)=16.9%). Producción intacta. |
 
 Los 15 francotiradores originales: 🟢 PRESERVADOS — no modificar durante esta investigación.
 
 Segunda lista de 5: 🔒 TODAVÍA NO DEFINIDA.
-Matriz calendario/régimen: 🔒 PENDIENTE DE COMPLETAR LAS 5 MONEDAS.
+Matriz calendario/régimen: 🔒 PENDIENTE (Sistema C completo — BNB pendiente de segunda investigación).
 Sistema externo de inteligencia: 🔒 DISEÑO FUTURO.
 Integración Telegram: 🔒 FASE FUTURA.
 
@@ -866,8 +866,20 @@ Integración Telegram: 🔒 FASE FUTURA.
 1. BNB ALCISTA — 🟡 EN INVESTIGACIÓN (Prueba #1 cerrada, insuficiente)
 2. ETH ALCISTA — 🔴 Sistema C descartado · Producción preservada
 3. BTC ALCISTA — 🟡 EN INVESTIGACIÓN (Sistema C prometedor OOS · no opera en régimen bajista 2026)
-4. SOL ALCISTA — ⚪ PENDIENTE
-5. AVAX ALCISTA — ⚪ PENDIENTE
+4. SOL ALCISTA — 🔴 Sistema C descartado (PF OOS 0.984, 0/4 EMAs) · Producción preservada
+5. AVAX ALCISTA — 🔴 Sistema C descartado (PF OOS 0.707, 0/4 EMAs) · Producción preservada
+
+**Conclusión del experimento Sistema C (2026-08-14):**
+El patrón RSI 55–60 + gate EMA diaria NO es generalizable entre altcoins.
+Únicamente BTC muestra evidencia OOS positiva (4/4 EMAs, PF 1.322).
+ETH, SOL y AVAX: 0/4 EMAs positivas en los tres casos.
+
+| Activo | PF OOS | Exp OOS | EMAs>1 | Trades OOS | Veredicto |
+|--------|--------|---------|--------|-----------|-----------|
+| BTC | 1.322 | +$0.0383 | 4/4 | 59 | 🟡 PROMETEDOR |
+| ETH | 0.960 | −$0.0055 | 0/4 | 67 | 🔴 DESCARTADO |
+| SOL | 0.984 | −$0.0022 | 0/4 | 96 | 🔴 DESCARTADO |
+| AVAX | 0.707 | −$0.0466 | 0/4 | 67 | 🔴 DESCARTADO |
 
 No avanzar a la siguiente moneda de forma aleatoria. Completar y documentar cada etapa de
 la moneda actual antes de pasar a la siguiente, salvo decisión explícita de cambiar el orden.
@@ -889,10 +901,9 @@ ETH ALCISTA: 🔴 SISTEMA C DESCARTADO — Baseline forward 2026 completado (PF 
 
 BTC ALCISTA: 🟡 EN INVESTIGACIÓN — Prueba #1 completada (múltiples fases: forense, RSI, EMA200d, robustez, walkforward, bootstrap, forward 2026). Sistema C PROMETEDOR en OOS (PF 1.322, 4/4 EMAs). Forward 2026: 0 trades — BTC estuvo bajo EMA200d todo el período de señales RSI 55–60. Producción intacta. Sistema C no activado.
 
-SOL ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
-AVAX ALCISTA: ⚪ PENDIENTE DE INVESTIGACIÓN FORMAL
+SOL ALCISTA: 🔴 SISTEMA C DESCARTADO — Bootstrap + vecindad EMA completados (2026-08-14). PF OOS 0.984, 0/4 EMAs positivas. Delta bootstrap −$0.0023 (P(D>0) = 47.9% — prácticamente aleatorio). Forward 2026: 0 trades (SOL bajo EMA200d). Producción intacta (RSI 50–70, SL 5%, TP 6%).
 
-Las demás monedas: ⚪ PENDIENTES DE INVESTIGACIÓN FORMAL
+AVAX ALCISTA: 🔴 SISTEMA C DESCARTADO — Bootstrap + vecindad EMA completados (2026-08-14). PF OOS 0.707, 0/4 EMAs positivas, EMA200 la peor de las cuatro. Delta bootstrap −$0.0352 (P(D>0) = 16.9% — diferencia sistemáticamente desfavorable). Forward 2026: 0 trades (AVAX 100% del tiempo bajo EMA200d). Producción intacta (RSI 60–75, SL 4.5%, TP 5%).
 
 ### Estado de los francotiradores
 

@@ -10,7 +10,6 @@
 
 import time
 import threading
-import json
 import os
 from padre_corecro import ejecutar_corecro
 from consejero import consultar_consejero
@@ -23,7 +22,6 @@ from centinela.centinela import iniciar as iniciar_centinela
 from brain.telegram_engine import escuchar
 from historial_precios import registrar_snapshot as _registrar_precios
 
-BILLETERA     = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 ESTADO_ARCHIVO = os.path.expanduser("~/bot-padre-v2/estado_padre.txt")
 
 # --- Verificacion de actividad ---
@@ -49,15 +47,6 @@ if estado != "mensaje_enviado":
     except Exception as e:
         print(f"[MAIN] Error guardando estado: {e}")
 
-def cargar_capital():
-    try:
-        with open(BILLETERA, "r") as f:
-            bill = json.load(f)
-        return float(bill.get("USDT", 0))
-    except Exception as e:
-        print(f"[MAIN] Error leyendo capital: {e}")
-        return 0.0
-
 # --- Funcion principal del ciclo ---
 def ejecutar_ciclo_padre():
     # 1 Generar reporte CoreCro
@@ -68,9 +57,8 @@ def ejecutar_ciclo_padre():
         print(f"[MAIN] Error CoreCro: {e}")
 
     # 2 Consultar Consejero Economico
-    capital = cargar_capital()
     try:
-        recomendaciones = consultar_consejero(capital)
+        recomendaciones = consultar_consejero()
         print(f"Consejero: {recomendaciones['estado']} - {recomendaciones['mensaje']}")
         registrar_matrix(f"Consejero: {recomendaciones['estado']} - {recomendaciones['mensaje']}")
     except Exception as e:

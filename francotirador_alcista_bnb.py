@@ -23,7 +23,7 @@ from limitador_diario import puede_operar_hoy
 from filtro_eventos import puede_operar_eventos
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, calcular_rsi, calcular_ema, aplicar_filtro_estadistico, puede_operar_memoria
-from ejecutor import ejecutar_operacion, cerrar_posicion
+from ejecutor import ejecutar_operacion, cerrar_posicion, MONTO_MINIMO_BINANCE
 from memoria_propia import actualizar_memoria
 
 SYMBOL             = "BNBUSDT"
@@ -356,6 +356,11 @@ def evaluar():
             return
 
         monto_op   = round(min(MONTO_FIJO, capital) * factor_mem, 2)
+
+        if monto_op < MONTO_MINIMO_BINANCE:
+            print(f"  [CAPITAL] Monto ${monto_op} bajo minimo Binance (${MONTO_MINIMO_BINANCE}). "
+                  f"Sin operar este ciclo (factor memoria: {factor_mem}).")
+            return
 
         fila_id = reservar_operacion("ALCISTA", precio_actual, rsi, monto_op)
         if fila_id is None:

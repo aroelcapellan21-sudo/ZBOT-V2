@@ -42,7 +42,7 @@ main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca
 ├── signals/             ← archivos de estado compartidos entre módulos (JSON)
 ├── memoria/             ← logs por categoría (eventos, corecro, matrix, centinela)
 ├── constitution/        ← leyes supremas del bot (nunca violar)
-└── config/              ← billetera.json, modo.txt
+└── config/              ← billetera.json
 ```
 
 ## Procesos en pantalla (screen)
@@ -93,7 +93,9 @@ bot ajeno. Para `v2_main` **usar siempre PIDs explícitos**, verificados antes c
 ## Modo de operación
 - Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"4h","sleep_segundos":240}`
   (corregido de 1h/60 el 2026-07-12 — ver hallazgo de oscilación de fase más abajo)
-- Para cambiar a REAL: editar `modo.json` y `config/modo.txt`
+- Para cambiar a REAL: editar `signals/modo.json`. **`config/modo.txt` fue eliminado el
+  2026-08-15** (auditoría C-03): decía `SIMULACION` sin que ningún módulo lo leyera —
+  contradecía `modo.json` en silencio y funcionaba como un falso interruptor de emergencia.
 - **No cambiar a REAL sin autorización explícita de Ariel**
 - **Segunda confirmación técnica (desde 2026-07-29, commit `0278d48`):** `modo.json` diciendo
   `"REAL"` ya no alcanza por sí solo. `ejecutor.py` (`ejecutar_operacion`, `cerrar_posicion`)
@@ -144,6 +146,12 @@ res, fill_cierre = cerrar_posicion(MONEDA, TIPO_TRADE, precio_entrada, monto_op,
   que Binance. En REAL la comisión se lee de la respuesta real. Antes el simulador no cobraba nada:
   el paper trading venía inflado ~0.2% por operación completa (386 ops, $7.909 de nocional, $15.82
   = 1.58 pp sobre el capital inicial).
+
+> ⚠️ **No restaurar el simulador sobre `auditoria.csv` real.** El backup completo de esas 386
+> operaciones de paper trading vive en
+> `NUNCA_RESTAURAR_auditoria_simulador_386trades_2026-08-15.csv.bak` (raíz del proyecto).
+> Si se sobrescribe `auditoria.csv` con ese archivo, el bot en REAL vería 386 operaciones
+> históricas que nunca ocurrieron en Binance.
 
 ### `auditoria.csv` — 8 columnas, y dos estados nuevos
 
@@ -540,6 +548,14 @@ echo '{"modo":"REAL","intervalo_velas":"4h","sleep_segundos":240}' > ~/bot-padre
 
 ## Investigación de parámetros BNB ALCISTA — ago 2026
 
+> **Estado actualizado (2026-08-15, commit `349b53c`):** el candidato `RSI 60–68 / SL 4.5% /
+> TP 6.5%` descrito en esta sección como "🟡 PROMETEDOR" pasó a ser la configuración de
+> **producción real** en `config_cartera.py` y `francotirador_alcista_bnb.py` al activar el
+> modo REAL con $8.54 USDT. Los veredictos "🟡 PROMETEDOR" y "no autoriza cambio a producción"
+> de esta sección describen el estado de la investigación **antes** de esa activación — se
+> conservan como registro histórico. Los 30+ trades reales que las pruebas piden como umbral
+> se cuentan **desde el 2026-08-15**.
+
 ### Hallazgo de robustez (2026-08-13)
 
 Análisis de sensibilidad sobre 10 combinaciones vecinas al candidato `RSI 60–68 / SL 4.5% / TP 6.5%`.
@@ -700,6 +716,10 @@ Producción gana 3/7 meses · Candidato gana 1/7 · Empate 3/7.
 
 **Veredicto: INSUFICIENTE PARA CONCLUIR** — 19 trades vs umbral mínimo de 30.
 No se implementa ningún cambio. Re-evaluar cuando Producción tenga ≥30 trades reales.
+
+> Nota (2026-08-15): esta prueba comparaba Producción vieja (60–75/4.5/5.0) contra el
+> Candidato. Desde el commit `349b53c` el Candidato **es** Producción — el punto de
+> comparación de esta prueba ya no existe tal como se describe arriba.
 
 ## Estado técnico verificado — 2026-08-13
 

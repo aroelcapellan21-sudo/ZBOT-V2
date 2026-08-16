@@ -29,7 +29,7 @@ from memoria_propia import actualizar_memoria
 SYMBOL             = "BNBUSDT"
 MONEDA             = "BNB"
 TIPO_TRADE         = "ALCISTA"
-MONTO_FIJO         = 8.0
+MONTO_FIJO         = 12.0
 RSI_MIN            = 60
 RSI_MAX            = 68
 STOP_LOSS          = 4.5

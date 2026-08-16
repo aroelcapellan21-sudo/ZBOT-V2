@@ -29,11 +29,11 @@ from memoria_propia import actualizar_memoria
 SYMBOL             = "BNBUSDT"
 MONEDA             = "BNB"
 TIPO_TRADE         = "ALCISTA"
-CAPITAL_MAX_POR_OP = 0.02
-RSI_MIN            = 50
-RSI_MAX            = 70
-STOP_LOSS          = 4.0
-TAKE_PROFIT        = 7
+MONTO_FIJO         = 8.0
+RSI_MIN            = 60
+RSI_MAX            = 68
+STOP_LOSS          = 4.5
+TAKE_PROFIT        = 6.5
 EMA_CORTA          = 20
 EMA_LARGA          = 50
 MAX_OP_TOTAL       = 1
@@ -355,8 +355,7 @@ def evaluar():
             print("  [CORRELACION] ❌ Bloqueado.")
             return
 
-        monto_base = capital * CAPITAL_MAX_POR_OP
-        monto_op   = round(monto_base * factor_mem, 2)
+        monto_op   = round(min(MONTO_FIJO, capital) * factor_mem, 2)
 
         fila_id = reservar_operacion("ALCISTA", precio_actual, rsi, monto_op)
         if fila_id is None:

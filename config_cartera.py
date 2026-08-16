@@ -9,11 +9,11 @@
 
 # --- PESOS OPTIMOS DE CARTERA ---
 PESOS_CARTERA = {
-    "ETHUSDT": 100.0,
+    "BNBUSDT": 100.0,
 }
 
 # --- CAPITAL BASE ---
-CAPITAL_BASE = 20.0
+CAPITAL_BASE = 8.0
 
 # --- CAPITAL MAXIMO POR OPERACION ---
 CAPITAL_MAX_POR_OP = 0.02
@@ -47,7 +47,7 @@ PARAMETROS = {
         "lateral": {"rsi_min": 43, "rsi_max": 57, "sl": 3.5, "tp": 4.0, "ec": 20, "el": 100, "trail_act": 0.5, "trail_dist": 1.0},
     },
     "BNBUSDT": {
-        "alcista": {"rsi_min": 60, "rsi_max": 75, "sl": 4.5, "tp": 5.0, "ec": 20, "el": 100, "trail_act": 0.5, "trail_dist": 1.0},
+        "alcista": {"rsi_min": 60, "rsi_max": 68, "sl": 4.5, "tp": 6.5, "ec": 20, "el":  50, "trail_act": 0.5, "trail_dist": 1.0},
         "bajista": {"rsi_min": 30, "rsi_max": 50, "sl": 3.5, "tp": 4.0, "ec": 20, "el": 100, "trail_act": 0.5, "trail_dist": 1.0},
         "lateral": {"rsi_min": 43, "rsi_max": 57, "sl": 4.5, "tp": 5.0, "ec": 20, "el": 100, "trail_act": 0.5, "trail_dist": 1.0},
     },

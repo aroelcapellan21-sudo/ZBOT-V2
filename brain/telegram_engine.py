@@ -766,28 +766,34 @@ def reactivar_bot(chat_id):
 
 def obtener_disparos():
     QUINTETO     = [("BTCUSDT","BTC"),("ETHUSDT","ETH"),("SOLUSDT","SOL"),("BNBUSDT","BNB"),("AVAXUSDT","AVAX")]
-    RSI_MIN      = 45; RSI_MAX = 55
-    EMA_CORTA    = 20; EMA_LARGA = 50
     DIFF_EMA_MAX = 2.0
-    VENTANA_FASE = 30; UMBRAL_FASE = 2.5
-    from utils import calcular_rsi, calcular_ema, fetch_velas
+    import importlib
+    import gestor_bajistas
+    from utils import calcular_rsi, calcular_ema, fetch_velas, detectar_fase
 
-    def detectar_fase(cierres):
-        if len(cierres) < VENTANA_FASE: return "?"
-        cambio = ((cierres[-1]-cierres[-VENTANA_FASE])/cierres[-VENTANA_FASE])*100
-        if cambio > UMBRAL_FASE: return "ALCISTA"
-        elif cambio < -UMBRAL_FASE: return "BAJISTA"
-        return "LATERAL"
+    # Que francotirador atiende cada fase, por moneda. Replica el if/elif de
+    # cada director_<moneda>.py -- si un director cambia su gating, actualizar
+    # este mapa tambien. BAJISTA se agrega solo si gestor_bajistas.bajistas_activos()
+    # esta en True (hoy siempre False: spot solo-LONG); ETH nunca lo incluye
+    # porque director_eth.py no conecta francotirador_bajista_eth.
+    FRANCOTIRADORES = {
+        "BTC":  {"ALCISTA": "francotirador_alcista_btc",  "BAJISTA": "francotirador_bajista_btc",  "LATERAL": "francotirador_lateral_btc"},
+        "ETH":  {"ALCISTA": "francotirador_alcista_eth",  "LATERAL": "francotirador_lateral_eth"},
+        "SOL":  {"ALCISTA": "francotirador_alcista_sol",  "BAJISTA": "francotirador_bajista_sol",  "LATERAL": "francotirador_lateral_sol"},
+        "BNB":  {"ALCISTA": "francotirador_alcista_bnb",  "BAJISTA": "francotirador_bajista_bnb"},
+        "AVAX": {"ALCISTA": "francotirador_alcista_avax", "BAJISTA": "francotirador_bajista_avax", "LATERAL": "francotirador_lateral_avax"},
+    }
+    bajistas_ok = gestor_bajistas.bajistas_activos()
 
     def barra(pct, largo=10):
         pct = max(0, min(100, pct))
         return "█" * int(pct/100*largo) + "░" * (largo - int(pct/100*largo))
 
-    def pct_rsi(rsi):
+    def pct_rsi(rsi, rsi_min, rsi_max):
         if rsi is None: return 0
-        if RSI_MIN <= rsi <= RSI_MAX: return 100
-        if rsi < RSI_MIN: return max(0, round(100-((RSI_MIN-rsi)/RSI_MIN*100),1))
-        return max(0, round(100-((rsi-RSI_MAX)/(100-RSI_MAX)*100),1))
+        if rsi_min <= rsi <= rsi_max: return 100
+        if rsi < rsi_min: return max(0, round(100-((rsi_min-rsi)/rsi_min*100),1))
+        return max(0, round(100-((rsi-rsi_max)/(100-rsi_max)*100),1))
 
     def pct_ema(diff):
         if diff is None: return 0
@@ -800,20 +806,38 @@ def obtener_disparos():
         if not cierres:
             lineas.append(f"💱 <b>{nombre}</b>\n❌ Sin datos\n──────────────")
             continue
-        precio   = cierres[-1]
+        precio = cierres[-1]
+        fase   = detectar_fase(cierres, symbol=symbol)
+
+        activas_moneda = dict(FRANCOTIRADORES[nombre])
+        if "BAJISTA" in activas_moneda and not bajistas_ok:
+            del activas_moneda["BAJISTA"]
+        modulo_nombre = activas_moneda.get(fase)
+
+        if modulo_nombre is None:
+            lineas.append(
+                f"💱 <b>{nombre}</b> — ${precio}\n"
+                f"[{barra(0)}] 0% listo\n"
+                f"📍 {fase} | 🔴 SIN FRANCOTIRADOR ACTIVO\n"
+                f"⚙️ Esta moneda no opera en fase {fase}\n"
+                f"💬 Sin señal posible hasta que cambie la fase\n──────────────"
+            )
+            continue
+
+        modulo   = importlib.import_module(modulo_nombre)
+        rsi_min  = modulo.RSI_MIN
+        rsi_max  = modulo.RSI_MAX
         rsi      = calcular_rsi(cierres)
-        ema_c    = calcular_ema(cierres, EMA_CORTA)
-        ema_l    = calcular_ema(cierres, EMA_LARGA)
-        fase     = detectar_fase(cierres)
+        ema_c    = calcular_ema(cierres, modulo.EMA_CORTA)
+        ema_l    = calcular_ema(cierres, modulo.EMA_LARGA)
         diff_ema = round(abs(ema_c-ema_l)/ema_l*100,2) if ema_c and ema_l else None
-        p_rsi    = pct_rsi(rsi)
+        p_rsi    = pct_rsi(rsi, rsi_min, rsi_max)
         p_ema    = pct_ema(diff_ema) if diff_ema is not None else 0
-        p_fase   = 100 if fase == "LATERAL" else 0
+        p_fase   = 100  # la fase actual ya tiene francotirador activo (ver arriba)
         p_total  = round(p_rsi*0.4 + p_ema*0.4 + p_fase*0.2, 1)
-        rsi_ok   = RSI_MIN <= (rsi or 0) <= RSI_MAX
+        rsi_ok   = rsi_min <= (rsi or 0) <= rsi_max
         ema_ok   = (diff_ema or 999) < DIFF_EMA_MAX
-        fase_ok  = fase == "LATERAL"
-        if rsi_ok and ema_ok and fase_ok and p_total >= 90:
+        if rsi_ok and ema_ok and p_total >= 90:
             estado_emoji = "🟢 LISTO PARA OPERAR"
             consejo      = "El bot puede entrar en cualquier momento."
         elif p_total >= 60:
@@ -823,13 +847,12 @@ def obtener_disparos():
             estado_emoji = "🔴 NO LISTO"
             consejo      = "El mercado no da señal todavía."
         motivos = []
-        if not rsi_ok:  motivos.append("RSI fuera de rango")
-        if not ema_ok:  motivos.append("Medias muy separadas")
-        if not fase_ok: motivos.append(f"Mercado en {fase}")
+        if not rsi_ok: motivos.append(f"RSI fuera de {rsi_min}-{rsi_max}")
+        if not ema_ok: motivos.append("Medias muy separadas")
         lineas.append(
             f"💱 <b>{nombre}</b> — ${precio}\n"
             f"[{barra(p_total)}] {p_total}% listo\n"
-            f"📍 {fase} | {estado_emoji}\n"
+            f"📍 {fase} ({modulo_nombre.replace('francotirador_','')}) | {estado_emoji}\n"
             f"⚙️ {' | '.join(motivos) if motivos else 'Todo en orden'}\n"
             f"💬 {consejo}\n──────────────"
         )

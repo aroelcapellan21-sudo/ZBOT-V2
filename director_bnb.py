@@ -51,8 +51,7 @@ def dirigir(fase_global=None):
         print(f"  🔻 Activando FRANCOTIRADOR BAJISTA BNB")
         evaluar_bajista()
     elif fase == "LATERAL":
-        print(f"  ⚖️ Activando FRANCOTIRADOR LATERAL BNB")
-        evaluar_lateral()
+        print(f"  ⏸️ Fase LATERAL — BNB alcista-solo, lateral desactivado.")
     else:
         print(f"  ⏸️ Fase desconocida. Sin operacion.")
         registrar_evento(f"DIRECTOR BNB: Fase desconocida. Sin operacion.")

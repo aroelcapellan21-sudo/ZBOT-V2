@@ -1009,3 +1009,43 @@ Reporte completo: `reports/2026-08-15_segunda_lista_sistema_c.md`
 | UNIUSDT | 🔒 SIN BACKTEST | — | — |
 | NEARUSDT | 🔒 SIN BACKTEST | — | — |
 | ADAUSDT | 🔒 SIN BACKTEST | — | — |
+
+## Checklist — Incremento de capital real (2026-08-15)
+
+Seguir este orden cada vez que se deposite capital adicional en Binance.
+Aprendido durante la activación a REAL con $8.54 USDT.
+Archivo completo con comandos: `CHECKLIST_CAPITAL.md` en la raíz del proyecto.
+
+### Antes de empezar
+- Confirmar saldo exacto en Binance Spot Wallet
+- Verificar que `auditoria.csv` no tenga filas ABIERTA o RESERVADA (`grep -c "ABIERTA\|RESERVADA" auditoria.csv` debe devolver 0)
+
+### Pasos en orden
+
+1. **`signals/billetera.json`** → `USDT = NUEVO_CAPITAL`, `capital_inicial = NUEVO_CAPITAL`, `capital_real = NUEVO_CAPITAL`
+
+2. **`bot.db` → `estado_riesgo`** (fuente activa del Guardian — la más importante):
+   `capital_maximo_historico = NUEVO_CAPITAL`, `capital_inicio_dia = NUEVO_CAPITAL`, `bloqueado = false`
+
+3. **`signals/estado_riesgo.json`** (legacy, mantener consistente con bot.db):
+   mismos campos que el paso 2
+
+4. **`config_cartera.py`** → `CAPITAL_BASE = NUEVO_CAPITAL`
+   Afecta al Consejero y a los cálculos de `/resumen` y `/retiro`
+
+5. **Francotirador activo** → `MONTO_FIJO = <monto_por_op_decidido>`
+   Actualmente: `francotirador_alcista_bnb.py`, línea `MONTO_FIJO = 8.0`
+
+6. **Reiniciar `main.py`** dentro del screen `v2_main` con `BOT_REAL_CONFIRMADO=true` exportado.
+   Confirmar en log: `[CENTINELA] Capital real leido desde billetera.json: $NUEVO_CAPITAL`
+
+7. **Verificar Consejero**: `python3 consejero.py` debe mostrar estado SALUDABLE
+
+8. **Commit + push**: solo `config_cartera.py` y el francotirador modificado (no commitear CSVs ni JSONs de signals)
+
+### Errores conocidos que pueden ocurrir si se omite algún paso
+
+- **Guardian se bloquea**: `bot.db → estado_riesgo` no actualizado → drawdown calculado sobre pico antiguo (~$1075) vs capital real ($8) → 99% DD → bloqueo inmediato
+- **Centinela muestra $1000**: `estado_global.py` cae al fallback si la ruta de billetera.json es incorrecta (bug histórico: typo `bot-padre-v8`, corregido 2026-08-15, commit `349b53c`)
+- **Consejero en CRITICO**: `CAPITAL_BASE` viejo → porcentaje calculado incorrecto (ej. $8.54/$20 = 42.7% → CRITICO)
+- **Lateral genera ANULADA**: `francotirador_lateral_bnb.py` usa `capital × 2%` = $0.17 < mínimo Binance. Corregido 2026-08-15 desactivando el lateral en `director_bnb.py` (commit `c16683c`)

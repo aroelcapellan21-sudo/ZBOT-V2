@@ -22,6 +22,8 @@ Reglas de clasificacion (sin n_ema_pos >= 3):
 import json, os, random, urllib.request, urllib.parse
 from datetime import datetime, timezone, timedelta
 
+from utils_backtest import export_trades_csv
+
 # ── Parametros globales ───────────────────────────────────────────────────────
 FECHA_WU_4H  = "2020-10-01"
 FECHA_WU_D   = "2019-06-01"
@@ -137,6 +139,8 @@ def simular(velas_4h, ema_map, rsi_min, rsi_max, sl, tp, use_gate=False,
                     "ema_v": round(e_ema_v, 4) if e_ema_v else None,
                     "res":   res,
                     "pl":    pl,
+                    "exit_ts": tsdt.strftime("%Y-%m-%d %H:%M"),
+                    "exit_price": round(tp_p if res == "TP" else sl_p, 4),
                 })
                 en_pos = False
 
@@ -343,6 +347,31 @@ def main():
                           AVAX_C["rsi_min"],  AVAX_C["rsi_max"],
                           AVAX_C["sl"],       AVAX_C["tp"],
                           use_gate=True)
+
+    def _a_filas_export(trades, sl, tp):
+        return [{
+            "symbol": "AVAXUSDT",
+            "entry_timestamp": t["ts"],
+            "exit_timestamp": t["exit_ts"],
+            "entry_price": t["precio"],
+            "exit_price": t["exit_price"],
+            "cantidad": round(MONTO / t["precio"], 8),
+            "fee_entrada": round(MONTO * COMISION, 4),
+            "fee_salida": round(MONTO * COMISION, 4),
+            "pnl_bruto": round(MONTO * tp if t["res"] == "TP" else -MONTO * sl, 4),
+            "pnl_neto": t["pl"],
+            "resultado": t["res"],
+            "fase": "ALCISTA",
+        } for t in trades]
+
+    ruta_csv_prod = export_trades_csv(
+        _a_filas_export(trades_prod, AVAX_PROD["sl"], AVAX_PROD["tp"]),
+        "avax_produccion_vs_sistemac")
+    ruta_csv_c = export_trades_csv(
+        _a_filas_export(trades_c, AVAX_C["sl"], AVAX_C["tp"]),
+        "avax_sistemac_vs_produccion")
+    print(f"      CSV crudo Produccion: {ruta_csv_prod}")
+    print(f"      CSV crudo Sistema C:  {ruta_csv_c}")
 
     def split(trades, per): return [t for t in trades if t["per"] == per]
 

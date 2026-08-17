@@ -74,13 +74,20 @@ def leer_billetera():
     try:
         with open(os.path.join(BOT_DIR, 'signals/billetera.json')) as f:
             b = json.load(f)
-        capital_actual = float(b.get('USDT', 0))
+        usdt_liquido = float(b.get('USDT', 0))
         capital_inicial = float(b.get('capital_inicial', 1000))
+        try:
+            from consejero import calcular_capital_total
+            capital_actual = calcular_capital_total()
+        except Exception as e:
+            print(f"[ASISTENTE] Error valorizando criptos, uso solo USDT liquido: {e}")
+            capital_actual = usdt_liquido
         ganancia = round(capital_actual - capital_inicial, 2)
         pct = round((ganancia / capital_inicial) * 100, 2)
         texto = f"\nBILLETERA:\n"
         texto += f"- Capital inicial: ${capital_inicial}\n"
-        texto += f"- Capital actual: ${capital_actual} USDT\n"
+        texto += f"- USDT líquido: ${usdt_liquido}\n"
+        texto += f"- Capital total (USDT + criptos en posición a precio de mercado): ${capital_actual}\n"
         texto += f"- Ganancia/Pérdida: ${ganancia} ({pct}%)\n"
         texto += f"- Última actualización: {b.get('ultima_actualizacion', 'N/A')}\n"
         for moneda in ['BTC', 'ETH', 'SOL', 'BNB', 'AVAX']:

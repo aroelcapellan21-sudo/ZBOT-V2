@@ -9,7 +9,9 @@
 
 # --- PESOS OPTIMOS DE CARTERA ---
 PESOS_CARTERA = {
-    "BNBUSDT": 100.0,
+    "BTCUSDT": 33.3,
+    "ETHUSDT": 33.3,
+    "SOLUSDT": 33.4,
 }
 
 # --- CAPITAL BASE ---

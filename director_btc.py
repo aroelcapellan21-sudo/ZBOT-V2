@@ -52,8 +52,7 @@ def dirigir(fase_global=None):
         print(f"  🔻 Activando FRANCOTIRADOR BAJISTA BTC")
         evaluar_bajista()
     elif fase == "LATERAL":
-        print(f"  ⚖️ Activando FRANCOTIRADOR LATERAL BTC")
-        evaluar_lateral()
+        print(f"  ⏸️ LATERAL BTC pausado — sin backtest de gates completos esta semana.")
     else:
         print(f"  ⏸️ Fase desconocida. Sin operacion.")
         registrar_evento(f"DIRECTOR BTC: Fase desconocida. Sin operacion.")

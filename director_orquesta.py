@@ -15,7 +15,9 @@ import time
 import os
 import fcntl
 from datetime import datetime
-from director_bnb import dirigir as dirigir_bnb
+from director_btc import dirigir as dirigir_btc
+from director_eth import dirigir as dirigir_eth
+from director_sol import dirigir as dirigir_sol
 from engine import enviar_aviso
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
@@ -238,18 +240,17 @@ def ejecutar_ciclo():
 
     db.json_set("fase_orquesta", {"fase": fase_global, "timestamp": timestamp})
 
-    # Directores solo se activan segun fase global
-    if fase_global == "ALCISTA":
-        print(f"  🟢 Activando Director BNB en modo ALCISTA")
-        dirigir_bnb("ALCISTA")
+    # Directores se activan segun la fase LOCAL de cada moneda (no el voto de fase_global).
+    # BNB ALCISTA pausado 2026-08-17: PnL -9.18% confirmado en simulacion con gates completos
+    # (ver reports/2026-08-16_trades-reales-simulados-bnb-2026.md). Reemplazado por BTC/ETH/SOL.
+    print(f"  🟢 Activando Director BTC (fase local: {fases['BTCUSDT']})")
+    dirigir_btc(fases['BTCUSDT'])
 
-    elif fase_global == "BAJISTA":
-        print(f"  ⏸️ Fase BAJISTA — BNB activo, bajista desactivado.")
-        dirigir_bnb("BAJISTA")
+    print(f"  🟢 Activando Director ETH (fase local: {fases['ETHUSDT']})")
+    dirigir_eth(fases['ETHUSDT'])
 
-    else:
-        print(f"  ⚖️ Mercado lateral. Director BNB en modo proteccion.")
-        dirigir_bnb("LATERAL")
+    print(f"  🟢 Activando Director SOL (fase local: {fases['SOLUSDT']})")
+    dirigir_sol(fases['SOLUSDT'])
 
     print(f"{'='*60}\n")
 

@@ -1,20 +1,22 @@
 {
   "proyecto": "Z-Bot Padre v2",
   "dueño": "Ariel",
-  "estado_actual": "paper trading",
-  "capital_inicial": 1000,
+  "estado_actual": "REAL",
+  "fecha_paso_a_real": "2026-08-15",
+  "capital_inicial": 20.0,
   "meses_en_testing": 3,
-  "meses_consecutivos_en_positivo": "no confirmado aún — en evaluación",
-  "listo_para_real": false,
+  "meses_consecutivos_en_positivo": "no confirmado aún — el bot pasó a REAL por CAMINO 2 (bot estable, sin esperar 3 meses positivos)",
+  "listo_para_real": true,
   "condiciones_para_pasar_a_real": [
     "CAMINO 1: 3 meses consecutivos en positivo sostenido — si llega a eso, listo para real",
     "CAMINO 2: Todo funcionando perfecto — bot estable, asistente robusto, código limpio, sin errores, todo conectado — si llega antes de los 3 meses, también es suficiente",
-    "El que llegue primero es el que manda"
+    "El que llegue primero es el que manda",
+    "Se cumplió CAMINO 2 el 2026-08-15: bot activado en REAL con $20 USDT reales en Binance"
   ],
   "preocupaciones_actuales": [
     "El bot a veces pasa semanas sin operar",
     "No siempre entiendo por qué no dispara",
-    "Quiero estar 100% seguro antes de arriesgar dinero real"
+    "Capital chico ($20): la ganancia mensual esperada es de centavos, no dólares, hasta reinvertir y crecer"
   ],
-  "notas": "Ariel construyó este bot con IA desde cero. Tiene potencial real y planea vender soluciones similares a otros en el futuro. Los 3 meses en testing no significan 3 meses consecutivos en positivo — eso aún está en evaluación."
+  "notas": "Ariel construyó este bot con IA desde cero. Tiene potencial real y planea vender soluciones similares a otros en el futuro. El bot pasó de paper trading a REAL el 2026-08-15 con $20 USDT de capital inicial (config_cartera.py: CAPITAL_BASE=20.00). El histórico previo (miles de trades en SIMULADOR con capital virtual $1000) sigue documentado en reports/ y CLAUDE.md, pero ya no es el estado vigente."
 }

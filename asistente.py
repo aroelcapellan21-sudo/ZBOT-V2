@@ -394,8 +394,26 @@ def leer_config_cartera_resumida():
     except Exception as e:
         return f"\nCONFIGURACIÓN: error ({e})\n"
 
+def leer_modo():
+    """Modo real del bot, leido en vivo desde signals/modo.json.
+    Fallback seguro: SIMULADOR (mismo criterio que director_orquesta._leer_modo())."""
+    ruta = os.path.join(BOT_DIR, 'signals/modo.json')
+    try:
+        with open(ruta) as f:
+            cfg = json.load(f)
+        modo = cfg.get('modo', 'SIMULADOR')
+    except Exception as e:
+        return f"\nMODO ACTUAL DEL BOT: SIMULADOR (no se pudo leer {ruta}: {e})\n"
+    texto = f"\nMODO ACTUAL DEL BOT (dato en vivo, fuente: signals/modo.json): {modo}\n"
+    if modo == "REAL":
+        texto += "- El bot opera con dinero real ahora mismo. NO es paper trading.\n"
+    else:
+        texto += "- El bot opera en SIMULADOR (paper trading), sin dinero real.\n"
+    return texto
+
 def leer_archivos():
     datos = leer_parada_emergencia()
+    datos += leer_modo()
     datos += leer_contexto_proyecto()
     datos += interpretar_diagnostico()
     datos += leer_billetera()
@@ -624,6 +642,12 @@ Cada vez que reportes WR global o "trades cerrados" de MEMORIA PROPIA, mencioná
 la fecha de "ÚLTIMA ACTUALIZACIÓN" que viene en los datos. Si tiene más de 1 día
 de antigüedad, aclará explícitamente que es un dato viejo y puede no reflejar
 la configuración de francotiradores vigente hoy.
+
+Para saber si el bot opera en SIMULADOR (paper trading) o REAL (dinero real),
+usá SIEMPRE el bloque "MODO ACTUAL DEL BOT" (dato en vivo). El campo "Estado"
+dentro de "CONTEXTO DEL PROYECTO" puede estar desactualizado — si contradice a
+"MODO ACTUAL DEL BOT", ese es el que vale; nunca digas "paper trading" si
+"MODO ACTUAL DEL BOT" dice REAL.
 
 ACCIONES QUE PUEDES SUGERIR (Ariel usa los botones de la pantalla para ejecutarlas):
 - Activar Parada de Emergencia → detiene todas las operaciones inmediatamente

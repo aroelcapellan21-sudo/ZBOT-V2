@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string, session
 import anthropic, os, json
+from datetime import datetime
 from historial_precios import leer_historial_formateado as _historial_precios
 
 app = Flask(__name__, static_folder='static')
@@ -189,6 +190,26 @@ def leer_estado_mercado():
     except Exception as e:
         return f"\nError leyendo estado_mercado.json: {e}\n"
 
+def _dias_desde(fecha_str):
+    try:
+        dt = datetime.strptime(fecha_str, "%Y-%m-%d %H:%M:%S")
+        return (datetime.now() - dt).days
+    except Exception:
+        return None
+
+def _cerrados_actuales_auditoria():
+    """Cuenta TP/SL/TRAILING_SL/BE en el auditoria.csv vigente (no el JSON cacheado)."""
+    ruta = os.path.join(BOT_DIR, 'auditoria.csv')
+    if not os.path.exists(ruta):
+        return 0
+    n = 0
+    with open(ruta) as f:
+        for linea in f.readlines()[1:]:
+            partes = linea.strip().split(',')
+            if len(partes) >= 6 and partes[5] in ('TP', 'SL', 'TRAILING_SL', 'BE'):
+                n += 1
+    return n
+
 def leer_memoria_propia():
     ruta = os.path.join(BOT_DIR, 'data/memoria_propia.json')
     if not os.path.exists(ruta):
@@ -196,11 +217,19 @@ def leer_memoria_propia():
     try:
         with open(ruta) as f:
             m = json.load(f)
+        actualizado = m.get('actualizado', 'N/A')
+        dias = _dias_desde(actualizado)
         texto = "\nMEMORIA PROPIA DEL BOT:\n"
+        texto += f"- ÚLTIMA ACTUALIZACIÓN: {actualizado}"
+        texto += f" ({dias} día(s) atrás)\n" if dias is not None else "\n"
         texto += f"- WR global: {m.get('wr_global', 'N/A')}%\n"
         texto += f"- Total trades cerrados: {m.get('total_trades', 0)}\n"
         texto += f"- Pérdidas últimos 5 trades: {m.get('perdidas_ultimos_5', 0)}\n"
-        texto += f"- Actualizado: {m.get('actualizado', 'N/A')}\n"
+        cerrados_actuales = _cerrados_actuales_auditoria()
+        if cerrados_actuales == 0 and m.get('total_trades', 0) > 0:
+            texto += ("- ⚠️ auditoria.csv actual no tiene ningún cierre TP/SL/BE/TRAILING_SL: "
+                      "el histórico de arriba es de una configuración anterior. "
+                      "Con la config vigente van 0 trades cerrados.\n")
         texto += "- WR por símbolo:\n"
         for moneda in ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'AVAXUSDT']:
             wr_key = f"{moneda}_wr"
@@ -583,6 +612,11 @@ Explica en lenguaje simple y directo. Responde SOLO con datos del reporte. Nunca
 Responde siempre en español. Máximo 6 oraciones claras y directas.
 Si detectas algo anómalo o mejorable, menciónalo con precisión.
 Recuerdas todo lo que Ariel ha preguntado en esta sesión.
+
+Cada vez que reportes WR global o "trades cerrados" de MEMORIA PROPIA, mencioná
+la fecha de "ÚLTIMA ACTUALIZACIÓN" que viene en los datos. Si tiene más de 1 día
+de antigüedad, aclará explícitamente que es un dato viejo y puede no reflejar
+la configuración de francotiradores vigente hoy.
 
 ACCIONES QUE PUEDES SUGERIR (Ariel usa los botones de la pantalla para ejecutarlas):
 - Activar Parada de Emergencia → detiene todas las operaciones inmediatamente

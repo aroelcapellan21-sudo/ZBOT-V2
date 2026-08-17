@@ -28,11 +28,17 @@ proceso_activo() {
     archivo=$(echo "$comando" | grep -oE '[A-Za-z0-9_./-]+\.py' | head -1)
     [ -z "$archivo" ] && return 1
     archivo=$(basename "$archivo")
+    # FIX: pgrep -f hace match por substring — "python3 .*asistente.py" matcheaba
+    # tambien "tunnel_asistente.py" (false positive: SKIP de un proceso que no
+    # esta corriendo). Anclar el nombre de archivo a un limite real (inicio de
+    # linea o "/" antes, fin de linea o espacio despues).
+    local archivo_regex
+    archivo_regex=$(printf '%s' "$archivo" | sed 's/\./\\./g')
     while read -r pid; do
         [ -z "$pid" ] && continue
         cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null)
         [ "$cwd" = "$dir_abs" ] && return 0
-    done < <(pgrep -f "python3 .*$archivo")
+    done < <(pgrep -f "(^|[ /])${archivo_regex}(\$| )")
     return 1
 }
 

@@ -566,6 +566,29 @@ funcionan como están diseñados) pero es una nota para el futuro: si algún dí
 hardcodeado en vez de leer el del francotirador que los llama) podría repetirse en otros pares no
 auditados con este nivel de detalle.
 
+**Segunda causa raíz encontrada — `horario×calidad` (razón 1.06-1.13, consistente en las 3
+monedas)**, esta vez sin código compartido: `filtro_horario` es función pura de reloj, no toca
+precio (`2026-08-18_investigacion-horario-calidad-estadistico.md`). La correlación viene de un
+**artefacto de indexación**: `filtro_calidad.señal_tiene_calidad()` mide volumen con
+`vol_actual = velas[-2]` (la vela **cerrada anterior**, a propósito, "para evitar falsos bajos en
+vela en curso"). Cuando la señal cae en la vela de las 04:00 UTC (la que bloquea `filtro_horario`,
+distinta de la de eventos), esa vela es `velas[-1]` y `velas[-2]` termina siendo la de las
+**00:00 UTC** — verificado con datos reales de mercado (no solo señales) que es, consistentemente
+en BTC/ETH/SOL, una de las dos horas de menor volumen relativo del día (~0.88 vs. promedio diario
+~1.0-1.4, junto con 16:00 UTC — la propia vela de 04:00 tiene volumen prácticamente promedio, no
+es floja ella misma). Confirmado numéricamente: en las 3 monedas, calidad bloquea más seguido
+cuando la señal cae en la vela horario-bloqueada (+3.4 a +4.1pp) y, dentro de esas, "volumen bajo"
+es proporcionalmente mucho más frecuente (51.6%-56.4%) que en el resto (34.8%-43.6%). El par
+`horario×estadístico` (racha==5) muestra la misma dirección en BTC/ETH pero **no en SOL** — no se
+encontró un mecanismo tan sólido como el del volumen, queda parcialmente explicado. **Tampoco es
+un bug** — `velas[-2]` es una decisión de diseño razonable; el efecto secundario de heredar
+ocasionalmente el volumen de una hora floja es una curiosidad, no un error, y la magnitud es
+demasiado chica para tocar nada. **Patrón a tener en cuenta hacia adelante**: van dos veces en
+esta serie que dos gates aparentemente sin relación correlacionan por un motivo de implementación
+no obvio (hardcode compartido en un caso, indexación de vela adyacente en el otro) — al investigar
+cualquier correlación nueva entre gates, buscar primero un mecanismo de código antes de asumir que
+es una relación de mercado genuina.
+
 **No se recomienda ningún cambio de producción como consecuencia de esta serie.**
 
 ## Telegram

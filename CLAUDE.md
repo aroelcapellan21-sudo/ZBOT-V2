@@ -108,6 +108,34 @@ bot ajeno. Para `v2_main` **usar siempre PIDs explícitos**, verificados antes c
   `except`. Si `modo.json` faltaba, se corrompía o se leía a medio escribir (ese archivo no se
   escribe atómicamente en ningún lado), el sistema asumía REAL. Ahora ambos devuelven
   `"SIMULADOR"` y loguean el motivo del fallo.
+- **`BOT_REAL_CONFIRMADO` NO sobrevive a un reinicio — es a propósito, no lo automatices
+  (evaluado 2026-08-18).** `iniciar_bots.sh` corre por `@reboot` en crontab y relanza `v2_main`
+  sin exportar la variable, así que tras un corte de luz (o cualquier reinicio del servidor) el
+  bot vuelve a operar en SIMULADOR aunque `modo.json` siga diciendo `"REAL"` — silenciosamente,
+  sin error. Se consideró hacer que `iniciar_bots.sh` exportara `BOT_REAL_CONFIRMADO=true`
+  automáticamente (incluso solo cuando `modo.json` ya dice `"REAL"`) y **se descartó**: es
+  syntácticamente trivial pero anula el propósito completo de la "segunda confirmación técnica"
+  de arriba — volvería a acoplar en un único archivo (`modo.json`) lo que ese fix separó a
+  propósito para que una corrupción o escritura a medias de ese JSON no bastara sola para
+  habilitar dinero real. Un script que corre sin intervención humana en cada boot no puede ser,
+  él mismo, la confirmación humana.
+  - **Runbook — si volvés y el bot está en SIMULADOR sin que lo hayas cambiado vos:**
+    1. `screen -r v2_main` y mirar el log: si dice `[SIMULADOR]` en vez de `[REAL]` en las
+       aperturas/cierres, o no aparece `[CENTINELA] Capital real leido desde billetera.json`,
+       confirma el diagnóstico.
+    2. Verificar `signals/modo.json` — si sigue en `"REAL"`, el problema es la variable de
+       entorno, no el modo configurado.
+    3. **Exportar la variable en una shell nueva no alcanza**: `os.environ` de un proceso ya
+       corriendo no cambia por un `export` posterior en la terminal. Hay que matar el proceso
+       real (`pgrep -af main.py` + verificar `readlink /proc/<pid>/cwd` antes de matar — no usar
+       `kill $(pgrep -f main.py)` a ciegas, cruza con otros bots) y volver a lanzarlo desde una
+       shell donde la variable ya esté exportada:
+       ```
+       screen -S v2_main -X quit
+       kill <PID_verificado>
+       screen -dmS v2_main bash -c "cd ~/bot-padre-v2 && export BOT_REAL_CONFIRMADO=true && python3 main.py"
+       ```
+    4. Confirmar en el log del screen que ahora sí opera en modo REAL antes de dar por resuelto.
 
 ## Camino de dinero — contrato tras la auditoría pre-REAL (ago 2026)
 

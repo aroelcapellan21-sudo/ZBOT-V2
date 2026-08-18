@@ -492,6 +492,82 @@ NO implementar antes de tener 30+ trades reales en REAL.
   `timestamp` al cerrar, por eso hubo que reconstruir vía `historial_billetera.csv` para el
   backtest).
 
+## Auditoría de gates de entrada — serie completa (ago 2026)
+
+Serie de 20 auditorías de solo lectura sobre los gates de entrada de los 3 francotiradores
+activos hoy (**BTC ALCISTA**, **ETH ALCISTA**, **SOL LATERAL**), en dos tandas: ventana corta
+(2026-01-01→08-17) y, para los gates reconstruibles con solo precio, ventana extendida (BTC/ETH
+2017-2026 ~9 años, SOL 2020-2026 ~5.9 años — la misma historia usada para calibrar los
+parámetros de cada francotirador, así que **no es validación out-of-sample**, es caracterización
+histórica completa). Ningún archivo de producción tocado, ningún commit de los scripts (quedan en
+scratchpad de sesión) ni de los reportes (`reports/` no se commitea). Metodología base: recalcular
+`raw_signal` de forma independiente (mismas fórmulas reales de `utils.py`, sin reimplementar) para
+aislar qué llamadas a un gate correspondían a una señal que de verdad habría abierto trade, y
+simular cada señal bloqueada con `revisar_cierres()` literal.
+
+**Hallazgo transversal más importante de toda la serie: los resultados con muestra chica (n<30)
+tienden a diluirse o revertirse con más datos.** No tratar ningún hallazgo de esta serie con n<30
+como concluyente sin revisar si ya se hizo (o se puede hacer) la versión con ventana extendida.
+
+### Por gate
+
+| Gate | Impacto real medido | Reporte |
+|---|---|---|
+| `gestor_correlacion` (componente `trades_misma_dir`) | Matemáticamente inalcanzable con solo 3 francotiradores activos (máximo teórico 1, umbral de bloqueo 2) | `2026-08-18_auditoria-correlacion.md` |
+| `gestor_correlacion` (componente fase-BTC-macro) | 0/61 bloqueos reales en la ventana corta — BTC/ETH nunca tuvieron señal propia coincidiendo con BTC macro bajista | `2026-08-18_auditoria-correlacion.md` |
+| `filtro_horario` | Determinista (bloquea la vela de 00:00 hora local, 1/6 del tiempo). Confirmado neutro con muestra grande (502-1078 señales/moneda, 9 años): diferencias de solo −2.5pp a +0.4pp vs. WR real | `2026-08-18_auditoria-horario-limitador.md`, extendido en `2026-08-18_auditoria-horario-limitador-extendido.md` |
+| `limitador_diario` (límite diario) | **0 bloqueos en 11,536 señales evaluadas, hasta 9 años y 909 trades reales combinados.** Máximo real de cierres el mismo día: 4 (vs umbral 8); racha máx. de SL seguidos: 3 (vs umbral 4). El gate más inerte de la serie | `2026-08-18_auditoria-horario-limitador-extendido.md` |
+| `medidor_spread` | **NO reconstruible con datos históricos** (Binance no da bid/ask histórico, sin logs propios). Hallazgo aparte: `SPREAD_MAXIMO` es una constante fija 0.48% para las 5 monedas — el nombre `TP_PCT` sugiere que debería ser dinámico por francotirador, pero no lo es | `2026-08-18_auditoria-spread.md` |
+| `termometro` | Congelado desde marzo 2026 (verificado en vivo) → 0 impacto real. Si se reconectara: bloquearía ~32% del tiempo con efecto **mixto** (protegería a BTC, sería contraproducente en ETH) | `2026-08-18_auditoria-termometro-guardian.md` |
+| `guardian_riesgo` | No reconstruible para el 66% de la ventana pedida (sin datos ene-may 2026). Tramo con datos: margen 10x-17x de los límites, nunca bloqueó | `2026-08-18_auditoria-termometro-guardian.md` |
+| `filtro_eventos` | Solo detecta bloqueo en la vela 20:00-00:00 UTC por un problema de granularidad (evalúa 1 vez por vela 4h, producción sondea cada 4 min) — es, paradójicamente, la vela con *menor* overlap real (6.2%) de las 3 afectadas | `2026-08-18_auditoria-eventos.md` |
+| `filtro_calidad` | **Hallazgo más citado de la serie, revertido con más datos**: SOL LATERAL "protegía" con WR 16.7% (n=36, solo 2026) — con 9x más datos (n=959, 2020-2026) da WR 47.9%, prácticamente neutro. BTC también converge a neutro (47.4% vs 48.3%). Solo ETH invierte de signo, moderado (52.2% vs 57.2%) | `2026-08-18_auditoria-filtro-calidad.md`, revertido en `2026-08-18_auditoria-filtro-calidad-extendido.md` |
+| `filtro_estadístico` | Único motivo real de bloqueo: `racha==5` (incondicional). **Techo estructural de muestra** — ni con 9 años de historia ninguna moneda individual cruza n=30 (BTC=19, ETH=15, SOL=7) | `2026-08-18_auditoria-filtro-estadistico.md`, extendido en `2026-08-18_auditoria-estadistico-memoria-extendido.md` |
+| `memoria_propia` | Único motivo real: `racha_mala` (`perdidas_ultimos_5>=3`, cross-symbol). Puede quedar congelado en el peor valor semanas si escasean cierres reales (episodio de 60 días abr-jun 2026 ya documentado abajo). **No extendible**: backup de trades reales arranca 2026-03-01, no hay dato anterior. BTC (n=57) y SOL (n=84) ya tenían muestra suficiente; ETH (n=9) no, y no hay forma de subirlo hoy | `2026-08-18_auditoria-memoria-propia.md`, extensión evaluada en `2026-08-18_auditoria-estadistico-memoria-extendido.md` |
+| `multitimeframe` (ETH específicamente) | Hallazgo repetido 3 veces con WR 100% (n=10-12) **no se sostuvo** con 9 años de datos: n=104, WR real 63.5% vs. 57.2% de producción — misma dirección, magnitud mucho menor | `2026-08-18_auditoria-multitimeframe.md`, revertido en `2026-08-18_auditoria-eth-multitimeframe-extendido.md` |
+
+### Matriz de solapamiento entre gates (10 de 10 pares posibles)
+
+Se evaluaron los 5 gates que pueden bloquear una señal antes del chequeo RSI+EMA final
+(`horario`, `multitimeframe`, `calidad`, `estadístico`, `memoria`) de forma **independiente**
+entre sí (bypaseando el orden real de producción) para medir si tienden a bloquear las mismas
+señales. Ninguno de los 10 pares mostró redundancia sistemática — todas las razones
+observado/esperado (bajo independencia estadística simple) quedaron entre 0.76 y 1.43.
+
+| Par | Razón obs/esp | Reporte |
+|---|---|---|
+| horario × multitimeframe | 1.04 | `2026-08-18_auditoria-horario-multitimeframe-solapamiento.md` |
+| calidad × estadístico | 0.70 (corta) / 0.91 (9 años) | `2026-08-18_auditoria-calidad-estadistico-solapamiento.md` |
+| multitimeframe × memoria | 0.76 | `2026-08-18_auditoria-multitimeframe-memoria-solapamiento.md` |
+| horario × calidad | 1.08 | `2026-08-18_auditoria-pares-solapamiento-restantes.md` |
+| horario × estadístico | 1.20 (n chico) | ídem |
+| **multitimeframe × calidad** | **1.23 agregado, 2.23 en BTC** | ídem — causa raíz abajo |
+| multitimeframe × estadístico | 0.77 (n chico) | ídem |
+| horario × memoria | 1.08 | ídem |
+| calidad × memoria | 1.10 | ídem |
+| estadístico × memoria | 1.43 (n=11, no concluyente) | ídem |
+
+**Único hallazgo con sustancia: `multitimeframe×calidad` en BTC específicamente (razón 2.23,
+no replica en ETH ni con la misma fuerza en SOL).** Causa raíz encontrada y verificada
+(`2026-08-18_investigacion-mtf-calidad-btc.md`): `filtro_calidad.señal_tiene_calidad()` y
+`detector_multitimeframe.detectar_tendencia(..., "4h")` comparten, **sin coordinarse**, el mismo
+chequeo de alineación EMA20/EMA50 **hardcodeado** en fase ALCISTA (ninguno de los dos lee el
+`EMA_CORTA`/`EMA_LARGA` real del francotirador que los llama). BTC ALCISTA usa EMA20/EMA50 como su
+propia condición de entrada — coincide exacto con el hardcode. ETH ALCISTA usa EMA20/**EMA100** —
+no coincide. Verificado con datos: de las 246 señales BTC bloqueadas por ambos gates, **59.8%**
+son por "EMAs no alineadas" (vs. 9.8% cuando calidad bloquea sola — 6x más frecuente); en ETH ese
+motivo aparece en **0%** de las 6 señales compartidas. El régimen de mercado que dispara
+multitimeframe (1h/4h/1d en LATERAL, MACD negativo 4h y 1d) es idéntico en ambas monedas — lo que
+cambia es si ese régimen también hace fallar el chequeo EMA hardcodeado de calidad, y eso depende
+solo de qué EMA larga usa la entrada propia de cada francotirador. **No es un bug** (ambos gates
+funcionan como están diseñados) pero es una nota para el futuro: si algún día se cambia el
+`EMA_LARGA` de un francotirador ALCISTA, el grado de solapamiento entre estos dos gates cambia con
+él, sin que nadie lo haya pedido — y el mismo patrón (dos gates que comparten un parámetro
+hardcodeado en vez de leer el del francotirador que los llama) podría repetirse en otros pares no
+auditados con este nivel de detalle.
+
+**No se recomienda ningún cambio de producción como consecuencia de esta serie.**
+
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)
 - Token en `keys.env` como `TELEGRAM_BOT_TOKEN` — **ese es el nombre exacto de la clave, todos los módulos deben leerlo así**.

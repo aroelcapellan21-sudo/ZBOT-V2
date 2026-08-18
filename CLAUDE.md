@@ -383,6 +383,28 @@ NO implementar antes de tener 30+ trades reales en REAL.
   True**. Si alguien reconecta el módulo, pasaría a bloquear ~29.5% del tiempo de golpe
   (`MERCADO_MUERTO`). Por eso el fix se aplicó también ahí, aunque hoy sea inerte. Decidir si se
   conecta o se elimina es un punto abierto.
+- **Verificado línea por línea en los 15 francotiradores (2026-08-18):** el patrón de arriba
+  (`revisar_cierres(precio_actual, evaluar_tp=False)` antes de cada `return` de horario/eventos/
+  guardián/termómetro/spread/límite diario, y `evaluar_tp=True` al final) se confirma exacto en
+  14 de los 15 — incluidos los 5 bajistas, que además tienen un gate extra
+  (`gestor_bajistas.bajistas_activos()`) como **primer** chequeo de `evaluar()`, antes que
+  cualquier otro: con bajistas desactivados (estado actual), la función retorna ahí mismo **sin
+  llamar `revisar_cierres()` en absoluto** — a diferencia de horario/eventos, ese gate no protege
+  posiciones abiertas (no debería haber ninguna, dado que los bajistas tampoco pueden abrir, pero
+  el código no llama a revisar_cierres de todos modos si algún día hubiera una).
+  - **Excepción real: `francotirador_lateral_eth.py` no sigue el patrón — está desactivado por
+    código, no solo por config, desde el 2026-08-13** (commit `8153b6d`, backtest forense PF
+    0.90 — ver `project_forense_eth_alcista_lateral` en memoria persistente). `evaluar()` hace
+    `return` incondicional en la línea 293, **antes** de llegar a `esta_bloqueado()` (295),
+    `puede_operar_horario()` (307) o `puede_operar_eventos()` (315) — todo ese bloque queda
+    inalcanzable. En su lugar, la línea 291 llama `revisar_cierres(precio_actual,
+    evaluar_tp=True)` **una sola vez, sin ninguna condición** — más permisivo que el resto de los
+    14 (ni SL ni TP quedan sujetos a horario/eventos/guardián/etc. para este francotirador
+    específico, aunque en la práctica no importa porque tampoco abre posiciones nuevas). No es un
+    bug: el propio comentario del código (línea 290) explica la intención — mantener
+    `revisar_cierres` activo solo para proteger una posición que ya estuviera abierta al momento
+    de desactivar la fase, sin la sobrecarga de evaluar los 6 gates de entrada que ya no importan
+    si nunca se va a abrir un trade nuevo.
 
 ## Asimetría TP/SL en el registro de cierres (hallazgo jun 2026 — corregido jul 2026, superado por el fill real ago 2026)
 - En `revisar_cierres()` de los **15 francotiradores** (alcista/bajista/lateral × 5 activos), el

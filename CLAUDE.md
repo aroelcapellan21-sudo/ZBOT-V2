@@ -91,51 +91,67 @@ bot ajeno. Para `v2_main` **usar siempre PIDs explícitos**, verificados antes c
 `pgrep -af main.py` y `readlink /proc/<pid>/cwd`.
 
 ## Modo de operación
-- Modo actual: `signals/modo.json` → `{"modo":"SIMULADOR","intervalo_velas":"4h","sleep_segundos":240}`
-  (corregido de 1h/60 el 2026-07-12 — ver hallazgo de oscilación de fase más abajo)
-- Para cambiar a REAL: editar `signals/modo.json`. **`config/modo.txt` fue eliminado el
+- Modo actual: `signals/modo.json` → `{"modo":"REAL","intervalo_velas":"4h","sleep_segundos":240}`
+  (corregido de 1h/60 el 2026-07-12 — ver hallazgo de oscilación de fase más abajo; pasó a REAL
+  el 2026-08-15 con $8.54 USDT, ver checklist de capital al final del documento)
+- Para cambiar de modo: editar `signals/modo.json`. **`config/modo.txt` fue eliminado el
   2026-08-15** (auditoría C-03): decía `SIMULACION` sin que ningún módulo lo leyera —
   contradecía `modo.json` en silencio y funcionaba como un falso interruptor de emergencia.
-- **No cambiar a REAL sin autorización explícita de Ariel**
+- **No cambiar el modo sin autorización explícita de Ariel**
 - **Segunda confirmación técnica (desde 2026-07-29, commit `0278d48`):** `modo.json` diciendo
-  `"REAL"` ya no alcanza por sí solo. `ejecutor.py` (`ejecutar_operacion`, `cerrar_posicion`)
+  `"REAL"` no alcanza por sí solo. `ejecutor.py` (`ejecutar_operacion`, `cerrar_posicion`)
   también exige la variable de entorno `BOT_REAL_CONFIRMADO=true` en el proceso de `v2_main`
-  — si falta, opera en SIMULADOR aunque el JSON diga REAL. La variable no vive en ningún
-  archivo del repo (ni `keys.env` ni `modo.json`); se exporta a mano en la sesión screen el
-  día del paso a real. Punto 3 de `CIERRE_FINAL.md`.
+  — si falta, opera en SIMULADOR aunque el JSON diga REAL. Punto 3 de `CIERRE_FINAL.md`.
 - **Fallback seguro (desde 2026-08-12, commit `0aee782`):** `_leer_modo()` en `ejecutor.py` y
   `director_orquesta.py` devolvía `"REAL"` por defecto — tanto en el `.get()` como en el
   `except`. Si `modo.json` faltaba, se corrompía o se leía a medio escribir (ese archivo no se
   escribe atómicamente en ningún lado), el sistema asumía REAL. Ahora ambos devuelven
   `"SIMULADOR"` y loguean el motivo del fallo.
-- **`BOT_REAL_CONFIRMADO` NO sobrevive a un reinicio — es a propósito, no lo automatices
-  (evaluado 2026-08-18).** `iniciar_bots.sh` corre por `@reboot` en crontab y relanza `v2_main`
-  sin exportar la variable, así que tras un corte de luz (o cualquier reinicio del servidor) el
-  bot vuelve a operar en SIMULADOR aunque `modo.json` siga diciendo `"REAL"` — silenciosamente,
-  sin error. Se consideró hacer que `iniciar_bots.sh` exportara `BOT_REAL_CONFIRMADO=true`
-  automáticamente (incluso solo cuando `modo.json` ya dice `"REAL"`) y **se descartó**: es
-  syntácticamente trivial pero anula el propósito completo de la "segunda confirmación técnica"
-  de arriba — volvería a acoplar en un único archivo (`modo.json`) lo que ese fix separó a
-  propósito para que una corrupción o escritura a medias de ese JSON no bastara sola para
-  habilitar dinero real. Un script que corre sin intervención humana en cada boot no puede ser,
-  él mismo, la confirmación humana.
+- **Llave persistente para `BOT_REAL_CONFIRMADO` (desde 2026-08-15, commit `b547d81`) — mecanismo
+  vigente, reemplaza la decisión anterior de no automatizar esto.** La variable ya **sí sobrevive**
+  a un reinicio del servidor, mediante un archivo fuera del repo que Ariel crea a mano una sola
+  vez: `~/.bot_real_confirmado` (vacío, solo su existencia importa). Dos lectores independientes
+  de ese archivo, ambos con la misma lógica:
+  - `iniciar_bots.sh` (disparado por `@reboot` en crontab, `sleep 30 && iniciar_bots.sh`): si el
+    archivo existe, arranca `v2_main` con `export BOT_REAL_CONFIRMADO=true && python3 main.py`
+    (log: `[REAL] ~/.bot_real_confirmado presente — exportando BOT_REAL_CONFIRMADO=true para
+    v2_main`). Si no existe, arranca sin la variable → SIMULADOR aunque `modo.json` diga REAL.
+  - `watchdog.py` (cron cada 5 min, solo actúa si `main.py` no está vivo): mismo chequeo del
+    mismo archivo antes de relanzar el proceso — respaldo si el que revive `v2_main` es el
+    watchdog en vez de `iniciar_bots.sh`.
+  - **La segunda confirmación técnica sigue siendo real, no se acopló todo a un único archivo**:
+    `modo.json` y `~/.bot_real_confirmado` son dos archivos distintos, en ubicaciones distintas
+    (uno dentro del repo y versionado indirectamente vía `signals/`, el otro fuera del repo en
+    `$HOME` y fuera de git por completo), que alguien tiene que haber tocado por separado en algún
+    momento. La diferencia con el diseño original es que, una vez creada la llave, ya no hace
+    falta repetir el `export` manual en cada reinicio — la llave persiste, el `export` no.
+  - **Verificado en vivo el 2026-08-18** (`reports/2026-08-18_verificacion-corte-luz-real.md`):
+    tras simular un corte de luz, `v2_main` (PID nuevo, cwd correcto) relanzó con
+    `BOT_REAL_CONFIRMADO=true` presente en `/proc/<PID>/environ`, `modo.json` intacto en
+    `"REAL"`, posiciones SOL/ETH sin alterar en `auditoria.csv`/`billetera.json`, sin tracebacks,
+    un solo disparador de arranque (el `@reboot` de crontab; `watchdog.py` no compite, solo actúa
+    si el proceso está caído).
   - **Runbook — si volvés y el bot está en SIMULADOR sin que lo hayas cambiado vos:**
     1. `screen -r v2_main` y mirar el log: si dice `[SIMULADOR]` en vez de `[REAL]` en las
        aperturas/cierres, o no aparece `[CENTINELA] Capital real leido desde billetera.json`,
        confirma el diagnóstico.
     2. Verificar `signals/modo.json` — si sigue en `"REAL"`, el problema es la variable de
        entorno, no el modo configurado.
-    3. **Exportar la variable en una shell nueva no alcanza**: `os.environ` de un proceso ya
-       corriendo no cambia por un `export` posterior en la terminal. Hay que matar el proceso
-       real (`pgrep -af main.py` + verificar `readlink /proc/<pid>/cwd` antes de matar — no usar
-       `kill $(pgrep -f main.py)` a ciegas, cruza con otros bots) y volver a lanzarlo desde una
-       shell donde la variable ya esté exportada:
+    3. Verificar que `~/.bot_real_confirmado` exista (`ls -la ~/.bot_real_confirmado`). Si no
+       existe, ese es el motivo — créalo (`touch ~/.bot_real_confirmado`) para que el próximo
+       arranque automático lo tome. Si existe pero igual arrancó en SIMULADOR, revisar
+       `memoria/arranque.log` por si `iniciar_bots.sh` falló antes de llegar a `v2_main`.
+    4. **Exportar la variable en una shell nueva no alcanza para el proceso ya corriendo**:
+       `os.environ` de un proceso vivo no cambia por un `export` posterior en la terminal. Hay
+       que matar el proceso real (`pgrep -af main.py` + verificar `readlink /proc/<pid>/cwd`
+       antes de matar — no usar `kill $(pgrep -f main.py)` a ciegas, cruza con otros bots) y
+       volver a lanzarlo desde una shell donde la variable ya esté exportada:
        ```
        screen -S v2_main -X quit
        kill <PID_verificado>
        screen -dmS v2_main bash -c "cd ~/bot-padre-v2 && export BOT_REAL_CONFIRMADO=true && python3 main.py"
        ```
-    4. Confirmar en el log del screen que ahora sí opera en modo REAL antes de dar por resuelto.
+    5. Confirmar en el log del screen que ahora sí opera en modo REAL antes de dar por resuelto.
 
 ## Camino de dinero — contrato tras la auditoría pre-REAL (ago 2026)
 
@@ -1036,7 +1052,13 @@ importantes.
 Los 15 francotiradores originales: 🟢 PRESERVADOS — no modificar durante esta investigación.
 
 Segunda lista de 5: ✅ DEFINIDA (2026-08-15) — ver sección "Segunda lista — Candidatas Sistema C".
-Matriz calendario/régimen: 🔒 PENDIENTE.
+Matriz calendario/régimen: 🟡 BORRADOR CON EVIDENCIA REAL 2026 (2026-08-16) — ver
+`reports/2026-08-16_matriz-calendario-regimen-5monedas.md`. Régimen dominante (`detectar_fase()`
+real) cruzado con señales de entrada RSI+EMA+fase, ene–ago 2026, 5 monedas. Hallazgo: febrero
+5/5 monedas en BAJISTA dominante (0 señales en las 5); junio 4/5 BAJISTA (0 señales en las 5) —
+confirma el mes malo universal de [[project_estacionalidad_5monedas]]. Febrero **contradice** el
+prior histórico 2021-2025 (que lo marcaba "bueno unánime"). Falta ampliar a más años de régimen
+real antes de proponer reglas de activación por Telegram. Ningún cambio de producción.
 Sistema externo de inteligencia: 🔒 DISEÑO FUTURO.
 Integración Telegram: 🔒 FASE FUTURA.
 
@@ -1091,7 +1113,8 @@ Segunda lista de 5: ✅ DEFINIDA (2026-08-15) — XRP, LINK, UNI, NEAR, ADA — 
 
 ### Investigación futura y sistemas complementarios
 
-Calendario inteligente: 🔒 PENDIENTE
+Calendario inteligente: 🟡 BORRADOR (2026-08-16) — matriz calendario/régimen con evidencia real
+2026, ver punto 13 arriba y `reports/2026-08-16_matriz-calendario-regimen-5monedas.md`.
 Sistema externo de inteligencia: 🔒 DISEÑO FUTURO
 Integración Telegram: 🔒 FASE FUTURA
 

@@ -282,15 +282,17 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
 def evaluar():
     print(f"[FRANCOTIRADOR BAJISTA BTC] Evaluando {SYMBOL}...")
 
-    if not bajistas_activos():
-        print("  ⏸️ Bajistas desactivados (sin saldo en Futuros USDT-M). Solo ALCISTA/LATERAL.")
-        return
     cierres = fetch_velas(SYMBOL, limite=210)
     if not cierres:
         print("[ERROR] Sin datos.")
         return
 
     precio_actual = cierres[-1]
+
+    if not bajistas_activos():
+        print("  ⏸️ Bajistas desactivados (sin saldo en Futuros USDT-M). Solo ALCISTA/LATERAL.")
+        revisar_cierres(precio_actual, evaluar_tp=True)
+        return
 
     if esta_bloqueado():
         print("  🚨 Guardian activo.")

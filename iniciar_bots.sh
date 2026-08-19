@@ -126,6 +126,10 @@ if [ -f "$BOT_REAL_CONFIRMADO_FILE" ]; then
 fi
 iniciar v2_main "$DIR" "$CMD_V2_MAIN"
 
+# --- Rescatados de la copia vieja en $HOME (jun 2026), antes de borrarla ---
+iniciar motor_confluencia ~/motor-confluencia "python3 main.py"
+iniciar claude_code "$DIR" "claude"
+
 echo "================================================"
 echo " Todos los procesos iniciados."
 echo " Ver con: screen -ls"

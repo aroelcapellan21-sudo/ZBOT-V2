@@ -9,6 +9,12 @@
 DIR=~/bot-padre-v2
 KEYS="$DIR/keys.env"
 
+# Llave de confirmacion persistente para BOT_REAL_CONFIRMADO (fuera del repo).
+# La crea Ariel a mano una sola vez -- ver CLAUDE.md, seccion "Modo de operacion".
+# Su sola existencia no alcanza para operar en REAL: modo.json tambien tiene
+# que decir "REAL" (segunda confirmacion independiente, sin cambios).
+BOT_REAL_CONFIRMADO_FILE="$HOME/.bot_real_confirmado"
+
 # Lee una variable de keys.env
 leer_key() {
     grep "^$1=" "$KEYS" | cut -d= -f2
@@ -113,7 +119,12 @@ iniciar z_tunnel "$DIR" "python3 tunnel_asistente.py"
 
 # --- Bot principal (último, depende de los anteriores) ---
 sleep 5
-iniciar v2_main "$DIR" "python3 main.py"
+CMD_V2_MAIN="python3 main.py"
+if [ -f "$BOT_REAL_CONFIRMADO_FILE" ]; then
+    echo "[REAL] $BOT_REAL_CONFIRMADO_FILE presente — exportando BOT_REAL_CONFIRMADO=true para v2_main"
+    CMD_V2_MAIN="export BOT_REAL_CONFIRMADO=true && $CMD_V2_MAIN"
+fi
+iniciar v2_main "$DIR" "$CMD_V2_MAIN"
 
 echo "================================================"
 echo " Todos los procesos iniciados."

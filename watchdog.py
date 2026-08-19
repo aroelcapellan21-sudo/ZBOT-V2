@@ -16,6 +16,13 @@ ADMIN_YAYO = 6578945006
 ADMIN_SOCIA = 6533031969
 ADMIN_IDS = [ADMIN_YAYO, ADMIN_SOCIA]
 
+# Llave de confirmacion persistente para BOT_REAL_CONFIRMADO (fuera del repo,
+# creada a mano por Ariel una sola vez). Mismo archivo que lee iniciar_bots.sh --
+# ver CLAUDE.md, seccion "Modo de operacion". Su sola existencia no alcanza para
+# operar en REAL: modo.json tambien tiene que decir "REAL" (segunda confirmacion
+# independiente, sin cambios).
+BOT_REAL_CONFIRMADO_FILE = os.path.expanduser("~/.bot_real_confirmado")
+
 def cargar_token():
     ruta = os.path.expanduser("~/bot-padre-v2/keys.env")
     try:
@@ -55,10 +62,14 @@ def bot_esta_vivo():
 def reiniciar_bot():
     try:
         os.chdir(os.path.expanduser("~/bot-padre-v2"))
+        env = os.environ.copy()
+        if os.path.isfile(BOT_REAL_CONFIRMADO_FILE):
+            env["BOT_REAL_CONFIRMADO"] = "true"
         subprocess.Popen(
             ["python3", "main.py"],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            stderr=subprocess.DEVNULL,
+            env=env
         )
         return True
     except:

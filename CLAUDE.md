@@ -388,10 +388,19 @@ NO implementar antes de tener 30+ trades reales en REAL.
   guardián/termómetro/spread/límite diario, y `evaluar_tp=True` al final) se confirma exacto en
   14 de los 15 — incluidos los 5 bajistas, que además tienen un gate extra
   (`gestor_bajistas.bajistas_activos()`) como **primer** chequeo de `evaluar()`, antes que
-  cualquier otro: con bajistas desactivados (estado actual), la función retorna ahí mismo **sin
-  llamar `revisar_cierres()` en absoluto** — a diferencia de horario/eventos, ese gate no protege
-  posiciones abiertas (no debería haber ninguna, dado que los bajistas tampoco pueden abrir, pero
-  el código no llama a revisar_cierres de todos modos si algún día hubiera una).
+  cualquier otro.
+- **Gap encontrado y corregido el mismo día (2026-08-18, commit `e60a547`):** con bajistas
+  desactivados (estado actual), los 5 bajistas retornaban en ese primer gate **sin llamar
+  `revisar_cierres()` en absoluto** — a diferencia de horario/eventos, no protegía una posición
+  bajista que quedara abierta mientras el gate siguiera en `False`. En la práctica no debería
+  haber ninguna (los bajistas tampoco pueden abrir con el gate apagado), pero el código no la
+  protegía de todos modos si alguna vez la hubiera. Corregido en los 5 (`bajista_btc/eth/sol/
+  bnb/avax.py`) moviendo `fetch_velas()`/`precio_actual` antes del gate y llamando
+  `revisar_cierres(precio_actual, evaluar_tp=True)` dentro de esa misma rama, antes del
+  `return` — mismo patrón que ya usan horario/eventos en estos archivos (revisar salidas antes
+  de cortar), sin llamada duplicada cuando el gate esté activo (la cadena normal de gates, más
+  abajo, ya tiene sus propias llamadas a `revisar_cierres`). Mismo enfoque seguro que ya usaba
+  `francotirador_lateral_eth.py` para su propia desactivación (ver excepción debajo).
   - **Excepción real: `francotirador_lateral_eth.py` no sigue el patrón — está desactivado por
     código, no solo por config, desde el 2026-08-13** (commit `8153b6d`, backtest forense PF
     0.90 — ver `project_forense_eth_alcista_lateral` en memoria persistente). `evaluar()` hace

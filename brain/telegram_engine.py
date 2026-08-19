@@ -183,6 +183,22 @@ def obtener_corecro():
     except:
         return "Sin reporte CoreCro disponible."
 
+def obtener_consejero():
+    try:
+        from consejero import consultar_consejero
+        r = consultar_consejero()
+        return (
+            f"📊 <b>CONSEJERO</b>\n"
+            f"Capital actual : ${r['capital_actual']}\n"
+            f"Capital inicial: ${r['capital_inicial']}\n"
+            f"Nivel          : {r['porcentaje']}%\n"
+            f"Estado         : {r['estado']}\n"
+            f"{r['mensaje']}"
+        )
+    except Exception as e:
+        print(f"[TELEGRAM] Error consultando Consejero: {e}")
+        return "Sin datos del Consejero disponibles."
+
 def obtener_bitacora(tipo="eventos", cantidad=10):
     tipo = tipo.upper()
     if tipo not in BITACORAS:
@@ -987,6 +1003,8 @@ def procesar_comando(mensaje, chat_id):
         enviar_mensaje(chat_id, obtener_senales())
     elif mensaje == "/corecro":
         enviar_mensaje(chat_id, obtener_corecro())
+    elif mensaje == "/consejero":
+        enviar_mensaje(chat_id, obtener_consejero())
     elif mensaje == "/resumen":
         enviar_mensaje(chat_id, obtener_resumen_personal())
     elif mensaje == "/operaciones":
@@ -1086,7 +1104,11 @@ def procesar_comando(mensaje, chat_id):
             "/capital — Cuánto USDT hay disponible\n"
             "/retiro — Ganancia disponible para retirar\n"
             "/memoria — Lo que el bot aprendió\n"
-            "/disparos — Estado de cada moneda\n\n"
+            "/disparos — Estado de cada moneda\n"
+            "/corecro — Último reporte de observación (RSI 5 monedas)\n"
+            "/senales — CoreCro: últimas 10 señales registradas\n"
+            "/consejero — Salud del capital ahora mismo\n"
+            "/noticias — Últimas noticias/inteligencia de mercado (no trading directo)\n\n"
             "⚙️ <b>CONTROLAR EL BOT:</b>\n"
             "/parar — Detener el bot de emergencia\n"
             "/reactivar — Volver a activar el bot\n"

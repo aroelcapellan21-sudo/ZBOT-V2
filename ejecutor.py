@@ -28,6 +28,7 @@ BILLETERA            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json
 LOCK_FILE            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json.lock")
 KEYS_FILE            = os.path.expanduser("~/bot-padre-v2/keys.env")
 MODO_FILE            = os.path.expanduser("~/bot-padre-v2/signals/modo.json")
+PARADA_EMERGENCIA_FILE = os.path.expanduser("~/bot-padre-v2/signals/PARADA_EMERGENCIA.txt")
 MONTO_MINIMO_BINANCE = 5.0
 BASE_URL             = "https://api.binance.com"
 
@@ -57,6 +58,15 @@ def _leer_modo():
 
 def _confirmacion_real_activa():
     return os.environ.get("BOT_REAL_CONFIRMADO", "").strip().lower() == "true"
+
+def _parada_emergencia_activa():
+    # Kill switch de /parar (Telegram) y del asistente web. Antes de este fix
+    # ningun modulo del camino real lo leia: era cosmetico (solo cambiaba el
+    # dashboard). Se chequea aca porque ejecutor.py es el unico autorizado
+    # para abrir/cerrar posiciones (CLAUDE.md) - cubre los 15 francotiradores
+    # sin tocarlos. Solo bloquea APERTURAS (ejecutar_operacion); no toca
+    # cerrar_posicion(), para que SL/TP sigan protegiendo posiciones abiertas.
+    return os.path.exists(PARADA_EMERGENCIA_FILE)
 
 def _truncar_cantidad(symbol, qty):
     """
@@ -205,6 +215,9 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
 
     if monto < MONTO_MINIMO_BINANCE:
         return f"❌ RECHAZADO: Monto ${monto:.2f} bajo minimo Binance (${MONTO_MINIMO_BINANCE})", None
+
+    if _parada_emergencia_activa():
+        return "❌ RECHAZADO: Parada de emergencia activa (signals/PARADA_EMERGENCIA.txt)", None
 
     symbol     = moneda + "USDT"
     modo       = _leer_modo()

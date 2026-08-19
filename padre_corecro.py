@@ -6,7 +6,7 @@
 # =========================================
 
 import os
-from corecro.corecro import generar_reporte
+from corecro.corecro import generar_reporte, evaluar_alertas_extremas
 from memoria.memoria import registrar_corecro
 
 REPORTS_DIR = os.path.expanduser("~/bot-padre-v2/corecro/reports")
@@ -17,7 +17,7 @@ def ejecutar_corecro():
     FIX: Solo registra resumen, no el reporte completo.
     """
     try:
-        generar_reporte()
+        resultados = generar_reporte()
     except Exception as e:
         registrar_corecro(f"Error generando reporte: {e}")
         print(f"[CORECRO] Error: {e}")
@@ -35,6 +35,12 @@ def ejecutar_corecro():
             registrar_corecro("Reporte generado correctamente.")
     except Exception as e:
         registrar_corecro(f"Error leyendo reporte: {e}")
+
+    try:
+        evaluar_alertas_extremas(resultados)
+    except Exception as e:
+        registrar_corecro(f"Error evaluando alertas extremas: {e}")
+        print(f"[CORECRO] Error alertas: {e}")
 
     print("✔ CoreCro: reporte generado silenciosamente")
 

@@ -14,6 +14,8 @@ import urllib.parse
 import json
 from datetime import datetime
 from utils import fetch_velas, calcular_rsi
+from engine import enviar_aviso
+import db
 
 BASE_DIR    = os.path.expanduser("~/bot-padre-v2/corecro")
 LOGS_DIR    = os.path.join(BASE_DIR, "logs")
@@ -22,6 +24,11 @@ HISTORICO   = os.path.join(REPORTS_DIR, "corecro_signals_historico.txt")
 
 QUINTETO    = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "AVAXUSDT"]
 MAX_REPORTES = 10  # FIX: Maximo de archivos a conservar
+
+# Aviso automatico solo en cruce a zona extrema (mas estricto que evaluar_senal)
+UMBRAL_EXTREMO_BAJO = 20   # RSI <= esto -> sobreventa extrema
+UMBRAL_EXTREMO_ALTO = 80   # RSI >= esto -> sobrecompra extrema
+ESTADO_ALERTAS_KEY  = "estado_corecro_alertas"
 
 def evaluar_senal(rsi):
     if rsi is None:
@@ -32,6 +39,48 @@ def evaluar_senal(rsi):
         return "SOBRECOMPRA - POSIBLE VENTA"
     else:
         return "NEUTRAL - ESPERAR"
+
+def _zona_extrema(rsi):
+    """Zona de alerta (mas estricta que evaluar_senal). None = zona normal."""
+    if rsi is None:
+        return None
+    if rsi <= UMBRAL_EXTREMO_BAJO:
+        return "SOBREVENTA_EXTREMA"
+    if rsi >= UMBRAL_EXTREMO_ALTO:
+        return "SOBRECOMPRA_EXTREMA"
+    return None
+
+def evaluar_alertas_extremas(resultados):
+    """
+    Avisa por Telegram solo cuando un simbolo CRUZA a zona extrema (RSI<=20 o >=80),
+    no en cada ciclo mientras se mantenga ahi. Estado por simbolo persistido en db.py
+    para no repetir el aviso hasta que vuelva a zona normal y cruce de nuevo.
+    resultados: lista de (symbol, precio, rsi).
+    NO ejecuta, NO decide -- solo informa. Constitucion RESPETADA.
+    """
+    estado = db.json_get(ESTADO_ALERTAS_KEY) or {}
+    avisos = []
+
+    for symbol, precio, rsi in resultados:
+        zona_actual = _zona_extrema(rsi)
+        zona_previa = estado.get(symbol)
+
+        if zona_actual is None:
+            if zona_previa is not None:
+                estado[symbol] = None
+            continue
+
+        if zona_actual != zona_previa:
+            avisos.append(f"{symbol}: ${precio} | RSI {rsi} | {zona_actual}")
+            estado[symbol] = zona_actual
+
+    if avisos:
+        enviar_aviso(
+            "🔎 CORECRO — Extremo detectado\n" + "\n".join(avisos) +
+            "\n\nCoreCro no ejecuta ni decide. Solo observacion."
+        )
+
+    db.json_set(ESTADO_ALERTAS_KEY, estado)
 
 def limpiar_reportes_antiguos():
     """FIX: Elimina reportes viejos para no acumular miles de archivos."""
@@ -61,6 +110,7 @@ def generar_reporte():
         f"===== CORECRO | REPORTE DE OBSERVACION =====\n"
         f"Fecha: {timestamp}\n\n"
     )
+    resultados = []
 
     for symbol in QUINTETO:
         # FIX: Usa fetch_velas y calcular_rsi de utils
@@ -72,6 +122,7 @@ def generar_reporte():
             rsi    = calcular_rsi(cierres)
             senal  = evaluar_senal(rsi)
             linea  = f"{symbol}: ${precio} | RSI: {rsi} | {senal}"
+            resultados.append((symbol, precio, rsi))
 
         reporte += linea + "\n"
         lineas_historico.append(linea)
@@ -99,6 +150,8 @@ def generar_reporte():
 
     print(f"✔ CoreCro: reporte generado correctamente.")
     print(f"✔ Ruta: {ruta_archivo}")
+
+    return resultados
 
 if __name__ == "__main__":
     generar_reporte()

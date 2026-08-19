@@ -12,6 +12,7 @@ import json
 import os
 import urllib.request
 import urllib.parse
+from datetime import datetime, timezone, timedelta
 from config_cartera import CAPITAL_BASE
 from engine import enviar_aviso
 import db
@@ -19,6 +20,10 @@ import db
 BILLETERA = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 UMBRAL_SALUDABLE = 90.0
 UMBRAL_RIESGO    = 80.0
+
+# Resumen diario adicional (no reemplaza el aviso de transicion de estado)
+RESUMEN_DIARIO_KEY   = "estado_consejero_resumen"
+RESUMEN_DIARIO_HORAS = 24
 
 MONEDAS_PRECIO = {
     "BTC":  "BTCUSDT",
@@ -34,6 +39,36 @@ def _cargar_estado_previo():
 
 def _guardar_estado_actual(estado):
     db.json_set("estado_consejero", {"estado": estado})
+
+def _debe_enviar_resumen_diario():
+    """Gate de 24h -- mismo patron que historial_precios.py::registrar_snapshot()."""
+    data   = db.json_get(RESUMEN_DIARIO_KEY)
+    ultimo = data.get("ultimo_envio") if data else None
+    if ultimo is None:
+        return True
+    try:
+        ahora = datetime.now(timezone.utc)
+        return ahora - datetime.fromisoformat(ultimo) >= timedelta(hours=RESUMEN_DIARIO_HORAS)
+    except Exception as e:
+        print(f"[CONSEJERO] Error leyendo fecha de resumen previo: {e}")
+        return True
+
+def _enviar_resumen_diario(resultado):
+    """
+    Resumen de estado una vez cada 24h, independiente de si hubo transicion.
+    Cubre el silencio prolongado cuando el estado queda trabado (ej. CRITICO
+    varios dias) -- el aviso de transicion de mas abajo no se toca.
+    """
+    if not _debe_enviar_resumen_diario():
+        return
+    enviar_aviso(
+        f"📊 CONSEJERO — Resumen diario\n"
+        f"Capital actual : ${resultado['capital_actual']}\n"
+        f"Capital inicial: ${resultado['capital_inicial']}\n"
+        f"Nivel          : {resultado['porcentaje']}%\n"
+        f"Estado         : {resultado['estado']}"
+    )
+    db.json_set(RESUMEN_DIARIO_KEY, {"ultimo_envio": datetime.now(timezone.utc).isoformat()})
 
 def obtener_precio(symbol):
     try:
@@ -114,13 +149,20 @@ def consultar_consejero(capital_actual=None):
                 f"Nivel          : {round(pct, 1)}% — Sistema operativo."
             )
 
-    return {
+    resultado = {
         "estado":          estado,
         "capital_actual":  capital_actual,
         "capital_inicial": CAPITAL_BASE,
         "porcentaje":      round(pct, 1),
         "mensaje":         mensaje
     }
+
+    try:
+        _enviar_resumen_diario(resultado)
+    except Exception as e:
+        print(f"[CONSEJERO] Error enviando resumen diario: {e}")
+
+    return resultado
 
 if __name__ == "__main__":
     capital = calcular_capital_total()

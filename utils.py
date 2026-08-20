@@ -40,6 +40,32 @@ def fetch_velas(symbol, intervalo="4h", limite=210):
         print(f"[UTILS] Error fetch {symbol}: {e}")
         return []
 
+def fetch_velas_ohlcv(symbol, intervalo="4h", limite=210):
+    """OHLCV completo (no solo close). Independiente de fetch_velas() —
+    no cambia su forma de retorno, que usan los 15 francotiradores."""
+    params = urllib.parse.urlencode({
+        "symbol": symbol,
+        "interval": intervalo,
+        "limit": limite
+    })
+    url = f"https://api.binance.com/api/v3/klines?{params}"
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode())
+        return [
+            {
+                "open":   float(k[1]),
+                "high":   float(k[2]),
+                "low":    float(k[3]),
+                "close":  float(k[4]),
+                "volume": float(k[5]),
+            }
+            for k in data
+        ]
+    except Exception as e:
+        print(f"[UTILS] Error fetch_velas_ohlcv {symbol}: {e}")
+        return []
+
 def calcular_rsi(cierres, periodo=RSI_PERIODO):
     if len(cierres) < periodo + 1:
         return None

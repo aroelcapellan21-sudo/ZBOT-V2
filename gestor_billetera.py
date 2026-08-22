@@ -60,6 +60,7 @@ def cargar_billetera():
 def guardar_billetera(billetera):
     tmp = BILLETERA + ".tmp"
     try:
+        billetera["ultima_actualizacion"] = datetime.now().strftime("%Y-%m-%d")
         os.makedirs(os.path.dirname(BILLETERA), exist_ok=True)
         with open(tmp, "w") as f:
             json.dump(billetera, f, indent=2)

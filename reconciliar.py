@@ -113,13 +113,15 @@ def calcular_comprometido():
 
 def detectar_polvo():
     """
-    Devuelve (barrer, omitidas). 'barrer' son las monedas con excedente
-    vendible; 'omitidas' las que tienen excedente pero por debajo del
-    minNotional o sin precio.
+    Devuelve (barrer, omitidas, truncadas). 'barrer' son las monedas con
+    excedente vendible; 'omitidas' las que tienen excedente pero por debajo
+    del minNotional o sin precio; 'truncadas' las que tienen excedente pero
+    es menor a 1 tick (stepSize) — ni siquiera llegan a evaluarse contra el
+    minNotional, Binance no aceptaria una orden por esa cantidad.
     """
     billetera    = cargar_billetera()
     comprometido = calcular_comprometido()
-    barrer, omitidas = [], []
+    barrer, omitidas, truncadas = [], [], []
 
     for moneda, symbol in CRYPTO_MAP.items():
         saldo = float(billetera.get(moneda, 0))
@@ -132,6 +134,8 @@ def detectar_polvo():
 
         cantidad = _truncar_cantidad(symbol, libre)
         if cantidad <= 0:
+            truncadas.append({"moneda": moneda, "saldo": saldo,
+                              "reservado": reservado, "libre": libre})
             continue
 
         precio = fetch_precio(symbol)
@@ -150,7 +154,7 @@ def detectar_polvo():
         else:
             barrer.append(item)
 
-    return barrer, omitidas
+    return barrer, omitidas, truncadas
 
 
 def hacer_backup():
@@ -236,15 +240,20 @@ def ejecutar_reconciliacion(barrer, origen="manual"):
 
 
 # ----------------------------------------------------------------- Telegram
+NOTA_ALCANCE = ("ℹ️ USDC, EURI u otra moneda fuera de BTC/ETH/SOL/BNB/AVAX no están cubiertas "
+                "por este script — no se detectan ni se pueden vender desde acá.")
+
+
 def reporte_telegram():
     """Previo, sin tocar nada. Lo usa /reconciliar."""
     try:
-        barrer, omitidas = detectar_polvo()
+        barrer, omitidas, truncadas = detectar_polvo()
     except Exception as e:
         return f"⚠️ Error analizando: {e}"
 
-    if not barrer and not omitidas:
-        return "✅ Sin polvo para reconciliar. Todo el saldo respalda posiciones."
+    if not barrer and not omitidas and not truncadas:
+        return ("✅ Sin polvo para reconciliar. Todo el saldo respalda posiciones.\n\n"
+                f"{NOTA_ALCANCE}")
 
     l = ["🧹 <b>RECONCILIACIÓN — PREVIO</b>", ""]
     if barrer:
@@ -262,6 +271,14 @@ def reporte_telegram():
         l.append("<b>Omitido:</b>")
         for h in omitidas:
             l.append(f"  {h['moneda']}: {h.get('motivo','')}")
+    if truncadas:
+        l.append("")
+        l.append("<b>Por debajo de 1 tick (no vendible, ni evaluado contra minNotional):</b>")
+        for h in truncadas:
+            l.append(f"  {h['moneda']}: libre {h['libre']:.8f} "
+                     f"(saldo {h['saldo']:.8f} − {h['reservado']:.8f} en posición)")
+    l.append("")
+    l.append(NOTA_ALCANCE)
     if barrer:
         l.append("")
         l.append("Para ejecutar: <code>/reconciliar confirmar</code>")
@@ -271,7 +288,7 @@ def reporte_telegram():
 def ejecutar_telegram():
     """Ejecuta de verdad. Lo usa /reconciliar confirmar."""
     try:
-        barrer, omitidas = detectar_polvo()
+        barrer, omitidas, truncadas = detectar_polvo()
     except Exception as e:
         return f"⚠️ Error analizando: {e}"
     if not barrer:
@@ -294,7 +311,7 @@ def main():
     print(f"\n{sep}\n  RECONCILIACIÓN DE POLVO — Z-Bot v2\n{sep}")
 
     try:
-        barrer, omitidas = detectar_polvo()
+        barrer, omitidas, truncadas = detectar_polvo()
     except Exception as e:
         print(f"\n  ERROR: {e}\n")
         return

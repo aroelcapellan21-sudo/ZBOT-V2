@@ -45,8 +45,8 @@ def dirigir(fase_global=None):
     registrar_evento(f"DIRECTOR SOL: Fase {fase} | Precio ${precio_actual} | Cambio {cambio_30v}%")
 
     if fase == "ALCISTA":
-        print(f"  ⏸️ ALCISTA SOL pausado — WR 11.1%, PnL -28.63% confirmado esta semana "
-              f"(ver reports/2026-08-16_trades-reales-simulados-sol-2026.md).")
+        print(f"  ✅ Activando FRANCOTIRADOR ALCISTA SOL")
+        evaluar_alcista()
     elif fase == "BAJISTA":
         print(f"  🔻 Activando FRANCOTIRADOR BAJISTA SOL")
         evaluar_bajista()

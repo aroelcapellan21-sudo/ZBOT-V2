@@ -23,13 +23,13 @@ from limitador_diario import puede_operar_hoy
 from filtro_eventos import puede_operar_eventos
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, calcular_rsi, calcular_ema, aplicar_filtro_estadistico, puede_operar_memoria
-from ejecutor import ejecutar_operacion, cerrar_posicion
+from ejecutor import ejecutar_operacion, cerrar_posicion, MONTO_MINIMO_BINANCE
 from memoria_propia import actualizar_memoria
 
 SYMBOL             = "AVAXUSDT"
 MONEDA             = "AVAX"
 TIPO_TRADE         = "ALCISTA"
-CAPITAL_MAX_POR_OP = 0.02
+MONTO_FIJO         = 5.0
 RSI_MIN            = 50
 RSI_MAX            = 70
 STOP_LOSS          = 4.0
@@ -355,8 +355,12 @@ def evaluar():
             print("  [CORRELACION] ❌ Bloqueado.")
             return
 
-        monto_base = capital * CAPITAL_MAX_POR_OP
-        monto_op   = round(monto_base * factor_mem, 2)
+        monto_op = round(min(MONTO_FIJO, capital) * factor_mem, 2)
+
+        if monto_op < MONTO_MINIMO_BINANCE:
+            print(f"  [CAPITAL] Monto ${monto_op} bajo minimo Binance (${MONTO_MINIMO_BINANCE}). "
+                  f"Sin operar este ciclo (factor memoria: {factor_mem}).")
+            return
 
         fila_id = reservar_operacion("ALCISTA", precio_actual, rsi, monto_op)
         if fila_id is None:

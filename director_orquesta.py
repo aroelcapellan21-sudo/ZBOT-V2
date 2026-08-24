@@ -18,6 +18,7 @@ from datetime import datetime
 from director_btc import dirigir as dirigir_btc
 from director_eth import dirigir as dirigir_eth
 from director_sol import dirigir as dirigir_sol
+from director_avax import dirigir as dirigir_avax
 from engine import enviar_aviso
 from memoria.memoria import registrar_evento
 from utils import fetch_velas, detectar_fase
@@ -241,8 +242,8 @@ def ejecutar_ciclo():
     db.json_set("fase_orquesta", {"fase": fase_global, "timestamp": timestamp})
 
     # Directores se activan segun la fase LOCAL de cada moneda (no el voto de fase_global).
-    # BNB ALCISTA pausado 2026-08-17: PnL -9.18% confirmado en simulacion con gates completos
-    # (ver reports/2026-08-16_trades-reales-simulados-bnb-2026.md). Reemplazado por BTC/ETH/SOL.
+    # BNB sigue huerfano (director_bnb.py existe pero no se llama aca) — no forma parte
+    # de este cambio. AVAX se suma como 4to activo (combo O del torneo), 2026-08-25.
     print(f"  🟢 Activando Director BTC (fase local: {fases['BTCUSDT']})")
     dirigir_btc(fases['BTCUSDT'])
 
@@ -251,6 +252,9 @@ def ejecutar_ciclo():
 
     print(f"  🟢 Activando Director SOL (fase local: {fases['SOLUSDT']})")
     dirigir_sol(fases['SOLUSDT'])
+
+    print(f"  🟢 Activando Director AVAX (fase local: {fases['AVAXUSDT']})")
+    dirigir_avax(fases['AVAXUSDT'])
 
     print(f"{'='*60}\n")
 

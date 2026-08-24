@@ -183,11 +183,19 @@ def obtener_corecro():
     except:
         return "Sin reporte CoreCro disponible."
 
+# Actualizar a mano cada vez que cambie el wiring de director_orquesta.py
+# (que francotiradores llama). Ultima actualizacion: 2026-08-25, combo O.
+# SOL y AVAX corren ambas fases (ALC/LAT) segun la fase local detectada —
+# a diferencia de BTC/ETH, que solo operan ALCISTA (LATERAL pausado por
+# codigo propio en ambos).
+FRANCOTIRADORES_ACTIVOS = "BTC-ALC, ETH-ALC, SOL-ALC/LAT, AVAX-ALC/LAT"
+
 def obtener_consejero():
     try:
         from consejero import consultar_consejero
         r = consultar_consejero()
         return (
+            f"🎯 Francotiradores activos: {FRANCOTIRADORES_ACTIVOS}\n\n"
             f"📊 <b>CONSEJERO</b>\n"
             f"Capital actual : ${r['capital_actual']}\n"
             f"Capital inicial: ${r['capital_inicial']}\n"
@@ -780,6 +788,49 @@ def reactivar_bot(chat_id):
     except Exception as e:
         return f"❌ Error reactivando: {e}"
 
+# Estados que representan una operacion real ejecutada (no RESERVADA/ANULADA).
+# La columna timestamp de cada fila es siempre la hora de ENTRADA -- nunca se
+# reescribe al cerrar (revisar_cierres() solo muta estado/precio) -- asi que
+# "tiempo sin operar" mide desde la ultima vez que el francotirador ENTRO a
+# un trade, no desde que cerro el ultimo.
+ESTADOS_OPERACION_REAL = {"ABIERTA", "TP", "SL", "TRAILING_SL", "BE"}
+
+def _ultima_operacion_por_symbol():
+    """{symbol: (timestamp_str, estado)} de la ultima fila real por symbol.
+    Agrupa por symbol (no por accion) -- SOL/AVAX cuentan como una sola
+    moneda sea que hayan operado ALCISTA o LATERAL."""
+    ultimas = {}
+    try:
+        with open(AUDITORIA_PATH, "r") as f:
+            lineas = f.readlines()[1:]
+    except Exception as e:
+        print(f"[TELEGRAM] Error leyendo auditoria para tiempo sin operar: {e}")
+        return ultimas
+    for linea in lineas:
+        p = linea.strip().split(",")
+        if len(p) < 6:
+            continue
+        if p[5].strip() in ESTADOS_OPERACION_REAL:
+            ultimas[p[2]] = (p[0], p[5].strip())
+    return ultimas
+
+def _texto_tiempo_sin_operar(symbol, ultimas_ops):
+    dato = ultimas_ops.get(symbol)
+    if dato is None:
+        return "⏱️ Sin operaciones registradas todavía"
+    ts_str, estado = dato
+    try:
+        dt       = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+        segundos = (datetime.now() - dt).total_seconds()
+        dias, resto  = divmod(int(segundos), 86400)
+        horas, resto = divmod(resto, 3600)
+        minutos      = resto // 60
+        duracion = f"{dias}d {horas}h" if dias > 0 else f"{horas}h {minutos}min"
+        return f"⏱️ Última operación: hace {duracion} ({estado}, {ts_str[:16]})"
+    except Exception as e:
+        print(f"[TELEGRAM] Error calculando tiempo sin operar {symbol}: {e}")
+        return "⏱️ Sin datos de última operación"
+
 def obtener_disparos():
     QUINTETO     = [("BTCUSDT","BTC"),("ETHUSDT","ETH"),("SOLUSDT","SOL"),("BNBUSDT","BNB"),("AVAXUSDT","AVAX")]
     DIFF_EMA_MAX = 2.0
@@ -817,6 +868,7 @@ def obtener_disparos():
         return round((1-diff/DIFF_EMA_MAX)*100,1)
 
     lineas = ["🎯 <b>ESTADO DE CADA MONEDA</b>\n"]
+    ultimas_ops = _ultima_operacion_por_symbol()
     for symbol, nombre in QUINTETO:
         cierres = fetch_velas(symbol, limite=210)
         if not cierres:
@@ -836,6 +888,7 @@ def obtener_disparos():
                 f"[{barra(0)}] 0% listo\n"
                 f"📍 {fase} | 🔴 SIN FRANCOTIRADOR ACTIVO\n"
                 f"⚙️ Esta moneda no opera en fase {fase}\n"
+                f"⏱️ No conectado a producción hoy (huérfano) — sin datos comparables\n"
                 f"💬 Sin señal posible hasta que cambie la fase\n──────────────"
             )
             continue
@@ -865,11 +918,13 @@ def obtener_disparos():
         motivos = []
         if not rsi_ok: motivos.append(f"RSI fuera de {rsi_min}-{rsi_max}")
         if not ema_ok: motivos.append("Medias muy separadas")
+        tiempo_sin_operar = _texto_tiempo_sin_operar(symbol, ultimas_ops)
         lineas.append(
             f"💱 <b>{nombre}</b> — ${precio}\n"
             f"[{barra(p_total)}] {p_total}% listo\n"
             f"📍 {fase} ({modulo_nombre.replace('francotirador_','')}) | {estado_emoji}\n"
             f"⚙️ {' | '.join(motivos) if motivos else 'Todo en orden'}\n"
+            f"{tiempo_sin_operar}\n"
             f"💬 {consejo}\n──────────────"
         )
     return "\n".join(lineas)

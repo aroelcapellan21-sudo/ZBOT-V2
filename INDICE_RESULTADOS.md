@@ -1,6 +1,6 @@
 # Índice de resultados — Z-Bot Padre v2
 
-Tabla de todos los backtests/pruebas cuantitativas corridos entre 2026-07-12 y 2026-08-24, con
+Tabla de todos los backtests/pruebas cuantitativas corridos entre 2026-07-12 y 2026-08-25, con
 métricas y veredicto. Fuente: los 176 reportes de `reports/*.md` + `INVESTIGACION.md`. Los
 reportes que son diagnóstico/infraestructura (no backtests de estrategia) no están acá — ver
 `ESTADO_ACTUAL.md` para esos.
@@ -119,3 +119,44 @@ nueva (backtest, prueba, auditoría con veredicto), se agrega una fila acá y se
 | Combo E (ETH-ALC + SOL-ALC + AVAX-ALC, sin BTC) | 798 | 48.0% | 1.300 | 3.399 | Mejor que A, racha de pérdidas peor (15) | `2026-08-24_torneo-francotiradores-fase1.md` |
 | Combo F (BTC-ALC + ETH-ALC + BNB-ALC) | 754 | 50.9% | 1.283 | 3.287 | Mejor que A | `2026-08-24_torneo-francotiradores-fase1.md` |
 | Combo G — hipotético (BTC-ALC + ETH-ALC + AVAX-BAJ, no ejecutable hoy) | 785 | 49.7% | 1.352 | 3.956 | Mejor de todos los probados, pero requiere Futuros | `2026-08-24_torneo-francotiradores-fase1.md` |
+
+### Fase 2 (25-ago) — 10 combinaciones nuevas, capital $100 (no comparable celda a celda con la tabla de arriba, base $1,000)
+
+| Combinación | n | WR | PF | Sharpe | Resultado | Reporte fuente |
+|---|---|---|---|---|---|---|
+| Combo N — BTC-ALC+ETH-ALC+AVAX-BAJ (confirmado real, no hipotético) | 785 | 49.7% | 1.352 | 3.956 | 🟢 Mejor de 3 de toda la investigación; requiere Futuros | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo H — BTC-ALC+SOL-ALC+AVAX-ALC | 753 | 44.6% | 1.273 | 3.020 | Mejor que A, no supera a B/N | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo I — BTC-ALC+SOL-ALC+BNB-LAT | 786 | 48.0% | 1.237 | 2.773 | Mejor que A, no supera a B/N | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo J — BTC-ALC+AVAX-ALC+BNB-LAT | 796 | 47.6% | 1.231 | 2.750 | Mejor que A, no supera a B/N | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo K — ETH-ALC+SOL-ALC+BNB-LAT | 831 | 51.0% | 1.267 | 3.180 | Mejor que A, no supera a B/N | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo L — ETH-ALC+AVAX-ALC+BNB-LAT (sin BTC, sin SOL) | 841 | 50.7% | 1.261 | 3.157 | Mejor que A; combinaciones sin BTC nunca superan a las que sí lo incluyen | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo M — SOL-ALC+AVAX-ALC+BNB-LAT (sin BTC, sin ETH) | 803 | 46.0% | 1.203 | 2.399 | Peor de las 10 nuevas | `2026-08-25_torneo-francotiradores-fase2.md` |
+| **Combo O — B + AVAX-ALC** (4 francotiradores, 100% ejecutable SPOT) | 1041 | 48.1% | 1.314 | **4.060** | 🟢 Mejor candidato ejecutable de toda la investigación (Sharpe y retorno), racha de pérdidas más larga (13) | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo P — B + BNB-LAT (4 francotiradores) | 1074 | 50.5% | 1.288 | 3.880 | Mejor que B, no supera a O | `2026-08-25_torneo-francotiradores-fase2.md` |
+| Combo Q — B + AVAX-BAJ (4 francotiradores, hipotético) | 1035 | 48.1% | 1.324 | **4.159** | Mejor Sharpe de toda la investigación, requiere Futuros | `2026-08-25_torneo-francotiradores-fase2.md` |
+
+**Perfil de perdedoras + circuit breaker (25-ago, capital $20 real)**: sin señal de aviso previo
+clara — RSI/volumen relativo/ATR% de entrada casi idénticos entre ganadoras y perdedoras en A y O.
+El tamaño del movimiento en contra en las perdedoras es esencialmente el SL configurado (mediana
+−4.83% A / −5.13% O), no una variable con distribución propia. Circuit breaker (3 pérdidas→pausa 7
+días, único parámetro probado, sin optimizar): mejora drawdown en ambas (A −15.38%→−12.51%, O
+−12.92%→−10.03%) pero es mixto — cuesta $1.48 en A, y en O **empeora la racha máxima de pérdidas
+(13→15)** pese a mejorar PF/WR/$ — resultado no limpio, reportado tal como salió. El 58-59% del
+costo total en $ viene de rachas cortas (1-3 pérdidas), no de las largas. Ver
+`2026-08-25_perfil-perdidas-circuit-breaker.md`.
+
+**Recálculo A vs. O con capital real $20** (mismos n/WR/PF/Sharpe que arriba, invariantes al
+capital): ganancia en $ idéntica en cualquier base ($24.03 A / $47.84 O, por `MONTO_FIJO` fijo);
+con $20, DD sube a −14.97% (A) / −12.92% (O), retorno a +120.17% (A) / +239.18% (O) — ver
+`2026-08-25_torneo-recalculo-capital-real-20.md` para el detalle de por qué cambia solo lo que
+depende de una base de capital y no lo demás.
+
+## Correlación entre monedas 25-ago — moneda líder vs. moneda operada
+
+*(Familia de 40 pruebas por fase — no una sola combinación n/WR/PF/Sharpe. Se resume en bloque,
+mismo criterio que el torneo.)*
+
+| Qué se probó | n | WR | PF | Sharpe | Resultado | Reporte fuente |
+|---|---|---|---|---|---|---|
+| **Fase A** — WR de moneda_operando según tendencia fuerte vs. lateral de moneda_contexto al momento de la entrada (5 monedas × 4 contextos × 2 criterios = 40 pruebas) | 22/40 pasan filtro rápido (n≥30, ΔWR≥5pp) | — | — | — | 🔴 Ninguna significativa — IC99.875% (Bonferroni/40) cruza cero en las 22; BNB como operando aparece en 7/22, sin confirmar | `2026-08-25_correlacion-5-monedas-fase-ab.md` |
+| **Fase B** — PnL/vela antes vs. después de que moneda_contexto entra en BAJISTA_FUERTE durante una posición ya abierta (40 combinaciones) | máx. 7 (de 40 combos) | — | — | — | ⚪ No evaluable — 0/40 combinaciones llegan a n≥30 casos de alerta válidos; limitación estructural (posiciones duran pocas velas frente a la escala diaria del criterio), no resultado nulo | `2026-08-25_correlacion-5-monedas-fase-ab.md` |

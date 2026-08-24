@@ -15,35 +15,60 @@ vez.
 
 - **Modo:** REAL, `BOT_REAL_CONFIRMADO=true` activo (llave persistente en
   `~/.bot_real_confirmado`, sobrevive reinicios — verificado en vivo 2 veces, corte real incluido).
-- **Capital nominal:** $20.00 USDT. USDT libre: $15.34 (al 2026-08-22).
-- **Francotiradores activos** (los únicos 3 que `director_orquesta.py` llama):
-  - **BTC ALCISTA** — RSI 50-70, SL 3.5%, TP 6.0%, EMA 20/50, `MAX_OP_TOTAL=1`. Puesto 4/15 en el
-    torneo (PF 1.369, Sharpe 2.346).
-  - **ETH ALCISTA** — RSI 60-75, SL 4.5%, TP 5.0%, EMA 20/100. **Mejor francotirador de los 15**
-    (PF 1.437, Sharpe 2.953).
-  - **SOL LATERAL** — RSI 43-57, SL 3.5%, TP 4.0%. **Puesto 12/15** — el más débil de los 3
-    activos hoy (PF 0.928, Sharpe −0.697 sobre 5.9 años) — ver "Cola de investigación".
-  - Posición abierta actual: ETH ALCISTA, $5, desde 2026-08-22.
+- **Capital nominal:** $20.00 USDT. USDT libre: $10.78 (al 2026-08-24).
+- **Combo O activado en producción — 24-ago.** `director_orquesta.py` ahora llama 4
+  francotiradores (antes 3): SOL pasó de LATERAL-solo a ALCISTA+LATERAL (según fase local, mismo
+  patrón que BTC/ETH), y se sumó AVAX (ALCISTA+LATERAL+BAJISTA, este último inerte por el gate
+  global de bajistas). Backtesteado como "Combo O" en el torneo (Sharpe 4.060 vs 2.62 de la config
+  anterior). Diagnóstico completo, diff y verificación en vivo:
+  `2026-08-25_diagnostico-cambio-produccion-avax-sol.md`, `2026-08-25_diff-final-combo-o.patch`.
+  - **BTC ALCISTA** — RSI 50-70, SL 3.5%, TP 6.0%, EMA 20/50, `MAX_OP_TOTAL=1`, `MONTO_FIJO=$5`.
+  - **ETH ALCISTA** — RSI 60-75, SL 4.5%, TP 5.0%, EMA 20/100, `MONTO_FIJO=$5` hardcodeado.
+  - **SOL ALCISTA/LATERAL** — RSI 50-70/43-57. **Cambio de sizing 24-ago**: pasó de
+    `CAPITAL_MAX_POR_OP=2%` a `MONTO_FIJO=$5` (mismo patrón que BTC), con chequeo previo contra
+    `MONTO_MINIMO_BINANCE` antes de reservar fila — ver siguiente punto, era un bloqueador real.
+  - **AVAX ALCISTA/LATERAL** — RSI 50-70/43-57. Mismo fix de sizing que SOL (idéntico código salvo
+    símbolo). Primera vez conectado a producción.
+  - Posiciones abiertas: BTC ALCISTA ($5, desde 2026-08-23) y ETH ALCISTA ($5, desde 2026-08-22) —
+    sin cambios por este despliegue, verificado con snapshots antes/después en
+    `reports/snapshots_combo_o/` (no versionados, gitignored).
+- **⚠️ Bloqueador de capital corregido, no solo detectado.** SOL/AVAX ALCISTA calculaban el monto
+  como 2% del capital libre — con capital real (~$10-20) eso daba ~$0.20-0.40/trade, por debajo del
+  mínimo de Binance ($5) que exige `ejecutor.py` (`MONTO_MINIMO_BINANCE=5.0`), así que toda señal
+  quedaba rechazada en silencio (fila `ANULADA`). El torneo no lo detectó porque backtesteó con
+  capital simulado de $100,000 (`sistema_c/torneo_generico.py`), donde 2% = $2,000. Corregido a
+  `MONTO_FIJO=5.0` en ambos francotiradores, mismo patrón que BTC/ETH.
+- **`gestor_correlacion.py` — `MAX_TRADES_MISMA_DIR=2`, sin tocar (decisión explícita de Ariel).**
+  Con los 4 francotiradores ahora ALCISTA, nunca va a haber más de 2 posiciones ALCISTA abiertas a
+  la vez en todo el sistema — el 3er/4to intento se bloquea ahí, no por falta de señal. Verificado
+  en vivo el primer ciclo post-activación (AVAX bloqueado por este gate con BTC+ETH ya abiertos).
+- **Telegram — 2 mejoras chicas, 24-ago:** `/consejero` ahora muestra una línea inicial
+  "🎯 Francotiradores activos: BTC-ALC, ETH-ALC, SOL-ALC/LAT, AVAX-ALC/LAT" (constante hardcodeada,
+  actualizar a mano si cambia el wiring); `/disparos` ahora muestra "⏱️ Última operación: hace Xd Xh"
+  por moneda (última fila `ABIERTA/TP/SL/TRAILING_SL/BE` en `auditoria.csv`, agrupado por symbol),
+  para detectar francotiradores inactivos demasiado tiempo. Diseño y diff:
+  `2026-08-25_diseno-tiempo-sin-operar.md`, `2026-08-25_diff-tiempo-sin-operar.patch`.
 - **Bajistas:** los 5 desactivados por gate global (`gestor_bajistas.py`, falta de capital en
   Futuros — no por mal resultado, ver Fase 3 del torneo: el grupo BAJISTA combinado da PF 1.074,
   positivo, con AVAX BAJISTA como 2° mejor francotirador de los 15).
-- **BNB y AVAX:** huérfanos en las 3 fases — código completo, sin ninguna pausa interna, pero
-  `director_orquesta.py` nunca los llama. AVAX ALCISTA (PF 1.231) y BNB LATERAL (PF 1.130) tienen
-  mejor evidencia que SOL LATERAL, el 3er activo actual.
+- **BNB:** sigue huérfano — código completo (3 fases sin pausa interna) pero
+  `director_orquesta.py` no lo llama. Nota nueva: sus 11 filas históricas en `auditoria.csv` son
+  todas `ANULADA` — nunca ejecutó un trade real ni siquiera cuando estuvo conectado (mismo
+  bloqueador de sizing que SOL/AVAX tenían, nunca corregido para BNB porque sigue desconectado).
 - **`config_cartera.py` no es fuente de verdad universal** — BTC ALCISTA lo ignora por completo
-  (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH ALCISTA y SOL LATERAL sí
-  lo leen en vivo.
+  (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
+  leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
 ## COLA DE INVESTIGACIÓN
 
 Ordenada por prioridad/impacto potencial, no por fecha.
 
-1. **Decisión pendiente — ¿reemplazar SOL LATERAL en producción?** El torneo (24-ago) muestra que
-   swapear SOL LATERAL por SOL ALCISTA (mismas 3 monedas, mismo capital) sube el Sharpe de la
-   config actual de 2.62 a 3.86 y es mucho más estable en walk-forward (nunca cae de PF 1.13 en 3
-   ventanas, contra PF 1.011 de la config actual en la ventana más reciente). AVAX ALCISTA es una
-   alternativa casi empatada. Ningún cambio se activó — decisión de Ariel. Ver
-   `2026-08-24_torneo-francotiradores-fase1.md`.
+1. ~~Decisión pendiente — ¿reemplazar/ampliar la config de producción?~~ **Resuelto 24-ago: Combo O
+   activado en producción** (ver "En producción ahora"). Nota viva: el peor caso teórico de $20
+   simultáneos (4×$5) en la práctica queda capado en $10 por `MAX_TRADES_MISMA_DIR=2`, que sigue sin
+   tocarse — así que la exposición real hoy es menor a la backtesteada como "worst case".
+   Pendiente de observación: **N** (BTC+ETH+AVAX-BAJISTA, Sharpe 3.96) seguía siendo mejor que O,
+   pero requiere Futuros — no descartado, solo fuera de alcance sin esa cuenta.
 2. **SOL LATERAL — filtro de volatilidad k=2.0, "prometedor no confirmado".** Mejor resultado de
    toda la línea de investigación de volatilidad (PF 1.768, Sharpe 1.704, +$3.53 vs. baseline) pero
    depende de una sola ventana de 6 meses (PF 5.88). Si se junta más historia de SOL con el tiempo,
@@ -71,6 +96,12 @@ Ordenada por prioridad/impacto potencial, no por fecha.
 9. **Bajistas en Futuros** — el torneo confirma señal real (grupo BAJISTA PF 1.074, AVAX BAJISTA
    2° mejor de los 15), pero activarlos requiere cuenta de Futuros y reescribir
    `ejecutor.py:cerrar_posicion` — no iniciado, no es tarea de backtest.
+10. **Fase B de correlación entre monedas — rediseño pendiente.** Con la ventana de 3 velas
+    antes/después pedida, 0/40 combinaciones llegan a n≥30 casos de alerta (máx. observado 7) — las
+    posiciones duran muy pocas velas frente a la escala diaria del criterio de tendencia. Un diseño
+    distinto (sin el requisito de margen, o con ventana fija post-entrada en vez de vela a vela
+    hasta el cierre) podría generar más muestra, pero es una pregunta distinta a la ya cerrada. Ver
+    `2026-08-25_correlacion-5-monedas-fase-ab.md`.
 
 ## CERRADO RECIENTEMENTE
 
@@ -78,6 +109,15 @@ Más reciente primero. Ver `INDICE_RESULTADOS.md` para el detalle de métricas d
 
 | Fecha | Investigación | Veredicto |
 |---|---|---|
+| 24-ago | **[PRODUCCIÓN]** Activación Combo O — SOL ALCISTA+LATERAL, AVAX conectado por primera vez | Aplicado y verificado en vivo. Diagnóstico previo detectó bloqueador crítico (sizing SOL/AVAX por debajo del mínimo Binance) antes de tocar nada; corregido a `MONTO_FIJO=$5` en ambos. Posiciones BTC/ETH abiertas intactas (snapshots antes/después). Ver `2026-08-25_diagnostico-cambio-produccion-avax-sol.md`, `2026-08-25_diff-final-combo-o.patch` |
+| 24-ago | **[PRODUCCIÓN]** Telegram — línea de francotiradores activos (`/consejero`) y tiempo sin operar (`/disparos`) | 2 cambios chicos aplicados y verificados. `/disparos` reusa infraestructura existente (no comando nuevo) — extiende el loop por moneda ya presente. Ver `2026-08-25_diseno-tiempo-sin-operar.md`, `2026-08-25_diff-tiempo-sin-operar.patch`, `2026-08-25_diff-linea-francotiradores-telegram.patch` |
+| 25-ago | *(proyecto separado, `~/experimento_director_adaptativo/`)* BNB — ¿caída de BTC como señal de ENTRADA? (3 variantes: inmediata, 1 vela después, gate adicional) | 🔴 Descartado, las 3 variantes. Entrada inmediata peor que la real (WR 42.3% vs 45.3%, PF 0.982); con 1 vela de espera queda empatada (no significativo, Δ−0.06% IC95%[−1.13,0.99]); como gate adicional mejora en el punto central (+0.98% vs −0.03%/trade) pero no significativo (IC95%[−1.30,3.25]) y sin consistencia año a año (n=1-3 en varios años). El rebote de 24h es real pero chico (mediana +0.88%) frente al TP real (6.5%) — no sobrevive a un trade completo. Ver `experimento_director_adaptativo/reports/2026-08-25_bnb-entrada-tras-caida-btc.md` |
+| 25-ago | *(proyecto separado, `~/experimento_director_adaptativo/`)* Profundización BTC→BNB (par más consistente del ranking de correlación) | Hallazgo contrario a la hipótesis: BTC cae ≥3%/24h → BNB tiende a **rebotar** (mediana +0.88%, bootstrap significativo IC95% [0.21,1.33], consistente 9/10 años), no a caer con él. BTC sube fuerte no muestra reacción significativa. No sirve como señal de aviso para cerrar BNB — sugiere lo opuesto. Profundizado en la fila de arriba (como señal de entrada, también descartado). Ver `experimento_director_adaptativo/reports/2026-08-25_btc-lidera-bnb.md` |
+| 25-ago | *(proyecto separado, `~/experimento_director_adaptativo/`)* Director adaptativo Fase 1+1B — cambiar dinámicamente entre A y O según fase global de mercado, 9 combinaciones de ventana/líder/frecuencia | Descartado en 8 de 9 combinaciones — pero **ventana 150 + voto 5 monedas + revisión diaria SÍ supera a O fijo** (Sharpe 4.336 vs 4.060, PnL $50.40 vs $47.84, mejor racha), con el trade-off de peor drawdown (−14.62% vs −12.92%). No es una tendencia general de "detectar más rápido = mejor" — es una combinación específica frágil. Ver `experimento_director_adaptativo/reports/2026-08-25_fase1-viabilidad.md` y `-fase1b-deteccion-rapida.md` |
+| 25-ago | Perfil de perdedoras + circuit breaker (A y O, $20 real) | Sin señal de aviso previo clara (RSI/volumen/ATR de entrada casi iguales ganadoras/perdedoras); circuit breaker (3 pérdidas→pausa 7 días) mejora DD en ambas pero es mixto (cuesta $ en A, empeora la racha máxima en O); mayor parte del costo viene de rachas cortas (1-3), no largas |
+| 25-ago | Recálculo A vs. O con capital real ($20) | Ganancia en $ idéntica en cualquier capital base ($24.03/$47.84, `MONTO_FIJO` fijo); WR/PF/Sharpe/racha invariantes; DD%/retorno%/peor30d% sí cambian (DD de O sube a −12.92% con $20); O requiere hasta $20 simultáneos (4 francotiradores × $5), sin margen libre hoy |
+| 25-ago | Torneo de francotiradores — Fase 2 (10 combinaciones nuevas, 3 y 4 francotiradores) | O (4 francotiradores, 100% SPOT) supera a B en Sharpe y retorno; N (con AVAX bajista) sigue siendo el mejor de 3 pero requiere Futuros; ninguna significativa vs A/B (ver cola #1) |
+| 25-ago | Correlación 5 monedas — Fase A (entradas) y Fase B (posiciones abiertas) | Fase A: ninguna de 40 combinaciones significativa (IC cruza cero en las 22 que pasan el filtro); Fase B: no evaluable, 0/40 combos llegan a n≥30 (máx. observado 7) — limitación estructural, no resultado nulo (ver cola #10) |
 | 24-ago | Torneo de francotiradores (15 combinaciones, Fase 1) | ALCISTA significativamente mejor que LATERAL; config actual no es la óptima (ver cola #1) |
 | 24-ago | Volatilidad como filtro de entrada (BTC/ETH/SOL) | BTC/ETH empeoran, SOL prometedor no confirmado (ver cola #2) |
 | 24-ago | Volatilidad como aviso de salida (postergación) | 🔴 Descartado — mediana 0.00pp pese a n≥30 |

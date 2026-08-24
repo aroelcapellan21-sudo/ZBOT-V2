@@ -833,6 +833,18 @@ Esto puede ser **fortaleza** (evita pérdidas en corrección) o **limitación** 
 > y la tabla de estado real en `CLAUDE.md`. Cualquier decisión sobre Sistema C que compare contra
 > "Producción BTC" debería re-verificarse contra los parámetros reales antes de usarse.
 
+> **Actualización (2026-08-24) — veredicto cerrado, ya no "🟡 PROMETEDOR":** re-testeado dentro del
+> sandbox `evaluar()` de producción completo (los 11 gates reales restantes intactos, no un
+> baseline simplificado), con SL/TP reales de BTC (3.5%/6.0%) y 9 años de histórico. Resultado:
+> n=101, WR 47.5%, PF 1.284, Sharpe 1.223 — **peor que la config real** (baseline PF 1.369, Sharpe
+> 2.346; bootstrap delta media −0.216%, IC99% [−2.04%, +1.66%], no significativo). Walk-forward de
+> 3 ventanas equiespaciadas muestra **degradación monótona hacia el presente**: PF 1.647 → 1.337 →
+> **0.945** (Sharpe 1.408 → 0.818 → **−0.161**) — la ventana más reciente (2023-04→2025-10) ya es
+> perdedora en términos absolutos. Esto confirma y agrava la reserva ya señalada arriba ("0 trades
+> en el forward 2026, BTC bajo su EMA200d") — el candidato no solo perdió actividad, perdió
+> rentabilidad de forma consistente. **Veredicto actualizado: 🔴 DESCARTADO — no activar.** Detalle
+> completo en `reports/2026-08-24_fase2b-gates-restantes.md`, item 9.
+
 ---
 
 ## Plan Maestro — Investigación y selección de 5 monedas / francotiradores
@@ -1110,3 +1122,78 @@ Archivo completo con comandos: `CHECKLIST_CAPITAL.md` en la raíz del proyecto.
 - **Centinela muestra $1000**: `estado_global.py` cae al fallback si la ruta de billetera.json es incorrecta (bug histórico: typo `bot-padre-v8`, corregido 2026-08-15, commit `349b53c`)
 - **Consejero en CRITICO**: `CAPITAL_BASE` viejo → porcentaje calculado incorrecto (ej. $8.54/$20 = 42.7% → CRITICO)
 - **Lateral genera ANULADA**: `francotirador_lateral_bnb.py` usa `capital × 2%` = $0.17 < mínimo Binance. Corregido 2026-08-15 desactivando el lateral en `director_bnb.py` (commit `c16683c`)
+
+---
+
+## Investigación de perfil de gates por moneda — BTC y ETH ALCISTA (ago 2026)
+
+Serie de 4 fases, todas solo backtest/solo lectura, mismo sandbox `evaluar()`/`revisar_cierres()`
+literal usado en toda esta línea de investigación (9 años de histórico, 2017-09 → 2026-08). Ningún
+candidato se activó en producción, sin excepción, en ninguna de las 4 fases.
+
+### Fase 1 — banco de candidatos (`reports/2026-08-23_banco-candidatos-gates.md`)
+
+Inventario de los 12 gates reales de `evaluar()` para BTC/ETH ALCISTA (umbral real + variantes
+propuestas por gate) más 4 candidatos adicionales nunca convertidos en gate de producción:
+EMA50-BASE20 (breakout + pendiente EMA50), compresión EMA20/100<1%, correlación cross-moneda
+(descartado como no aplicable directamente), y Sistema C para BTC (RSI 55-60 + EMA200d). Solo
+lista, sin backtest todavía.
+
+### Fase 2 — aporte individual, primer lote (`reports/2026-08-23_fase2-aporte-individual-gates.md`)
+
+Probó RSI/EMA de entrada (8 variantes), `MAX_OP_TOTAL` (2/3 vs. 1 real) y la EMA hardcodeada de
+`detector_multitimeframe` — 16 comparaciones (8×2 monedas), bootstrap α=0.00625 (Bonferroni).
+**Ninguna significativa.** Hallazgos: cambiar la EMA de multitimeframe no tiene efecto medible
+(cierra esa línea); `MAX_OP_TOTAL=2` sube el Sharpe en ambas monedas (BTC 2.346→3.211, ETH
+2.953→3.537) pero empeora drawdown/racha de pérdidas y se debilita en el walk-forward más
+reciente de BTC (PF 1.040) — trade-off genuino, no ganancia limpia. **Decisión de Ariel
+(2026-08-23): NO implementar `MAX_OP_TOTAL=2`** — config sin cambios.
+
+### Auditoría de gates inertes por remoción completa (`reports/2026-08-24_auditoria-gates-inertes.md`)
+
+A diferencia de variar un umbral, remueve por completo del flujo 3 gates con evidencia previa de
+inercia: `limitador_diario`, componente `MAX_TRADES_MISMA_DIR` de `gestor_correlacion`, y
+`detector_multitimeframe` completo (no solo su EMA). Resultado: los dos primeros dan **resultado
+byte-idéntico** al quitarlos (0 diferencia en n/WR/PF/Sharpe en las 3 ventanas walk-forward de
+ambas monedas) — inercia total confirmada para `limitador_diario`; para `MAX_TRADES_MISMA_DIR` el
+resultado es un artefacto trivial del sandbox de un solo símbolo (no puede medir el rol real
+cross-moneda), no evidencia nueva. `detector_multitimeframe` completo agrega solo 6 trades BTC/1
+ETH sobre 243/288, sin significancia — cierra la línea abierta en Fase 2 (ya se sabía que su EMA
+no importaba; ahora se confirma que el gate entero tampoco). **Recomendación: no tocar ninguno de
+los 3** — sin ganancia medible en quitarlos, y los dos primeros quedan como redes de seguridad
+estructurales ante escenarios que este backtest no puede poner a prueba (más capital, más
+monedas activas, mayor frecuencia).
+
+### Fase 2-B — gates y candidatos restantes (`reports/2026-08-24_fase2b-gates-restantes.md`)
+
+**Parte 1** — umbrales de los 6 gates que faltaban de Fase 1: `filtro_horario` (ventana 2-23h/
+6-19h), `filtro_calidad` (ATR 0.2%/0.5%, volumen 0.4×/0.7×), `filtro_estadístico` (racha de
+bloqueo 4 / ampliada a 5-6), `memoria_propia` (perdidas_ultimos_5 2/4, MIN_TRADES 10/20 — probado
+con una memoria rodante simulada, ver nota metodológica en el reporte, ya que el módulo real
+depende de `auditoria.csv` de producción no reconstruible en un backtest de 1 símbolo),
+`gestor_correlacion` fase-macro (`UMBRALES_FASE` BTC 1.0/1.5 y 2.0/3.0). `filtro_eventos` (ancho
+de ventana) se resolvió por argumento analítico, no simulación: con evaluación una vez por vela de
+4h, solo el evento de 20:00 UTC cae exacto en un límite de vela — el ancho de la ventana no puede
+cambiar el resultado. **28 comparaciones (14×2 monedas), α=0.00357 (Bonferroni), ninguna
+significativa.**
+
+**Parte 2** — 3 candidatos con motores de backtest propios:
+- **EMA50-BASE20 (BTC, item 7):** recalculado con el SL correcto (3.5%, no el 5.0% usado por error
+  en la Prueba 8C original hecha en chat sin Code). Con 9 años (n=2,298 vs. ~200 original):
+  sin gate PF 1.214, con gate PF 1.231, delta +0.032% IC95% [−0.237%, +0.311%] — **no
+  significativo, confirma NO IMPLEMENTAR con muestra ~15× mayor.** Candidato cerrado.
+- **Compresión EMA20/100<1% (BTC/ETH, item 8):** extendido de 8 meses a 9 años. BTC n=31 (antes
+  0), ETH n=38 (antes 2) — ahora ambos superan el umbral n≥30, pero direcciones opuestas entre
+  monedas (BTC PF 1.878 mejor, ETH PF 1.214 peor que baseline), ninguna significativa, ventanas de
+  walk-forward individuales (10-14 trades) siguen chicas. Sigue sin ser candidato viable.
+- **Sistema C (BTC, item 9):** ver actualización en la sección "Investigación BTC ALCISTA — ago
+  2026" arriba — **veredicto cambiado de 🟡 PROMETEDOR a 🔴 DESCARTADO.**
+
+### Conclusión de la serie completa (Fase 1 → Fase 2 → gates inertes → Fase 2-B)
+
+Con las 4 fases, la investigación de perfil de gates para BTC y ETH ALCISTA queda completa: los 12
+gates de producción más 4 candidatos adicionales nunca implementados, todos backtesteados con
+walk-forward y bootstrap. **Ningún cambio de umbral ni candidato nuevo tiene evidencia que
+justifique tocar la configuración actual.** El hallazgo más accionable de toda la serie es
+negativo pero útil: Sistema C para BTC, que llevaba meses como "🟡 PROMETEDOR" pendiente de más
+evidencia, queda formalmente descartado con evidencia de degradación clara.

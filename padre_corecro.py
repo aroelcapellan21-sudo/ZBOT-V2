@@ -36,11 +36,14 @@ def ejecutar_corecro():
     except Exception as e:
         registrar_corecro(f"Error leyendo reporte: {e}")
 
-    try:
-        evaluar_alertas_extremas(resultados)
-    except Exception as e:
-        registrar_corecro(f"Error evaluando alertas extremas: {e}")
-        print(f"[CORECRO] Error alertas: {e}")
+    # Aviso automatico desactivado (2026-08-19, pedido de Ariel): resultaba
+    # demasiado frecuente. /corecro y /senales siguen disponibles en Telegram
+    # bajo pedido. Para reactivar, descomentar el bloque de abajo.
+    # try:
+    #     evaluar_alertas_extremas(resultados)
+    # except Exception as e:
+    #     registrar_corecro(f"Error evaluando alertas extremas: {e}")
+    #     print(f"[CORECRO] Error alertas: {e}")
 
     print("✔ CoreCro: reporte generado silenciosamente")
 

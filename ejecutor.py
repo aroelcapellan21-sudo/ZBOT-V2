@@ -81,6 +81,20 @@ def _truncar_cantidad(symbol, qty):
     paso      = Decimal(1).scaleb(-decimales)
     return float(Decimal(str(qty)).quantize(paso, rounding=ROUND_DOWN))
 
+def _formatear_qty(symbol, qty):
+    """
+    Devuelve la cantidad en notacion decimal fija para el parametro 'quantity'
+    de Binance. NUNCA usar f"{qty}" con un float: Python convierte a notacion
+    cientifica cualquier valor absoluto menor a 1e-4 (str(5.994e-05) ==
+    '5.994e-05'), y Binance rechaza eso con -1100 "Illegal characters found
+    in parameter 'quantity'" (regex de Binance para ese campo no acepta 'e').
+    Pasa siempre con BTC: $5 de monto a ~$80.000 da qty~0.0000625,
+    por debajo de 1e-4.
+    """
+    decimales = LOT_SIZE.get(symbol, 6)
+    paso      = Decimal(1).scaleb(-decimales)
+    return format(Decimal(str(qty)).quantize(paso, rounding=ROUND_DOWN), "f")
+
 def _cargar_keys():
     api_key = secret = None
     try:
@@ -148,7 +162,7 @@ def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
     if quote_qty is not None:
         params["quoteOrderQty"] = f"{quote_qty:.2f}"
     elif base_qty is not None:
-        params["quantity"] = f"{base_qty}"
+        params["quantity"] = _formatear_qty(symbol, base_qty)
     else:
         raise ValueError("Debe especificarse quote_qty o base_qty")
 

@@ -224,7 +224,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
         print(f"  [AUDITORIA] Error leyendo: {e}")
         fcntl.flock(_lk, fcntl.LOCK_UN)
         _lk.close()
-        return
+        return False
 
     header = (
         lineas[0]
@@ -233,6 +233,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
     )
 
     nuevas_lineas = [header]
+    cerro_algo = False
 
     for linea in lineas[1:]:
         partes = linea.strip().split(",")
@@ -346,6 +347,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         continue
 
                     partes[5] = "TP"
+                    cerro_algo = True
 
                     _contabilizar(
                         registrar_tp,
@@ -406,6 +408,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                     if be_activo and sl_efectivo >= be_price:
 
                         partes[5] = "BE"
+                        cerro_algo = True
 
                         _contabilizar(
                             registrar_sl,
@@ -439,6 +442,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                     elif trailing_on:
 
                         partes[5] = "TRAILING_SL"
+                        cerro_algo = True
 
                         _contabilizar(
                             registrar_sl,
@@ -470,6 +474,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                     else:
 
                         partes[5] = "SL"
+                        cerro_algo = True
 
                         _contabilizar(
                             registrar_sl,
@@ -537,6 +542,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
 
     fcntl.flock(_lk, fcntl.LOCK_UN)
     _lk.close()
+    return cerro_algo
 
 
 def evaluar():
@@ -603,10 +609,12 @@ def evaluar():
         )
         return
 
-    revisar_cierres(
+    if revisar_cierres(
         precio_actual,
         evaluar_tp=True
-    )
+    ):
+        print(f"  ⏸️ {SYMBOL}: posición cerrada este ciclo — sin evaluar entrada nueva hasta el próximo.")
+        return
 
     rsi = calcular_rsi(cierres)
     ema_c = calcular_ema(

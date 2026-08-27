@@ -163,10 +163,11 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
     except Exception as e:
         print(f"  [AUDITORIA] Error leyendo: {e}")
         _lk.close()
-        return
+        return False
 
     header        = lineas[0] if lineas else "timestamp,accion,symbol,precio,rsi,estado,monto,qty\n"
     nuevas_lineas = [header]
+    cerro_algo    = False
 
     for linea in lineas[1:]:
         partes = linea.strip().split(",")
@@ -213,7 +214,8 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         enviar_aviso(f"⚠️ ERROR CIERRE {SYMBOL}\nNo se pudo cerrar posición en Binance (TP).\nPosición queda ABIERTA — reintentando próximo ciclo.\nError: {res_cierre}")
                         nuevas_lineas.append(linea)
                         continue
-                    partes[5] = "TP"
+                    partes[5]  = "TP"
+                    cerro_algo = True
                     _contabilizar(registrar_tp, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                  qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                     enviar_aviso(f"✅ TP ALCANZADO {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nGanancia: +{round(cambio,2)}%")
@@ -229,7 +231,8 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         nuevas_lineas.append(linea)
                         continue
                     if be_activo and sl_efectivo >= be_price:
-                        partes[5] = "BE"
+                        partes[5]  = "BE"
+                        cerro_algo = True
                         _contabilizar(registrar_sl, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                      qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(
@@ -242,14 +245,16 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                         registrar_evento(f"ALCISTA SOL: BE {SYMBOL} protegido tras {round(velas_abiert,1)} velas")
                         print(f"  🛡️ BE: ${precio_entrada} → ${sl_efectivo} protegido")
                     elif trailing_on:
-                        partes[5] = "TRAILING_SL"
+                        partes[5]  = "TRAILING_SL"
+                        cerro_algo = True
                         _contabilizar(registrar_sl, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                      qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(f"🎯 TRAILING SL {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}")
                         registrar_evento(f"ALCISTA SOL: TRAILING_SL {SYMBOL} ${sl_efectivo}")
                         print(f"  🎯 TRAILING_SL: ${precio_entrada} → ${sl_efectivo}")
                     else:
-                        partes[5] = "SL"
+                        partes[5]  = "SL"
+                        cerro_algo = True
                         _contabilizar(registrar_sl, precio_entrada, precio_actual, monto_op, MONEDA, TIPO_TRADE,
                                      qty=(fill_cierre or {}).get("qty"), usdt=(fill_cierre or {}).get("usdt"))
                         enviar_aviso(f"🛑 SL {SYMBOL}\nEntrada: ${precio_entrada}\nSalida: ${precio_actual}\nPerdida: -{STOP_LOSS}%")
@@ -274,6 +279,7 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
     except Exception as e:
         print(f"  [AUDITORIA] ERROR CRITICO guardando: {e}")
     _lk.close()
+    return cerro_algo
 
 def evaluar():
     print(f"[FRANCOTIRADOR ALCISTA SOL] Evaluando {SYMBOL}...")
@@ -309,7 +315,9 @@ def evaluar():
         revisar_cierres(precio_actual, evaluar_tp=False)
         return
 
-    revisar_cierres(precio_actual, evaluar_tp=True)
+    if revisar_cierres(precio_actual, evaluar_tp=True):
+        print(f"  ⏸️ {SYMBOL}: posición cerrada este ciclo — sin evaluar entrada nueva hasta el próximo.")
+        return
 
     rsi   = calcular_rsi(cierres)
     ema_c = calcular_ema(cierres, EMA_CORTA)

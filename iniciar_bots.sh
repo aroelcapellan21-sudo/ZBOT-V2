@@ -20,8 +20,6 @@ leer_key() {
     grep "^$1=" "$KEYS" | cut -d= -f2
 }
 
-ANTHROPIC_API_KEY=$(leer_key "ANTHROPIC_API_KEY")
-
 # ¿Ya hay un proceso python VIVO de este script lanzado desde ESTE directorio?
 # Guard de fondo: la detección por nombre de screen falla bajo cron (el socket dir
 # de screen difiere y no ve las sesiones), por eso duplicaba. Verificar el proceso
@@ -112,7 +110,7 @@ iniciar z_executor   ~/zbot/radar "python3 radar_executor.py"
 # --- Core del bot ---
 iniciar z_diagnostico  "$DIR" "python3 auto_diagnostico.py"
 iniciar z_dashboard_v2 "$DIR" "python3 z_webserver_v2.py"
-iniciar z_asistente    "$DIR" "ANTHROPIC_API_KEY='$ANTHROPIC_API_KEY' python3 asistente.py"
+iniciar z_asistente    "$DIR" "python3 asistente.py"
 
 # --- Túnel cloudflared ---
 iniciar z_tunnel "$DIR" "python3 tunnel_asistente.py"

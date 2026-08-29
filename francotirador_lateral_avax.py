@@ -286,6 +286,13 @@ def evaluar():
 
     precio_actual = cierres[-1]
 
+    # LATERAL PAUSADO 2026-08-29: torneo 24-ago marca esta fase como debil
+    # (PF 0.985, sin ganancia neta). revisar_cierres queda activo para proteger
+    # posiciones abiertas si las hubiera.
+    revisar_cierres(precio_actual, evaluar_tp=True)
+    print("  [LATERAL AVAX] Fase pausada — sin entradas nuevas.")
+    return
+
     if esta_bloqueado():
         print("  🚨 Guardian activo.")
         revisar_cierres(precio_actual, evaluar_tp=False)

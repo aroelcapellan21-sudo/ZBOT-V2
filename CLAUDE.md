@@ -256,6 +256,25 @@ ciclo de trades.
 Historial completo de los fixes que llevaron a este contrato (ejecutor #3/#4, guardian #7,
 reconciliar #9, auditoría pre-REAL): ver `INVESTIGACION.md`.
 
+## Cambios que afectan capital, monto por trade o cantidad de monedas simultáneas
+**Regla permanente (desde 2026-08-30).** Antes de aplicar cualquier cambio que toque capital,
+`MONTO_FIJO`/monto por trade, o cuántas monedas pueden operar a la vez (`MAX_OP_TOTAL`, cantidad
+de francotiradores conectados), es obligatorio presentar un **análisis de efectos secundarios**
+ANTES de implementar — no alcanza con "esto resuelve el problema X".
+
+El análisis tiene que decir explícitamente: *"esto también podría causar Y y Z en otras partes del
+sistema — revisado y descartado/confirmado"*, con evidencia real (código, números, logs), no
+opinión. Ejemplo del formato esperado: ver
+`reports/2026-08-30_analisis-riesgo-subir-monto-por-trade.md` (subir el monto por trade resuelve
+el NOTIONAL, pero reduce cuántas monedas pueden operar a la vez con el mismo capital — ambos
+efectos, el buscado y el secundario, cuantificados antes de decidir).
+
+**No se avanza a la implementación hasta que Ariel confirme explícitamente ese análisis.** Mismo
+espíritu que la regla de "aprobar antes de cambios" para francotiradores (backtest antes de
+aplicar), pero específico para cambios de capital/sizing: acá el backtest no alcanza porque el
+riesgo no es de estrategia, es de mecánica de cuenta (NOTIONAL, concentración, margen del
+guardián).
+
 ## Constitución (reglas irrompibles)
 - El capital base nunca se retira — solo ganancias netas
 - La inacción es victoria si el capital está en riesgo

@@ -1,6 +1,8 @@
 from flask import Flask, request, jsonify, render_template_string, session
 import anthropic, os, json
-from datetime import datetime
+import hmac, hashlib, time, urllib.request, urllib.parse, urllib.error
+import subprocess
+from datetime import datetime, timedelta
 from historial_precios import leer_historial_formateado as _historial_precios
 
 app = Flask(__name__, static_folder='static')
@@ -98,6 +100,111 @@ def leer_billetera():
     except Exception as e:
         return f"Error leyendo billetera: {e}\n"
 
+def _cargar_keys_lectura():
+    keys_file = os.path.expanduser("~/bot-padre-v2/keys.env")
+    api_key = secret = None
+    with open(keys_file) as f:
+        for linea in f:
+            if linea.startswith("BINANCE_API_KEY_LECTURA="):
+                api_key = linea.strip().split("=", 1)[1]
+            elif linea.startswith("BINANCE_API_SECRET_LECTURA="):
+                secret = linea.strip().split("=", 1)[1]
+    if not api_key or not secret:
+        raise RuntimeError("BINANCE_API_KEY_LECTURA o BINANCE_API_SECRET_LECTURA no encontradas en keys.env")
+    return api_key, secret
+
+def _binance_get_firmado(path, params, api_key, secret):
+    params = dict(params, timestamp=int(time.time() * 1000), recvWindow=5000)
+    query = urllib.parse.urlencode(params)
+    firma = hmac.new(secret.encode(), query.encode(), hashlib.sha256).hexdigest()
+    url = f"https://api.binance.com{path}?{query}&signature={firma}"
+    req = urllib.request.Request(url, headers={"X-MBX-APIKEY": api_key})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        return json.loads(resp.read())
+
+def _posiciones_abiertas_auditoria():
+    """
+    Activos con una fila ABIERTA o RESERVADA en auditoria.csv ahora mismo —
+    la unica fuente para distinguir un saldo que es una posicion real del
+    bot de un resto de polvo de una operacion ya cerrada.
+    """
+    posiciones = {}
+    try:
+        ruta = os.path.join(BOT_DIR, 'auditoria.csv')
+        with open(ruta) as f:
+            for linea in f:
+                partes = linea.strip().split(',')
+                if len(partes) < 6 or partes[5] not in ('ABIERTA', 'RESERVADA'):
+                    continue
+                activo = partes[2].replace('USDT', '')
+                posiciones[activo] = posiciones.get(activo, 0.0)
+    except Exception:
+        pass
+    return posiciones
+
+def leer_binance_real():
+    """
+    Estado real de la cuenta de Binance via la key de SOLO LECTURA
+    (BINANCE_API_KEY_LECTURA en keys.env — no puede operar ni retirar).
+    Complementa signals/billetera.json (contabilidad interna del bot) con lo
+    que Binance dice que hay de verdad ahora mismo: util para detectar
+    descuadres como el de BTC del 23/27-ago-2026 (fila marcada TP sin venta
+    real, ver reports/2026-08-29_prioridad2-confirmado-tp-fantasma-y-bloqueo-btc-activo.md).
+    """
+    try:
+        api_key, secret = _cargar_keys_lectura()
+    except Exception as e:
+        return f"\nCUENTA REAL BINANCE: no disponible ({e})\n"
+
+    texto = "\nCUENTA REAL DE BINANCE (via key de solo lectura, dato en vivo):\n"
+    try:
+        cuenta = _binance_get_firmado("/api/v3/account", {}, api_key, secret)
+        posiciones_bot = _posiciones_abiertas_auditoria()
+        liquidez, reales, polvo = [], [], []
+        for b in cuenta.get("balances", []):
+            libre, bloqueado = float(b["free"]), float(b["locked"])
+            if libre <= 0 and bloqueado <= 0:
+                continue
+            activo = b["asset"]
+            if activo.startswith("LD") or activo in ("USDT", "USDC", "BUSD", "FDUSD"):
+                liquidez.append((activo, libre, bloqueado))
+            elif activo in posiciones_bot:
+                reales.append((activo, libre, bloqueado))
+            else:
+                polvo.append((activo, libre, bloqueado))
+
+        texto += "- Posiciones reales activas (coinciden con fila ABIERTA/RESERVADA en auditoria.csv):\n"
+        for activo, libre, bloqueado in reales:
+            texto += f"  {activo}: {libre} / {bloqueado}\n"
+        if not reales:
+            texto += "  ninguna\n"
+
+        texto += "- Polvo (saldo residual de operaciones ya cerradas — NO es una posición activa):\n"
+        for activo, libre, bloqueado in polvo:
+            texto += f"  {activo}: {libre} / {bloqueado}\n"
+        if not polvo:
+            texto += "  ninguno\n"
+
+        texto += "- Liquidez (USDT / estables / Earn):\n"
+        for activo, libre, bloqueado in liquidez:
+            texto += f"  {activo}: {libre} / {bloqueado}\n"
+    except Exception as e:
+        texto += f"- Error consultando saldos reales: {e}\n"
+
+    try:
+        ordenes = _binance_get_firmado("/api/v3/openOrders", {}, api_key, secret)
+        if ordenes:
+            texto += "- Órdenes abiertas en Binance ahora mismo:\n"
+            for o in ordenes:
+                texto += (f"  {o['symbol']} {o['side']} {o['type']} qty={o['origQty']} "
+                          f"precio={o.get('price')} status={o['status']}\n")
+        else:
+            texto += "- Órdenes abiertas en Binance ahora mismo: ninguna\n"
+    except Exception as e:
+        texto += f"- Error consultando órdenes abiertas: {e}\n"
+
+    return texto
+
 def leer_auditoria():
     try:
         ruta = os.path.join(BOT_DIR, 'auditoria.csv')
@@ -171,6 +278,56 @@ def interpretar_screens():
         texto += f"- CAÍDOS: {', '.join(s['caidos'])}\n"
     else:
         texto += "- Todo corriendo correctamente\n"
+    return texto
+
+def leer_recursos_sistema():
+    texto = "\nRECURSOS DEL SISTEMA:\n"
+    try:
+        salida = subprocess.run(['free', '-m'], capture_output=True, text=True, timeout=5).stdout
+        for linea in salida.splitlines():
+            if linea.startswith('Mem:'):
+                p = linea.split()
+                texto += f"- RAM: {p[2]}MB usados / {p[1]}MB total ({p[3]}MB libres)\n"
+                break
+    except Exception as e:
+        texto += f"- Error leyendo RAM: {e}\n"
+    try:
+        salida = subprocess.run(['ps', '-eo', 'stat'], capture_output=True, text=True, timeout=5).stdout
+        zombies = sum(1 for l in salida.splitlines() if l.strip().startswith('Z'))
+        texto += f"- Procesos zombie: {zombies}\n"
+    except Exception as e:
+        texto += f"- Error contando zombies: {e}\n"
+    return texto
+
+def leer_estado_francotiradores():
+    ruta = os.path.join(BOT_DIR, 'CLAUDE.md')
+    try:
+        with open(ruta, encoding='utf-8') as f:
+            contenido = f.read()
+    except Exception as e:
+        return f"\nError leyendo CLAUDE.md: {e}\n"
+    inicio = contenido.find('## Estado real de francotiradores')
+    if inicio == -1:
+        return "\nNo se encontró la tabla de francotiradores en CLAUDE.md.\n"
+    fin = contenido.find('\n## ', inicio + 1)
+    return f"\n{contenido[inicio:fin if fin != -1 else None]}\n"
+
+def leer_reports_recientes(dias=2):
+    carpeta = os.path.join(BOT_DIR, 'reports')
+    if not os.path.isdir(carpeta):
+        return "\nNo hay carpeta reports/.\n"
+    fechas = {(datetime.now() - timedelta(days=d)).strftime('%Y-%m-%d') for d in range(dias)}
+    archivos = sorted(f for f in os.listdir(carpeta) if f[:10] in fechas and f.endswith('.md'))
+    if not archivos:
+        return "\nSin reportes en los últimos días.\n"
+    texto = f"\nREPORTES RECIENTES ({len(archivos)}, últimos {dias} días — solo encabezado de cada uno):\n"
+    for nombre in archivos:
+        try:
+            with open(os.path.join(carpeta, nombre), encoding='utf-8') as f:
+                resumen = ''.join(f.readlines()[:8])
+            texto += f"\n--- {nombre} ---\n{resumen}\n"
+        except Exception as e:
+            texto += f"\n--- {nombre} --- (error: {e})\n"
     return texto
 
 def leer_parada_emergencia():
@@ -417,6 +574,7 @@ def leer_archivos():
     datos += leer_contexto_proyecto()
     datos += interpretar_diagnostico()
     datos += leer_billetera()
+    datos += leer_binance_real()
     datos += leer_historial_billetera()
     datos += leer_auditoria()
     datos += leer_memoria_propia()
@@ -427,6 +585,8 @@ def leer_archivos():
     datos += leer_estados_internos()
     datos += leer_config_cartera_resumida()
     datos += interpretar_screens()
+    datos += leer_recursos_sistema()
+    datos += leer_estado_francotiradores()
     ev = os.path.join(BOT_DIR, 'memoria/eventos.log')
     if os.path.exists(ev):
         lineas = open(ev).readlines()
@@ -616,6 +776,11 @@ def preguntar():
             'simulador', 'binance', 'ejecuta', 'monto', 'slip'
         ])
 
+        necesita_reports = any(x in pregunta_lower for x in [
+            'hoy', 'reporte', 'arregl', 'pendiente', 'hallazgo',
+            'se corrigió', 'se corrigio', 'qué se hizo', 'que se hizo'
+        ])
+
         datos = leer_archivos()
         if necesita_codigo:
             if archivos_extra:
@@ -624,6 +789,8 @@ def preguntar():
                 datos += "\n" + leer_codigo_especifico(ARCHIVOS_GLOBALES[:6])
         if necesita_ejecutor:
             datos += "\n" + leer_codigo_especifico(['ejecutor.py'])
+        if necesita_reports:
+            datos += "\n" + leer_reports_recientes()
 
         historial = session['historial'][-10:]
         messages = historial + [{"role": "user", "content": pregunta}]
@@ -637,6 +804,10 @@ Explica en lenguaje simple y directo. Responde SOLO con datos del reporte. Nunca
 Responde siempre en español. Máximo 6 oraciones claras y directas.
 Si detectas algo anómalo o mejorable, menciónalo con precisión.
 Recuerdas todo lo que Ariel ha preguntado en esta sesión.
+
+Si te preguntan por el estado de la conexión a Anthropic: no podés verificarlo vos mismo — si
+Anthropic estuviera caído, no habrías podido generar esta respuesta. Contestá eso mismo (que está
+activa porque esta respuesta se generó con ese modelo), sin inventar un chequeo que no existe.
 
 Cada vez que reportes WR global o "trades cerrados" de MEMORIA PROPIA, mencioná
 la fecha de "ÚLTIMA ACTUALIZACIÓN" que viene en los datos. Si tiene más de 1 día
@@ -669,7 +840,7 @@ DATOS ACTUALES DEL BOT:
         ]
         session.modified = True
 
-        return jsonify({"respuesta": respuesta_texto})
+        return jsonify({"respuesta": f"Consejero Chrome dice: {respuesta_texto}"})
 
     except Exception as e:
         return jsonify({"respuesta": f"⚠️ El asistente tuvo un problema: {str(e)}. Revisa el screen z_asistente."})

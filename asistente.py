@@ -827,9 +827,9 @@ def preguntar():
             datos += "\n" + leer_codigo_especifico(['ejecutor.py'])
         if necesita_reports:
             datos += "\n" + leer_reports_recientes()
-            matches = _match_reports(pregunta_lower)
-            if matches:
-                datos += "\n" + leer_reports_completos(matches)
+        matches = _match_reports(pregunta_lower)
+        if matches:
+            datos += "\n" + leer_reports_completos(matches)
 
         historial = session['historial'][-10:]
         messages = historial + [{"role": "user", "content": pregunta}]

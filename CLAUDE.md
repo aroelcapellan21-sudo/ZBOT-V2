@@ -21,36 +21,41 @@ automáticamente como archivo en `~/bot-padre-v2/reports/`, sin pedir permiso, y
 ## Proyecto
 **Z-Bot Padre v2** — bot de trading algorítmico sobre Binance.
 - Dueño: Ariel
-- Activos con código propio: BTC, ETH, SOL, BNB, AVAX (ver tabla de estado real abajo — hoy solo
-  BTC/ETH/SOL están conectados al ciclo de producción)
+- Activos con código propio: BTC, ETH, SOL, BNB, AVAX (ver tabla de estado real abajo — hoy
+  BTC/ETH/SOL/AVAX están conectados al ciclo de producción, BNB sigue huérfano)
 - Stack: Python puro, Binance REST API, Telegram Bot API, Flask (asistente web)
-- **Estado actual (verificado 2026-08-22): modo REAL**, `BOT_REAL_CONFIRMADO=true` activo.
+- **Estado actual (verificado 2026-08-29): modo REAL**, `BOT_REAL_CONFIRMADO=true` activo.
   Capital nominal: $20.00 USDT (`capital_inicial`/`capital_real` en `billetera.json`). USDT libre:
-  $15.3424. Monedas con dinero operando: BTC ALCISTA, ETH ALCISTA, SOL LATERAL (los 3
-  francotiradores conectados hoy a `director_orquesta.py`) — posición ABIERTA actual: ETH ALCISTA,
-  $5 desde 2026-08-22.
+  $14.541 (post-reconciliación de la posición fantasma de ETH, ver
+  `reports/2026-08-29_reconciliacion-posicion-fantasma-eth.md`). Francotiradores con dinero real
+  operando: BTC ALCISTA, ETH ALCISTA, SOL ALCISTA, AVAX ALCISTA (los 4 conectados hoy a
+  `director_orquesta.py` — ver tabla abajo para el detalle completo por fase) — posición ABIERTA
+  actual: SOL ALCISTA, $5 desde 2026-08-29.
 - Objetivo: mantener REAL con evidencia continua; escalar capital cuando la rentabilidad real lo
   justifique (ver `INVESTIGACION.md` para el historial completo de validación).
 
-## Estado real de francotiradores por moneda × fase (verificado leyendo el código, 2026-08-22)
+## Estado real de francotiradores por moneda × fase (verificado leyendo el código, 2026-08-29)
 
 ⚠️ Esta tabla se arma leyendo `dirigir()` completo de cada `director_<moneda>.py` y confirmando
 qué llama `director_orquesta.py` — no se copia de documentación anterior. Reverificar del mismo
-modo antes de asumir que sigue vigente si pasó mucho tiempo.
+modo antes de asumir que sigue vigente si pasó mucho tiempo. Detalle completo de esta actualización:
+`reports/2026-08-29_francotiradores-activos-bot-real.md`.
 
 | Moneda | Fase | Estado | Motivo / mecanismo verificado |
 |--------|------|--------|-------------------------------|
 | **BTC** | ALCISTA | ✅ Activo | RSI 50–70, SL 3.5%, TP 6.0%, EMA 20/50, $5/trade, `MAX_OP_TOTAL=1`, trailing 0.5%/1.0%, BE 2 velas +0.8% |
-| BTC | BAJISTA | ⏸️ Inerte | El director sí llama `evaluar_bajista()`, pero el gate global `gestor_bajistas.bajistas_activos()` está en `False` (`signals/estado_bajistas.json`: `sin_autorizacion_manual`) y lo corta |
+| BTC | BAJISTA | ⏸️ Inerte | El director sí llama `evaluar_bajista()`, pero el gate global `gestor_bajistas.bajistas_activos()` está en `False` (`signals/estado_bajistas.json`: `sin_autorizacion_manual`, actualizado 2026-08-27) y lo corta |
 | BTC | LATERAL | ⏸️ Pausado en el director | Comentario literal: *"sin backtest de gates completos esta semana"* — `director_btc.py` ni siquiera llama a `evaluar_lateral` |
 | **ETH** | ALCISTA | ✅ Activo | RSI 60–75, SL 4.5%, TP 5.0%, EMA 20/100, $5/trade hardcodeado |
 | ETH | BAJISTA | ⏸️ Ni se llama | `director_eth.py` no importa ni llama `evaluar_bajista` — solo imprime *"BAJISTA desactivado — solo ALCISTA y LATERAL"* |
 | ETH | LATERAL | ⏸️ Desactivado por código propio | El director sí llama `evaluar_lateral()`, pero la función hace `return` incondicional desde 2026-08-13 (backtest forense PF 0.90). `revisar_cierres` sigue activo para proteger posiciones ya abiertas |
-| **SOL** | ALCISTA | ⏸️ Pausado en el director | Comentario literal: *"WR 11.1%, PnL -28.63% confirmado esta semana"* (`reports/2026-08-16_trades-reales-simulados-sol-2026.md`) |
+| **SOL** | ALCISTA | ✅ Activo (reactivado 24-ago) | `director_sol.py` llama `evaluar_alcista()` sin condición. Reactivado en commit `4dd1ba5` ("activar combo O en produccion SOL+AVAX ALCISTA") |
 | SOL | BAJISTA | ⏸️ Inerte | Mismo gate global `gestor_bajistas` que BTC |
-| SOL | LATERAL | ✅ Activo | RSI 43–57, SL 3.5%, TP 4.0%, EMA 20/100, $5/trade |
+| SOL | LATERAL | ⏸️ Pausado por código propio (29-ago) | Commit `5713c0a`: `francotirador_lateral_sol.py` hace `revisar_cierres(precio_actual, evaluar_tp=True); return` incondicional al entrar a `evaluar()` — torneo del 24-ago lo marcó débil (PF 0.928) |
 | **BNB** | las 3 | ⏸️ Director huérfano | `director_bnb.py` tiene las 3 fases codificadas **sin ninguna pausa interna** (ALCISTA y BAJISTA sin condición, LATERAL desactivado por código propio), pero `director_orquesta.py` no lo importa ni lo llama — nunca se ejecuta en producción |
-| **AVAX** | las 3 | ⏸️ Director huérfano | Mismo caso que BNB, sin ninguna pausa interna en el código propio — nunca estuvo conectado al orquestador |
+| **AVAX** | ALCISTA | ✅ Activo (conectado 24-ago) | `director_avax.py` ahora está importado y llamado por `director_orquesta.py` (antes huérfano). Llama `evaluar_alcista()` sin condición, mismo commit `4dd1ba5` |
+| AVAX | BAJISTA | ⏸️ Inerte | Mismo gate global `gestor_bajistas` |
+| AVAX | LATERAL | ⏸️ Pausado por código propio (29-ago) | Mismo commit `5713c0a` que SOL lateral, mismo patrón (`revisar_cierres` + `return` incondicional), torneo del 24-ago lo marcó débil (PF 0.985) |
 
 ## Arquitectura
 ```

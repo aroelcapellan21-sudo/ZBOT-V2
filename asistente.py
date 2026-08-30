@@ -312,22 +312,58 @@ def leer_estado_francotiradores():
     fin = contenido.find('\n## ', inicio + 1)
     return f"\n{contenido[inicio:fin if fin != -1 else None]}\n"
 
-def leer_reports_recientes(dias=2):
+REPORTS_DIAS_VENTANA = 30
+
+def _archivos_reports(dias=REPORTS_DIAS_VENTANA):
     carpeta = os.path.join(BOT_DIR, 'reports')
     if not os.path.isdir(carpeta):
-        return "\nNo hay carpeta reports/.\n"
+        return []
     fechas = {(datetime.now() - timedelta(days=d)).strftime('%Y-%m-%d') for d in range(dias)}
-    archivos = sorted(f for f in os.listdir(carpeta) if f[:10] in fechas and f.endswith('.md'))
+    return sorted((f for f in os.listdir(carpeta) if f[:10] in fechas and f.endswith('.md')), reverse=True)
+
+def leer_reports_recientes(dias=REPORTS_DIAS_VENTANA):
+    """
+    Solo el LISTADO de nombres (barato: ~2K tokens para 30 dias) -- el
+    contenido completo se agrega aparte, solo para los reportes que
+    matcheen la pregunta (ver _match_reports). Meter el extracto de los
+    ~180 reportes de 30 dias en cada consulta costaria ~21K tokens extra
+    por pregunta disparada, ver reports/2026-08-29_*ampliar-reports*.md.
+    """
+    archivos = _archivos_reports(dias)
     if not archivos:
         return "\nSin reportes en los últimos días.\n"
-    texto = f"\nREPORTES RECIENTES ({len(archivos)}, últimos {dias} días — solo encabezado de cada uno):\n"
-    for nombre in archivos:
+    texto = (f"\nREPORTES DISPONIBLES ({len(archivos)}, últimos {dias} días — solo nombres; "
+              f"si el nombre de alguno es relevante para la pregunta, su contenido completo "
+              f"puede venir agregado más abajo):\n")
+    texto += "\n".join(f"- {a}" for a in archivos)
+    return texto
+
+def _match_reports(pregunta_lower, dias=REPORTS_DIAS_VENTANA, top=3):
+    """
+    Matchea palabras del slug del nombre de archivo (>=5 letras) contra la
+    pregunta, para leer el CONTENIDO COMPLETO solo de los 1-3 reportes mas
+    relevantes -- evita inyectar los ~180 reportes de 30 dias enteros.
+    """
+    puntajes = []
+    for nombre in _archivos_reports(dias):
+        slug = nombre[11:-3]  # saca "YYYY-MM-DD_" y ".md"
+        palabras = {p for p in slug.replace('_', '-').split('-') if len(p) >= 5}
+        score = sum(1 for p in palabras if p in pregunta_lower)
+        if score > 0:
+            puntajes.append((score, nombre))
+    puntajes.sort(key=lambda x: x[0], reverse=True)
+    return [nombre for _, nombre in puntajes[:top]]
+
+def leer_reports_completos(nombres):
+    carpeta = os.path.join(BOT_DIR, 'reports')
+    texto = ""
+    for nombre in nombres:
         try:
             with open(os.path.join(carpeta, nombre), encoding='utf-8') as f:
-                resumen = ''.join(f.readlines()[:8])
-            texto += f"\n--- {nombre} ---\n{resumen}\n"
+                contenido = f.read()
+            texto += f"\n--- CONTENIDO COMPLETO: {nombre} ---\n{contenido}\n"
         except Exception as e:
-            texto += f"\n--- {nombre} --- (error: {e})\n"
+            texto += f"\n--- {nombre} --- (error leyendo: {e})\n"
     return texto
 
 def leer_parada_emergencia():
@@ -791,6 +827,9 @@ def preguntar():
             datos += "\n" + leer_codigo_especifico(['ejecutor.py'])
         if necesita_reports:
             datos += "\n" + leer_reports_recientes()
+            matches = _match_reports(pregunta_lower)
+            if matches:
+                datos += "\n" + leer_reports_completos(matches)
 
         historial = session['historial'][-10:]
         messages = historial + [{"role": "user", "content": pregunta}]

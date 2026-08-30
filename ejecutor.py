@@ -183,6 +183,55 @@ def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
         cuerpo = e.read().decode()
         raise RuntimeError(f"Binance {e.code}: {cuerpo}")
 
+def _saldo_libre(moneda):
+    """Saldo real disponible de un activo en Binance ahora mismo, con la key
+    de trading (la misma que ya coloca ordenes) -- para saber cuanto hay de
+    margen real antes de ajustar una cantidad de cierre."""
+    api_key, secret = _cargar_keys()
+    params = {"timestamp": int(time.time() * 1000)}
+    query  = urllib.parse.urlencode(params)
+    firma  = hmac.new(secret.encode(), query.encode(), hashlib.sha256).hexdigest()
+    url    = f"{BASE_URL}/api/v3/account?{query}&signature={firma}"
+    req    = urllib.request.Request(url, headers={"X-MBX-APIKEY": api_key})
+    with urllib.request.urlopen(req, timeout=10) as resp:
+        cuenta = json.loads(resp.read())
+    for b in cuenta.get("balances", []):
+        if b["asset"] == moneda:
+            return float(b["free"])
+    return 0.0
+
+def _ajustar_qty_bajo_notional(symbol, moneda, cantidad, precio):
+    """
+    Si vender 'cantidad' exacta no alcanza el minNotional de Binance (la
+    posicion perdio valor de mercado desde la entrada -- caso SOL 30-ago-2026,
+    ver reports/2026-08-30_diagnostico-sol-zombie-notional-1013.md), calcula
+    la MINIMA cantidad extra necesaria para superarlo, tomada del saldo real
+    disponible -- nunca mas de lo que hay en la cuenta.
+
+    Devuelve (cantidad_final, se_ajusto: bool) si se puede cerrar, o
+    (None, motivo) si ni con todo el saldo disponible alcanza el minimo.
+    """
+    valor = cantidad * precio
+    if valor >= MONTO_MINIMO_BINANCE:
+        return cantidad, False
+
+    # 3% de margen: cubre el pequeño movimiento de precio entre este chequeo
+    # y la ejecucion real, y lo que se pierde al truncar al LOT_SIZE despues.
+    objetivo      = (MONTO_MINIMO_BINANCE * 1.03) / precio
+    qty_necesaria = _truncar_cantidad(symbol, objetivo)
+
+    try:
+        saldo_libre = _saldo_libre(moneda)
+    except Exception as e:
+        return None, f"no se pudo consultar el saldo real para ajustar: {e}"
+
+    qty_final = min(qty_necesaria, _truncar_cantidad(symbol, saldo_libre))
+    if qty_final * precio < MONTO_MINIMO_BINANCE:
+        return None, (f"ni con todo el saldo disponible ({saldo_libre} {moneda}, "
+                       f"${round(saldo_libre * precio, 2)}) se alcanza el minimo "
+                       f"de ${MONTO_MINIMO_BINANCE}")
+    return qty_final, qty_final > cantidad
+
 def _extraer_fill(respuesta, moneda, qty_fallback, usdt_fallback, precio_fallback):
     """
     Normaliza la respuesta de Binance a (qty_neta, usdt_neto, precio_real).
@@ -355,16 +404,32 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op, qty=None):
     if cantidad <= 0:
         return f"❌ Cantidad de cierre inválida: {cantidad}", None
 
-    try:
-        if tipo_trade in ("ALCISTA", "LATERAL"):
-            lado, verbo = "SELL", "vendido"
-            etiqueta    = "CIERRE LONG"
-        elif tipo_trade == "BAJISTA":
-            lado, verbo = "BUY", "recomprado"
-            etiqueta    = "CIERRE SHORT"
-        else:
-            return f"❌ tipo_trade desconocido para cierre: {tipo_trade}", None
+    if tipo_trade in ("ALCISTA", "LATERAL"):
+        lado, verbo = "SELL", "vendido"
+        etiqueta    = "CIERRE LONG"
+    elif tipo_trade == "BAJISTA":
+        lado, verbo = "BUY", "recomprado"
+        etiqueta    = "CIERRE SHORT"
+    else:
+        return f"❌ tipo_trade desconocido para cierre: {tipo_trade}", None
 
+    ajuste_notional = ""
+    if lado == "SELL" and not simulador:
+        try:
+            precio_actual = _precio_ticker(symbol)
+        except Exception as e:
+            return f"❌ ERROR obteniendo precio para chequeo NOTIONAL {symbol}: {e}", None
+        cantidad_ajustada, detalle = _ajustar_qty_bajo_notional(symbol, moneda, cantidad, precio_actual)
+        if cantidad_ajustada is None:
+            return (f"❌ RECHAZADO: {symbol} bajo minimo Binance (${MONTO_MINIMO_BINANCE}) "
+                    f"incluso ajustando qty — {detalle}."), None
+        if detalle:
+            ajuste_notional = (f" [qty ajustada de {cantidad} a {cantidad_ajustada} {moneda} "
+                                f"para superar el minimo NOTIONAL de Binance]")
+            print(f"  [EJECUTOR] {symbol}: {ajuste_notional.strip()}")
+        cantidad = cantidad_ajustada
+
+    try:
         if simulador:
             respuesta = _simular_fill(symbol, lado, base_qty=cantidad)
         else:
@@ -379,7 +444,7 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op, qty=None):
                 "usdt": usdt_neto,
                 "precio": precio_r}
         tag = "[SIM] " if simulador else ""
-        return f"✅ {tag}{etiqueta} {moneda}: {verbo} {qty_ej} a ${precio_r}", fill
+        return f"✅ {tag}{etiqueta} {moneda}: {verbo} {qty_ej} a ${precio_r}{ajuste_notional}", fill
 
     except urllib.error.HTTPError as e:
         cuerpo = e.read().decode()

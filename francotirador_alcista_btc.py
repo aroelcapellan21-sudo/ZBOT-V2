@@ -42,6 +42,30 @@ TAKE_PROFIT        = 6
 EMA_CORTA          = 20
 EMA_LARGA          = 50
 MAX_OP_TOTAL       = 1
+
+# ─────────────────────────────────────────────────────────────────────────
+# ⚠️ TRAILING y BREAKEVEN NO OPERAN — verificado y backtesteado (2026-08-31)
+#
+# Estas constantes se usan para calcular `sl_efectivo` en revisar_cierres(),
+# pero el valor NO se persiste: cada ciclo se recalcula desde el precio
+# actual. Si el precio retrocede, el stop retrocede con el — nunca queda por
+# encima del SL base, asi que no se dispara ni un BE ni un TRAILING_SL.
+# Evidencia: 0 cierres BE y 0 TRAILING_SL en 9 anios de auditoria.
+#
+# NO "ARREGLARLO": arreglarlo empeora. Backtest de 2 anios 9 meses sobre las
+# 4 monedas, entradas identicas y salidas literales de produccion:
+#     ACTUAL (roto)        PF 0,98 · 472 trades · 194 TP
+#     Fix B (BE+trailing)  PF 0,94 · 1.064 trades · 121 TP
+# El trailing de 1% sobre velas de 4h cierra en el primer retroceso y mata
+# 73 take-profit; los TRAILING_SL en verde chico no los compensan. Ninguna
+# de las 12 combinaciones del barrido llega al umbral PF >= 1,6 de CLAUDE.md.
+#
+# TRAILING_ACTIVACION es COSMETICO: `trailing_on` solo elige el nombre del
+# estado (TRAILING_SL vs BE), nunca decide el nivel del stop. Cambiarlo de
+# 0,5 a 2,0 no mueve ni un trade — no lo "optimices" creyendo que hace algo.
+#
+# Detalle: reports/2026-08-31_backtest-fix-breakeven-trailing.md
+# ─────────────────────────────────────────────────────────────────────────
 TRAILING_ACTIVACION = 0.5
 TRAILING_DISTANCIA  = 1.0
 
@@ -192,7 +216,8 @@ def revisar_cierres(precio_actual, evaluar_tp=True):
                     dt_entrada  = datetime.strptime(timestamp_entry, "%Y-%m-%d %H:%M:%S")
                     horas_abiert = (datetime.now() - dt_entrada).total_seconds() / 3600
                     velas_abiert = horas_abiert / 4
-                except:
+                except (ValueError, TypeError) as e:
+                    print(f"  [CIERRES] {SYMBOL}: timestamp ilegible '{timestamp_entry}': {e}")
                     velas_abiert = 0
 
                 # SL base

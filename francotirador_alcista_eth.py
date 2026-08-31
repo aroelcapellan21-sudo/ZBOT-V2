@@ -52,6 +52,32 @@ TAKE_PROFIT        = _p["tp"]
 EMA_CORTA          = _p["ec"]
 EMA_LARGA          = _p["el"]
 MAX_OP_TOTAL       = 1
+
+# ─────────────────────────────────────────────────────────────────────────
+# ⚠️ TRAILING y BREAKEVEN NO OPERAN — verificado y backtesteado (2026-08-31)
+# (aca los valores vienen de config_cartera.py via _get_params, pero el
+#  comportamiento es identico al de BTC/SOL/AVAX: no se persiste el stop)
+#
+# Estas constantes se usan para calcular `sl_efectivo` en revisar_cierres(),
+# pero el valor NO se persiste: cada ciclo se recalcula desde el precio
+# actual. Si el precio retrocede, el stop retrocede con el — nunca queda por
+# encima del SL base, asi que no se dispara ni un BE ni un TRAILING_SL.
+# Evidencia: 0 cierres BE y 0 TRAILING_SL en 9 anios de auditoria.
+#
+# NO "ARREGLARLO": arreglarlo empeora. Backtest de 2 anios 9 meses sobre las
+# 4 monedas, entradas identicas y salidas literales de produccion:
+#     ACTUAL (roto)        PF 0,98 · 472 trades · 194 TP
+#     Fix B (BE+trailing)  PF 0,94 · 1.064 trades · 121 TP
+# El trailing de 1% sobre velas de 4h cierra en el primer retroceso y mata
+# 73 take-profit; los TRAILING_SL en verde chico no los compensan. Ninguna
+# de las 12 combinaciones del barrido llega al umbral PF >= 1,6 de CLAUDE.md.
+#
+# TRAILING_ACTIVACION es COSMETICO: `trailing_on` solo elige el nombre del
+# estado (TRAILING_SL vs BE), nunca decide el nivel del stop. Cambiarlo de
+# 0,5 a 2,0 no mueve ni un trade — no lo "optimices" creyendo que hace algo.
+#
+# Detalle: reports/2026-08-31_backtest-fix-breakeven-trailing.md
+# ─────────────────────────────────────────────────────────────────────────
 TRAILING_ACTIVACION = _p["trail_act"]
 TRAILING_DISTANCIA  = _p["trail_dist"]
 

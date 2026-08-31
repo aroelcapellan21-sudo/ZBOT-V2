@@ -12,11 +12,16 @@ import urllib.parse
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
+import db
+
 BASE = os.path.expanduser("~/bot-padre-v2")
 BILLETERA = os.path.join(BASE, "signals/billetera.json")
 AUDITORIA = os.path.join(BASE, "auditoria.csv")
 PARADA = os.path.join(BASE, "signals/PARADA_EMERGENCIA.txt")
-ESTADO_DIARIO = os.path.join(BASE, "signals/estado_diario.json")
+# El estado diario ya no se lee de signals/estado_diario.json: ese archivo es un
+# fosil de la migracion a SQLite (db.py escribe solo en signals/bot.db y nunca lo
+# reescribia), asi que el dashboard mostraba los valores del 2026-05-15 y nunca
+# habria reflejado un PAUSADO real. Se lee de la DB con db.json_get.
 
 CRYPTO_MAP = {
     "BTC": "BTCUSDT",
@@ -330,7 +335,7 @@ def calcular_wr(trades, solo_hoy=False):
 def estado_bot():
     if os.path.exists(PARADA):
         return "PARADA DE EMERGENCIA", "red"
-    diario = leer_json(ESTADO_DIARIO, {})
+    diario = db.json_get("estado_diario", {}) or {}
     if diario.get("pausado", False):
         return "PAUSADO", "orange"
     return "ACTIVO", "green"
@@ -454,7 +459,7 @@ def build_html():
         sec_operaciones = '<div class="empty">Sin operaciones registradas</div>'
 
     # Sección 5 — Estado bot
-    diario = leer_json(ESTADO_DIARIO, {})
+    diario = db.json_get("estado_diario", {}) or {}
     ops_hoy = diario.get("operaciones_hoy", 0)
     perdidas_consec = diario.get("perdidas_consecutivas", 0)
     sec_estado = f"""

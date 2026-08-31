@@ -29,7 +29,12 @@ from memoria_propia import actualizar_memoria
 SYMBOL             = "AVAXUSDT"
 MONEDA             = "AVAX"
 TIPO_TRADE         = "ALCISTA"
-MONTO_FIJO         = 5.0
+# Subido de $5.00 a $7.00 el 2026-08-30 (capital real $37.26 USDT libre).
+# Con $5 el SL era matematicamente inejecutable: al tocarlo, la posicion valia
+# menos que el minNotional de $5 de Binance y la venta se rechazaba con -1013.
+# Verificado con precios reales: las 4 monedas fallaban (AVAX: $4.71 al
+# SL). Con $7 las 4 pasan. Detalle: reports/2026-08-30_diff-monto-7-y-guardian-entrada.md
+MONTO_FIJO         = 7.0
 RSI_MIN            = 50
 RSI_MAX            = 70
 STOP_LOSS          = 4.0
@@ -375,7 +380,8 @@ def evaluar():
             print("  [AUDITORIA] Reserva fallida. NO se opera.")
             return
         
-        resultado, fill = ejecutar_operacion(MONEDA, "COMPRA", precio_actual, monto_op)
+        resultado, fill = ejecutar_operacion(MONEDA, "COMPRA", precio_actual, monto_op,
+                                              sl_pct=STOP_LOSS)
         print(f"  {resultado}")
 
         if "✅" in resultado:

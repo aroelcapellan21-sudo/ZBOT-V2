@@ -95,6 +95,38 @@ def _formatear_qty(symbol, qty):
     paso      = Decimal(1).scaleb(-decimales)
     return format(Decimal(str(qty)).quantize(paso, rounding=ROUND_DOWN), "f")
 
+def _valor_estimado_al_stop(symbol, monto, precio, sl_pct):
+    """
+    Valor en USDT que tendria la posicion al tocar su STOP_LOSS, modelando el
+    camino real del dinero -- no monto*(1-sl), que es lo que parece a simple
+    vista y da un numero optimista de mas.
+
+    Tres mordiscos, en este orden:
+      1. al COMPRAR se trunca al LOT_SIZE (no se compra el monto exacto)
+      2. Binance cobra la comision de la COMPRA en el activo base -> qty neta
+      3. al CERRAR se vuelve a truncar esa qty neta al LOT_SIZE
+
+    El truncamiento pega fuerte donde el step vale mucho: en BTC un step son
+    ~$0.78 al precio de hoy, el 15% de una entrada de $5.
+    """
+    qty_comprada = _truncar_cantidad(symbol, monto / precio)
+    qty_neta     = _truncar_cantidad(symbol, qty_comprada * (1 - COMISION_SPOT))
+    return qty_neta * precio * (1 - sl_pct / 100.0)
+
+def _monto_minimo_viable(symbol, precio, sl_pct):
+    """
+    Menor monto de entrada (en centavos) cuyo SL sigue siendo ejecutable al
+    precio actual. Solo para el mensaje de rechazo: que diga cuanto haria
+    falta, en vez de dejar a Ariel calculandolo a mano. Devuelve None si ni
+    con $30 alcanza (no deberia pasar; es un tope de cordura del bucle).
+    """
+    centavos = int(MONTO_MINIMO_BINANCE * 100)
+    while centavos <= 3000:
+        if _valor_estimado_al_stop(symbol, centavos / 100.0, precio, sl_pct) >= MONTO_MINIMO_BINANCE:
+            return centavos / 100.0
+        centavos += 1
+    return None
+
 def _cargar_keys():
     api_key = secret = None
     try:
@@ -227,9 +259,25 @@ def _ajustar_qty_bajo_notional(symbol, moneda, cantidad, precio):
 
     qty_final = min(qty_necesaria, _truncar_cantidad(symbol, saldo_libre))
     if qty_final * precio < MONTO_MINIMO_BINANCE:
+        # El mensaje viejo describia el sintoma y se quedaba ahi, y el aviso que
+        # lo envuelve dice "reintentando proximo ciclo" -- lo cual es falso: se
+        # repite identico cada 4 minutos y no se destraba solo. Se agrega lo
+        # unico accionable: que NO es transitorio, y a que precio deja de serlo.
+        qty_vendible = _truncar_cantidad(symbol, saldo_libre)
+        precio_destrabe = (MONTO_MINIMO_BINANCE / qty_vendible) if qty_vendible > 0 else None
+        if precio_destrabe:
+            subida_pct = (precio_destrabe / precio - 1) * 100
+            detalle_destrabe = (f" NO es transitorio: se repite igual cada ciclo hasta que "
+                                f"{moneda} suba a ~${round(precio_destrabe, 4)} "
+                                f"(+{subida_pct:.2f}% desde ${round(precio, 4)}). "
+                                f"Mientras tanto la posicion queda SIN STOP EFECTIVO: "
+                                f"cerrarla a mano si no se quiere esperar ese precio.")
+        else:
+            detalle_destrabe = (" NO es transitorio, y no hay saldo vendible: la posicion no "
+                                "puede cerrarse por esta via a ningun precio.")
         return None, (f"ni con todo el saldo disponible ({saldo_libre} {moneda}, "
                        f"${round(saldo_libre * precio, 2)}) se alcanza el minimo "
-                       f"de ${MONTO_MINIMO_BINANCE}")
+                       f"de ${MONTO_MINIMO_BINANCE}.{detalle_destrabe}")
     return qty_final, qty_final > cantidad
 
 def _extraer_fill(respuesta, moneda, qty_fallback, usdt_fallback, precio_fallback):
@@ -266,12 +314,18 @@ def _extraer_fill(respuesta, moneda, qty_fallback, usdt_fallback, precio_fallbac
     return round(qty - com_base, 8), round(usdt - com_quote, 8), precio_real
 
 
-def ejecutar_operacion(moneda, tipo, precio, monto=None):
+def ejecutar_operacion(moneda, tipo, precio, monto=None, sl_pct=None):
     """
     Devuelve (mensaje, fill).
       fill = {"qty": <cripto NETA de comision>, "usdt": <USDT NETO>, "precio": <fill real>}
       fill = None  si la orden fue rechazada o fallo.
     El mensaje mantiene el formato "✅ ..."/"❌ ..." de siempre.
+
+    sl_pct: STOP_LOSS del francotirador que llama, en porcentaje (ej. 3.5).
+    Si se pasa, se rechaza la entrada cuando el SL dejaria la posicion bajo el
+    minNotional -- ver el guardian de entrada mas abajo. Default None (no
+    chequea) para no romper a los 11 francotiradores que hoy no lo pasan; al
+    reactivar cualquiera de ellos hay que pasarle su STOP_LOSS.
     """
     if not monto or monto <= 0:
         return f"❌ RECHAZADO: Monto invalido (${monto})", None
@@ -283,6 +337,26 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None):
         return "❌ RECHAZADO: Parada de emergencia activa (signals/PARADA_EMERGENCIA.txt)", None
 
     symbol     = moneda + "USDT"
+
+    # ---- Guardian de entrada: no abrir una posicion cuyo SL sera inejecutable ----
+    # Motivo (reports/2026-08-30_fix-dos-bugs-de-fondo.md): con entradas de $5 y
+    # minNotional de $5, al tocar el SL la posicion vale menos del minimo y
+    # Binance rechaza la venta con -1013. Resultado: 15 dias operando en REAL
+    # sin stop-loss efectivo, con las 3 perdidas cerradas a mano.
+    # Que NO se abra es el resultado correcto: una posicion que no puede parar
+    # la perdida no es una posicion, es una apuesta abierta.
+    if sl_pct:
+        valor_sl = _valor_estimado_al_stop(symbol, monto, precio, sl_pct)
+        if valor_sl < MONTO_MINIMO_BINANCE:
+            minimo = _monto_minimo_viable(symbol, precio, sl_pct)
+            sugerencia = (f" Monto minimo viable hoy para {symbol}: ${minimo:.2f}."
+                          if minimo else "")
+            return (f"❌ RECHAZADO: SL inejecutable — con ${monto:.2f} de entrada y SL "
+                    f"{sl_pct}%, la posicion valdria ${valor_sl:.2f} al tocar el stop, "
+                    f"bajo el minimo de Binance (${MONTO_MINIMO_BINANCE}). Abrirla seria "
+                    f"quedarse sin stop.{sugerencia}"), None
+    # -----------------------------------------------------------------------------
+
     modo       = _leer_modo()
     simulador  = not (modo == "REAL" and _confirmacion_real_activa())
 
@@ -421,8 +495,12 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op, qty=None):
             return f"❌ ERROR obteniendo precio para chequeo NOTIONAL {symbol}: {e}", None
         cantidad_ajustada, detalle = _ajustar_qty_bajo_notional(symbol, moneda, cantidad, precio_actual)
         if cantidad_ajustada is None:
-            return (f"❌ RECHAZADO: {symbol} bajo minimo Binance (${MONTO_MINIMO_BINANCE}) "
-                    f"incluso ajustando qty — {detalle}."), None
+            # 'detalle' ya explica que no es transitorio y a que precio se
+            # destraba (ver _ajustar_qty_bajo_notional). Se marca ademas como
+            # CIERRE BLOQUEADO y no como un error de orden cualquiera: no hay
+            # nada que reintentar, es una condicion de mercado.
+            return (f"❌ CIERRE BLOQUEADO: {symbol} bajo minimo Binance "
+                    f"(${MONTO_MINIMO_BINANCE}) incluso ajustando qty — {detalle}"), None
         if detalle:
             ajuste_notional = (f" [qty ajustada de {cantidad} a {cantidad_ajustada} {moneda} "
                                 f"para superar el minimo NOTIONAL de Binance]")

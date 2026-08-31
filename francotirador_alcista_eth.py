@@ -31,6 +31,16 @@ MONEDA             = "ETH"
 TIPO_TRADE         = "ALCISTA"
 CAPITAL_MAX_POR_OP = 0.02
 
+# Subido de $5.00 a $7.00 el 2026-08-30 (capital real $37.26 USDT libre).
+# Con $5 el SL era matematicamente inejecutable: al tocarlo, la posicion valia
+# menos que el minNotional de $5 de Binance y la venta se rechazaba con -1013.
+# Verificado con precios reales: las 4 monedas fallaban (ETH: $4.38 al SL).
+# Detalle: reports/2026-08-30_diff-monto-7-y-guardian-entrada.md
+# A diferencia de BTC/SOL/AVAX, aca el monto estaba escrito suelto dentro de
+# evaluar() (monto_op = 5.0), sin constante: se le da el mismo nombre que en
+# las otras tres para que los 4 francotiradores se lean igual.
+MONTO_FIJO         = 7.0
+
 from config_cartera import get_params as _get_params
 
 _p = _get_params(SYMBOL, TIPO_TRADE.lower())
@@ -710,7 +720,7 @@ def evaluar():
             )
             return
 
-        monto_op = 5.0
+        monto_op = MONTO_FIJO
 
         fila_id = reservar_operacion(
             "ALCISTA",
@@ -730,7 +740,8 @@ def evaluar():
             MONEDA,
             "COMPRA",
             precio_actual,
-            monto_op
+            monto_op,
+            sl_pct=STOP_LOSS
         )
 
         print(

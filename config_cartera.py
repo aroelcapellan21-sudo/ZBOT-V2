@@ -15,7 +15,13 @@ PESOS_CARTERA = {
 }
 
 # --- CAPITAL BASE ---
-CAPITAL_BASE = 20.00
+# 2026-08-31: $20.00 -> $37.21 tras el aporte de $17.21 de Ariel. Es el capital
+# APORTADO (20.00 + 17.21), no el capital actual ($37.49): asi consejero.py
+# (pct = capital_actual / CAPITAL_BASE) y el dashboard siguen midiendo la
+# ganancia del trading (+$0.28 hoy) y no el deposito. Si se pusiera el capital
+# actual daria 100% siempre; si se dejaba en 20.00 daria ~187%, el deposito
+# disfrazado de rentabilidad. Detalle: reports/2026-08-31_sincronizacion-billetera-deposito.md
+CAPITAL_BASE = 37.21
 
 # --- CAPITAL MAXIMO POR OPERACION ---
 CAPITAL_MAX_POR_OP = 0.02

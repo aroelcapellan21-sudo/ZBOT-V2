@@ -60,7 +60,8 @@ modo antes de asumir que sigue vigente si pasó mucho tiempo. Detalle completo d
 ## Arquitectura
 ```
 main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca capital)
-├── director_orquesta.py ← define fase por símbolo y llama SOLO a BTC/ETH/SOL (ver tabla arriba)
+├── director_orquesta.py ← fase LOCAL por moneda → BTC/ETH/SOL/AVAX. Ojo: cerrar_huerfanas()
+│                          usa la fase GLOBAL, ver sección al final
 ├── director_<activo>.py ← uno por activo, decide qué francotirador activar
 │   └── francotirador_<fase>_<activo>.py ← genera señales de entrada
 ├── ejecutor.py          ← ÚNICO autorizado para abrir/cerrar posiciones
@@ -481,6 +482,96 @@ funciona y cubre drawdown máximo y pérdida diaria — esa es la red de segurid
 
 Evidencia completa: `reports/2026-08-31_termometro-impacto-economico.md` y
 `reports/2026-08-31_auditoria-arquitectura-y-conexiones.md`.
+
+## ⚠️ `cerrar_huerfanas()` usa fase GLOBAL mientras la apertura usa fase LOCAL (2026-08-31)
+
+**Este caso NO es como los tres anteriores.** El trailing, el termómetro y el centinela son inercia
+benigna: dejarlos rotos no hace daño. Éste es una **contradicción de diseño real y hoy ejecutable**,
+pero **la evidencia económica no alcanza para justificar el cambio**. Se documenta con esa distinción
+explícita para que quien lo mire decida con los números a la vista, no con la intuición.
+
+### La contradicción
+
+Los directores abren posiciones según la fase **LOCAL** de cada moneda
+(`director_orquesta.py:248-257`, `dirigir_btc(fases['BTCUSDT'])`, etc.), pero
+`cerrar_huerfanas()` decide el cierre forzado comparando contra la fase **GLOBAL** —el voto de las
+5 monedas— en `director_orquesta.py:56`:
+
+```python
+if len(partes) < 7 or partes[5] != "ABIERTA" or partes[1] == fase_nueva:
+    nuevas.append(linea); continue      # fase_nueva es la fase GLOBAL
+```
+
+**Consecuencia:** una posición abierta legítimamente (su moneda está en fase ALCISTA) puede cerrarse
+en Binance porque el voto global cambió, y el director puede **reabrirla al ciclo siguiente**, ya que
+la fase local no cambió. Comisión doble y una pérdida que ninguna lógica de trading pidió.
+
+### Cuándo nació (importante para no medir mal)
+
+| Commit | Fecha | Qué pasó |
+|---|---|---|
+| anterior a `bf414c0` | — | La apertura usaba **fase global**: abrir y cerrar por global era **coherente**. **No había bug** |
+| **`bf414c0`** | **2026-08-17** | La apertura pasa a **fase local** → **acá nace la divergencia** |
+| `4dd1ba5` | 2026-08-24 | Suma AVAX y cambia sizing. **No** introdujo la fase local (ya existía) |
+
+**De los 415 cambios de fase global del histórico, 399 (96%) son anteriores al 17-ago**, es decir de
+la época sin bug. **No los uses como evidencia de este problema.** La ventana real de exposición es
+de 16 cambios.
+
+### Evidencia económica — no alcanza
+
+**Impacto realizado: $0,00.** Hay **0 filas `FASE_CAMBIO`** en `auditoria.csv` en toda la ventana:
+el mecanismo **nunca llegó a dispararse**. La causa más consistente es que `cerrar_posicion()`
+fallaba por el bug de NOTIONAL (`MONTO_FIJO` era $5 y el mínimo de Binance es $5), lo que explica
+que las 4 posiciones del período terminaran cerradas **a mano** (`MANUAL_WIN`/`MANUAL_LOSS`). No está
+probado al 100%: esos avisos van a Telegram y los `print` al screen, y ninguno se conserva.
+
+**Simulación amplia** (`reports/2026-08-31_simulacion-historica-global-vs-local.md`): 222 posiciones
+donde ambas lógicas deciden distinto, con precios reales de 15m y TP/SL reconstruidos por commit. El
+modelo se validó reproduciendo **355 de los 376** cierres reales.
+
+| | Resultado |
+|---|---|
+| PnL fase GLOBAL (actual) | −$0,92 |
+| PnL fase LOCAL (propuesta) | +$5,50 |
+| Diferencia | **+$6,42** (+0,64% del capital simulado) |
+| **IC 95% (bootstrap)** | **−$3,10 … +$16,30 — el cero está dentro** |
+| **Casos que favorecen a GLOBAL** | **54,5%** (test de signo **p = 0,0219**, significativo) |
+| Sin SOL | **−$1,54** (se invierte) |
+| Sin los 14 casos que llegaron a TP | **−$5,08** (se invierte) |
+| Sin el mejor 5% | **−$3,66** (se invierte) |
+| **Máximo drawdown** | GLOBAL $2,24 vs **LOCAL $12,92 (5,8× más)** |
+
+**El dato que más pesa:** de las 222 posiciones que la lógica LOCAL mantendría abiertas, **206
+(92,8%) terminan cerrándose igual** poco después, al cambiar la fase local de su propia moneda. Toda
+la diferencia sale de **16 casos**. Y a escala actual ($7/op sobre $37) la ventaja equivaldría a
+**~$2,14 en tres meses** — centavos por mes.
+
+**Veredicto: 🔴 NO TOCAR por economía.** No hay mejora demostrada, se invierte ante cualquier
+exclusión, y viene con casi 6× más drawdown.
+
+### Lo que sí cambió, y hay que tener presente
+
+**El bug pasó de latente a ejecutable el 31-ago.** Durante toda la ventana estuvo **inhabilitado por
+otro bug** (el NOTIONAL con `MONTO_FIJO = $5`). Con **$7** desde el 31-ago los cierres automáticos
+**vuelven a ser ejecutables**, así que el mecanismo ahora sí puede disparar. La frecuencia histórica
+fue de ~1,14 cambios de fase global por día, con **63,2%** de los ciclos teniendo al menos una moneda
+cuya fase local difiere de la global.
+
+**Qué mirar si algún día aparece:** una fila con estado `FASE_CAMBIO` en `auditoria.csv` cuya moneda
+seguía en su fase local original. Ese sería el primer caso real — hasta hoy no hubo ninguno.
+
+### Si se decide corregirlo
+
+No se hace por PnL (no lo hay) sino **por coherencia**: hoy el sistema puede cerrar una posición que
+su propia lógica de entrada considera válida. Es un cambio de **una condición** en
+`director_orquesta.py:56` —comparar contra la fase local de la moneda de esa fila en vez de contra
+`fase_nueva`— y **no toca francotiradores ni parámetros**, así que no requiere backtest de PF. Sí
+requiere OK explícito de Ariel, y asumir que el beneficio esperado es **indistinguible de cero** y
+que el drawdown sube.
+
+Evidencia completa: `reports/2026-08-31_simulacion-historica-global-vs-local.md` (222 divergencias)
+y `reports/2026-08-31_evaluacion-economica-global-vs-local.md` (las 8 posiciones reales).
 
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)

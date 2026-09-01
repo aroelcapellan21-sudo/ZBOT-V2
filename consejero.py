@@ -31,6 +31,13 @@ MONEDAS_ACTIVAS         = ["BTC", "ETH", "SOL", "AVAX"]
 VERIFICACION_KEY        = "estado_verificacion_binance"
 UMBRAL_DISCREPANCIA_USD = 1.0
 
+# Ventana de validez que Binance aplica a la peticion firmada. Con 5000 ms, una
+# peticion que tarda mas de 5 s en llegar (arranque cargado, red lenta) se rechaza
+# con -1021 aunque el reloj este perfecto. El maximo que acepta Binance es 60000.
+RECV_WINDOW_MS      = 10000
+REINTENTOS_CONEXION = 2
+ESPERA_REINTENTO_S  = 3
+
 # Resumen diario adicional (no reemplaza el aviso de transicion de estado)
 RESUMEN_DIARIO_KEY   = "estado_consejero_resumen"
 RESUMEN_DIARIO_HORAS = 24
@@ -55,18 +62,79 @@ def _cargar_keys_lectura():
         raise RuntimeError("BINANCE_API_KEY_LECTURA/SECRET no encontradas en keys.env")
     return api_key, secret
 
+class ErrorBinanceLectura(Exception):
+    """Fallo de la key de lectura conservando el codigo real de Binance."""
+    def __init__(self, mensaje, code=None):
+        super().__init__(mensaje)
+        self.code = code
+
+
+def _causa_probable(code):
+    """Traduce el codigo de Binance a la causa real. Antes se afirmaba siempre
+    'cambio de IP publica', que es justamente el unico caso que NO llega como
+    HTTP 400: una IP fuera de la whitelist responde HTTP 401 con -2015."""
+    if code == -2015:
+        return ("IP publica fuera de la whitelist de la key, key revocada, o sin "
+                "permiso de lectura")
+    if code == -1021:
+        return (f"ventana de tiempo: reloj del servidor desfasado, o la peticion tardo "
+                f"mas de {RECV_WINDOW_MS} ms en llegar a Binance")
+    if code == -1022:
+        return "firma invalida: BINANCE_API_SECRET_LECTURA no corresponde a la key"
+    if code is None:
+        return "la peticion no llego a Binance (red, DNS o timeout)"
+    return "ver el codigo de Binance en la linea de arriba"
+
+
 def _binance_account_lectura():
     """Un unico GET firmado a /api/v3/account: sirve de prueba de conexion
     (si falla, la key de lectura no esta funcionando) Y trae los saldos
     reales para la deteccion de discrepancias, sin duplicar la llamada."""
     api_key, secret = _cargar_keys_lectura()
-    params = {"timestamp": int(time.time() * 1000), "recvWindow": 5000}
+    params = {"timestamp": int(time.time() * 1000), "recvWindow": RECV_WINDOW_MS}
     query  = urllib.parse.urlencode(params)
     firma  = hmac.new(secret.encode(), query.encode(), hashlib.sha256).hexdigest()
     url    = f"https://api.binance.com/api/v3/account?{query}&signature={firma}"
     req    = urllib.request.Request(url, headers={"X-MBX-APIKEY": api_key})
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        return json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        # Binance explica el motivo en el cuerpo de la respuesta; urllib lo
+        # descarta y deja solo "HTTP Error 400: Bad Request", que no distingue
+        # un problema de reloj de uno de IP.
+        code = msg = None
+        try:
+            cuerpo   = json.loads(e.read())
+            code, msg = cuerpo.get("code"), cuerpo.get("msg")
+        except Exception as err_cuerpo:
+            print(f"[CONSEJERO] No se pudo leer el cuerpo del error HTTP: {err_cuerpo}")
+        detalle = f"HTTP {e.code}"
+        if code is not None:
+            detalle += f" | Binance {code}: {msg}"
+        raise ErrorBinanceLectura(detalle, code) from e
+    except Exception as e:
+        raise ErrorBinanceLectura(f"{type(e).__name__}: {e}") from e
+
+
+def _cuenta_lectura_con_reintento():
+    """Un blip de red o una peticion lenta no deben disparar el aviso de key
+    caida: se reintenta una vez. Un -2015 (key/IP) no se arregla reintentando,
+    asi que corta de inmediato."""
+    ultimo = None
+    for intento in range(1, REINTENTOS_CONEXION + 1):
+        try:
+            return _binance_account_lectura()
+        except Exception as e:
+            # Cualquier fallo sale como ErrorBinanceLectura para que el llamador
+            # no tenga que distinguir tipos (p. ej. keys.env sin las claves).
+            ultimo = e if isinstance(e, ErrorBinanceLectura) else \
+                     ErrorBinanceLectura(f"{type(e).__name__}: {e}")
+            print(f"[CONSEJERO] Intento {intento}/{REINTENTOS_CONEXION} fallido: {ultimo}")
+            if ultimo.code == -2015 or intento == REINTENTOS_CONEXION:
+                break
+            time.sleep(ESPERA_REINTENTO_S)
+    raise ultimo
 
 def _posiciones_abiertas():
     """Qty real (no solo presencia) de cada moneda activa con fila ABIERTA
@@ -126,17 +194,17 @@ def _verificar_binance():
     discrepancias_previas = set(previo.get("discrepancias", []))
 
     try:
-        cuenta        = _binance_account_lectura()
+        cuenta        = _cuenta_lectura_con_reintento()
         conexion_ok   = True
         discrepancias = _detectar_discrepancias(cuenta)
-    except Exception as e:
+    except ErrorBinanceLectura as e:
         conexion_ok   = False
         discrepancias = []
         if conexion_ok_previa:
             enviar_aviso(
                 f"🚨 CONSEJERO — Conexión a Binance (key de lectura) caída\n"
                 f"Error: {e}\n"
-                f"Probable causa: cambio de IP pública (sin IP fija).\n"
+                f"Causa probable: {_causa_probable(e.code)}.\n"
                 f"El bot de trading sigue operando — usa una key distinta, de escritura."
             )
 

@@ -65,7 +65,7 @@ main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca
 │   └── francotirador_<fase>_<activo>.py ← genera señales de entrada
 ├── ejecutor.py          ← ÚNICO autorizado para abrir/cerrar posiciones
 ├── guardian_riesgo.py   ← DD máximo 10%, pérdida diaria máx 5%
-├── centinela/           ← monitorea posiciones abiertas en tiempo real
+├── centinela/           ← ⚠️ NO vigila nada. Observador aislado, ver sección al final
 ├── brain/
 │   ├── telegram_engine.py  ← polling de comandos + envío de alertas
 │   ├── data_engine.py      ← fetch de velas desde Binance
@@ -310,6 +310,177 @@ guardián).
   `grep` si el francotirador en cuestión importa `config_cartera` o lo tiene hardcodeado** — no
   asumir por lo que dice este archivo. Detalle completo:
   `reports/2026-08-22_config_cartera-codigo-muerto-3-francotiradores-activos.md`.
+
+## ⛔ El trailing stop y el breakeven están rotos A PROPÓSITO — NO LOS ARREGLES
+
+**Si llegaste acá porque viste que el trailing no funciona: sí, está roto. Ya lo sabemos. Fue
+medido dos veces y arreglarlo EMPEORA el resultado. No lo toques sin leer esto entero.**
+
+### Qué está roto y por qué lo parece tanto
+
+En `revisar_cierres()` de cada francotirador (p. ej. `francotirador_alcista_sol.py:221-235`),
+`sl_efectivo` es una **variable local que se recalcula de cero en cada ciclo** y se ancla al
+**precio actual**, no al máximo del trade:
+
+```python
+if cambio > 0:
+    sl_trail    = round(precio_actual * (1 - TRAILING_DISTANCIA / 100), 4)
+    sl_efectivo = max(sl_efectivo, sl_trail)     # <- desde el precio ACTUAL, no el maximo
+```
+
+Consecuencias, demostradas formalmente (no estimadas):
+- **El stop retrocede** cuando el precio baja. Un trailing real sólo sube.
+- Mientras el trailing manda, la condición de cierre es `precio_actual <= precio_actual × 0,99`,
+  **falsa por construcción**: el trailing no puede dispararse nunca.
+- El BE exige `cambio >= 0,8%` **en el ciclo actual**, así que nunca queda "armado".
+- **`sl_efectivo` no se persiste en ningún archivo ni tabla** — por eso no hay estado que mantener.
+
+**Resultado neto: el sistema opera con TP fijo + SL fijo.** Por eso hay **0 estados `TRAILING_SL` y
+0 `BE`** en todo el historial (9 años de backtest y todas las filas de `auditoria.csv`). No son
+estados raros: son **inalcanzables**. Si contás cierres por trailing y te da cero, no es un bug de
+tu consulta.
+
+### Por qué NO se arregla — dos mediciones independientes
+
+| Intento | Resultado | Veredicto |
+|---|---|---|
+| **Arreglar la versión inline** (persistir el máximo y anclar ahí el trailing) | PF **0,94** vs **0,98** actual · **mata 73 TP** (194 → 121) | 🔴 No aplicar |
+| **Barrido completo de parámetros** de ese mismo fix (varias distancias y activaciones) | Mejor combinación: PF **1,00** (trailing 3%) · **ninguna** pasa PF ≥ 1,6 | 🔴 No aplicar |
+| **Conectar `trailing_stop.py`** (auditoría económica 2026-08-31, 401 operaciones, mar–ago 2026) | PF **0,583** vs **0,919** actual · PnL **−$11,33** · **mata 152 de 168 TP** · win rate 42,1% → 29,4% | 🔴 Descartado |
+
+**Antes de proponer "probémoslo con otra distancia": ya se barrió el espacio de parámetros.** La
+tendencia es monótona y va en contra: cuanto **más ancho** el trailing, mejor el PF y más TP
+sobreviven — es decir, el óptimo tiende a *no tener trailing*. El techo del barrido (PF 1,00) queda
+a 0,6 puntos del umbral de 1,6.
+
+**El mecanismo es siempre el mismo:** un trailing que funciona cierra las operaciones antes de que
+lleguen al TP. Con TP de 4–7% y distancias de trailing de 1–1,5%, cualquier retroceso normal del
+mercado corta el trade. El trailing roto, al ser inoperante, **deja correr las operaciones hasta el
+TP — y eso rinde más**.
+
+Detalle por moneda del segundo estudio: donde el sistema pierde, el trailing amortigua; **donde
+gana, lo destruye**. En BNB (PF 3,39) y ETH (PF 2,26) —las dos únicas monedas rentables del
+período— `trailing_stop.py` se lleva el **98%** y el **84%** del beneficio.
+
+Ninguna de las dos alternativas alcanza el umbral **PF ≥ 1,6** que este proyecto exige para tocar
+francotiradores. Por eso no se aplican.
+
+### `trailing_stop.py` — existe, está huérfano, y así se queda
+
+Hay un módulo `trailing_stop.py` en la raíz con un trailing **técnicamente correcto** (persiste
+`trailing_sl` en la DB y sólo lo sube, `línea 59`). Es tentador: parece "la versión buena que
+alguien olvidó conectar". **No lo conectes.**
+
+- **Nadie lo importa** (`grep -rn "trailing_stop" --include=*.py .` sobre imports → vacío) y no
+  figura entre los módulos alcanzables desde producción.
+- **La tabla `trailing_data` no existe en `signals/bot.db`** → nunca se ejecutó ni una vez.
+- Su condición de cierre (`línea 70`) exige además `cambio > -(TRAILING_DISTANCIA + 0.5)`: por
+  debajo de −2% **deja de cerrar**, así que tampoco sirve como protección de pérdida por sí solo.
+- Fue medido: es la columna "conectar `trailing_stop.py`" de la tabla de arriba.
+
+### Qué SÍ es cierto y conviene no confundir
+
+- **No hay riesgo abierto.** El SL base funciona y protege la pérdida. Lo que no existe es la
+  protección de ganancia.
+- `TRAILING_ACTIVACION` y `TRAILING_DISTANCIA` en los francotiradores son, hoy, **cosméticos**:
+  cambiarlos no altera ninguna salida.
+- Si algún día se quiere trailing de verdad, no es una "reparación": es un **cambio de estrategia**
+  que necesita backtest propio con PF ≥ 1,6 y OK explícito de Ariel, y probablemente una columna
+  nueva **al final** de `auditoria.csv` (nunca en el medio).
+
+Reportes con la evidencia completa:
+`reports/2026-08-31_auditoria-economica-trailing.md` (el estudio de 401 operaciones),
+`reports/2026-08-31_backtest-fix-breakeven-trailing.md` y
+`reports/2026-08-31_chequeo-profundo-salud-bot.md` (causa raíz).
+
+## ⛔ Termómetro y Centinela — también rotos, tampoco se arreglan (2026-08-31)
+
+Mismo criterio que el trailing: **se midieron económicamente y ninguno demostró mejora**, así que
+**no se tocó una línea de código de ninguno de los dos**. Lo que sigue documenta por qué, para que
+nadie los "repare" creyendo que encontró un bug sin explorar.
+
+### 🌡️ Termómetro — gate congelado desde el 4 de marzo
+
+`puede_operar_termometro()` es uno de los 10 gates de entrada y lo llaman los 4 francotiradores
+activos (`francotirador_alcista_btc.py:333`, `eth.py:608`, `sol.py:327`, `avax.py:327`). Lee su
+estado de `db.json_get("estado_termometro")`.
+
+**Quien actualiza ese estado es `clasificar_mercado()` (`termometro.py:44-75`), y sólo se invoca
+desde su propio `if __name__ == "__main__"` (`línea 149`).** No hay screen, ni cron, ni import que
+lo ejecute (verificado sobre `iniciar_bots.sh`, `arrancar_maestro.sh` y `crontab -l`). El estado en
+la DB tiene una medición del **2026-03-04**: `TENDENCIA_DEBIL`, `operar: True`. **El gate deja pasar
+el 100% de las señales: hoy es un no-op.**
+
+**Evidencia económica de conectarlo (`reports/2026-08-31_termometro-impacto-economico.md`,
+reconstrucción hora por hora con 5.495 velas 1h reales por moneda, ene–ago 2026):**
+
+| | Resultado |
+|---|---|
+| Tiempo que bloquearía | **31,89%** (y **66,2% en agosto**) |
+| Operaciones reales que habría bloqueado | **4 de 8 (50%)** |
+| PnL de esas 4 (dinero real) | **+$0,3433** → conectarlo habría **costado $0,34** |
+| Misma prueba sobre 393 ops simuladas | **−$0,38** → habría ahorrado $0,38 |
+| Significancia | IC 95% **incluye el cero** en ambas |
+
+**Los dos signos se contradicen y ninguno es significativo → sin mejora demostrada → 🔴 NO
+CONECTAR.** El costo cierto, en cambio, sí es medible: perder la mitad de las operaciones en un bot
+que ya opera poco. Si algún día se quiere el filtro, entra como **cambio de estrategia** con
+backtest propio (PF ≥ 1,6), no como reparación.
+
+**⚠️ ADVERTENCIA OPERATIVA — no ejecutes `python3 termometro.py`.** Correrlo a mano **escribe**
+`estado_termometro` en la DB y ese valor queda congelado para siempre (nada vuelve a actualizarlo).
+Reconstruyendo las últimas 24 h del análisis, **15 de 24 horas habrían dado `MERCADO_MUERTO`
+(`operar: False`)**: si el congelamiento cae ahí, el gate pasa a **bloquear el 100% de las entradas
+de las 4 monedas, de forma permanente y silenciosa** — sin log de la transición y sin aviso de
+Telegram (el aviso de `guardar_estado()` sólo salta si el estado *cambia*, y no volvería a cambiar).
+El síntoma sería "el bot dejó de abrir posiciones" sin ninguna otra pista. Las rachas de
+`MERCADO_MUERTO` llegaron a **376 horas seguidas (15,7 días)** en el histórico.
+
+**Por qué esto NO se arregló quitando el gate:** quitarlo daría exactamente **$0,00** de diferencia
+(el gate no filtra nada hoy), así que no hay mejora económica que lo justifique — y este proyecto no
+cambia código de producción por limpieza. La contramedida elegida es de costo cero: **esta
+advertencia**. El disparador del fallo es una acción humana, así que documentarlo lo previene.
+
+**Dos hallazgos del código que conviene no repetir:** la rama `VOLATILIDAD_EXTREMA` **nunca se
+activó ni una hora** en 7,5 meses (volatilidad máxima observada 1,18% contra un umbral de 2,0%), así
+que el gate **sólo detecta mercado quieto, no volatilidad**; y `obtener_multiplicadores()`
+(`tp_mult`/`sl_mult`) **no la llama nadie**, así que conectarlo **no cambiaría ningún TP ni SL**.
+
+### 🛡️ Centinela — no es una red de seguridad, es un observador aislado
+
+`CLAUDE.md` lo describía como *"monitorea posiciones abiertas en tiempo real"*. **Era falso en los
+tres niveles** y por eso se corrigió el diagrama de arquitectura. Consume un hilo permanente de
+`main.py` (`main.py:104`) y **no puede afectar ninguna decisión de trading**:
+
+1. **Su capital nunca se actualiza.** `drawdown.evaluar()` lee `estado.get("capital_actual")`, y
+   `estado.actualizar_capital()` sólo se llama en el `if __name__ == "__main__"` de
+   `centinela/modulos/drawdown.py:73-74`, con valores de prueba (1000.0 / 980.0). **El drawdown vale
+   0 para siempre**: es estructuralmente incapaz de detectar la caída que dice vigilar.
+2. **Nadie lee su veredicto.** `alertas.py:67` escribe `estado.set("sistema_pausado", True)`, pero
+   `sistema_pausado` y `modo_panico` no se consultan desde ningún módulo fuera de `centinela/`. Su
+   estado vive sólo en RAM y se pierde en cada reinicio.
+3. **Su canal de alertas está vacío.** `TELEGRAM_TOKEN_ALERTAS = ""` en `centinela/config.py:47`,
+   así que toda alerta termina en un `print` dentro de un screen que nadie mira.
+
+Además, su módulo `operaciones` —el único que miraba posiciones— está comentado desde la auditoría
+V2.12 (`centinela/centinela.py:20` y `66-73`), y `centinela/estado/estado_global.py:14` conserva un
+`except:` desnudo con **fallback de $1.000** (el mismo patrón que `guardian_riesgo.py` eliminó a
+propósito), leyendo además sólo `USDT` y no el capital total.
+
+**Evidencia económica: su efecto sobre el dinero es exactamente CERO**, en ambas direcciones. No
+abre, no cierra, no bloquea. Por lo tanto **ninguna reparación suya puede demostrar mejora
+económica** — ni conectarlo, ni apagarlo, ni arreglar el fallback. **🔴 NO TOCAR el código.**
+
+Conectarlo de verdad **no sería una reparación sino un rediseño**: agregaría una **segunda autoridad
+de bloqueo** junto a `guardian_riesgo.py`, y habría que definir cuál manda. No se hace sin decisión
+explícita de Ariel y evidencia propia.
+
+**Lo único que importaba acá era la documentación:** quien lea el árbol de arquitectura no debe
+creer que existe una protección que no existe. El guardián de riesgo (`guardian_riesgo.py`) **sí**
+funciona y cubre drawdown máximo y pérdida diaria — esa es la red de seguridad real del sistema.
+
+Evidencia completa: `reports/2026-08-31_termometro-impacto-economico.md` y
+`reports/2026-08-31_auditoria-arquitectura-y-conexiones.md`.
 
 ## Telegram
 - Admins: ADMIN_YAYO (6578945006), ADMIN_SOCIA (6533031969)

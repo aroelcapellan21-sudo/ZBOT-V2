@@ -3,6 +3,23 @@
 ## Idioma
 Responde siempre en español.
 
+## 🛑 REGLA PERMANENTE — mostrar el diff y esperar confirmación (desde 2026-08-31)
+
+**REGLA PERMANENTE: Antes de aplicar CUALQUIER cambio a un archivo real del proyecto (código `.py`,
+o documentación como `CLAUDE.md`), mostrar siempre el diff completo a Ariel y esperar su
+confirmación explícita antes de escribirlo. Esto aplica sin excepción, incluso si una instrucción
+anterior en la misma tarea dice "implementa directamente" o algo similar — esa instrucción nunca
+reemplaza este paso. Aplica también a cambios pequeños o solo de documentación, no solo a cambios
+grandes de código de producción.**
+
+Notas de aplicación:
+- El diff se muestra **antes de escribir el archivo**, no después. Primero el diff, después la
+  confirmación de Ariel, y recién entonces la escritura.
+- No aplica a archivos que no son del proyecto: reportes en `reports/`, scripts de investigación en
+  el scratchpad de la sesión, ni consultas de solo lectura.
+- Si en una misma tarea Ariel dice "hazlo directamente", esta regla **sigue vigente**: se prepara el
+  diff, se muestra, y se espera. La instrucción de velocidad no cancela el paso de revisión.
+
 ## Reportes de análisis
 Toda respuesta (análisis, investigación, conclusión — no código) que ocupe más de **15 líneas** se guarda
 automáticamente como archivo en `~/bot-padre-v2/reports/`, sin pedir permiso, y en la terminal se muestra
@@ -549,6 +566,16 @@ la diferencia sale de **16 casos**. Y a escala actual ($7/op sobre $37) la venta
 
 **Veredicto: 🔴 NO TOCAR por economía.** No hay mejora demostrada, se invierte ante cualquier
 exclusión, y viene con casi 6× más drawdown.
+
+### ✅ DECISIÓN TOMADA (Ariel, 2026-08-31)
+
+**Decisión: no se corrige por ahora. Motivo: beneficio esperado indistinguible de cero y el
+drawdown simulado sube ~6×.**
+
+El arreglo de `director_orquesta.py:56` queda **cancelado**, no pendiente. Esto no es un TODO ni un
+trabajo a medio hacer: es una decisión tomada con la evidencia a la vista. Queda **solo
+documentado**. Si en el futuro se reabre, tiene que ser con evidencia nueva —no con el mismo
+análisis— y con una decisión explícita de Ariel que reemplace a ésta.
 
 ### Lo que sí cambió, y hay que tener presente
 

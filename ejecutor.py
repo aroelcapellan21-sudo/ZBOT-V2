@@ -21,8 +21,18 @@ import time
 import urllib.request
 import urllib.parse
 import urllib.error
+import socket
+from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 from gestor_billetera import registrar_historial_billetera
+
+# Aviso por Telegram. Import defensivo: si engine falla, el ejecutor debe seguir
+# cargando igual — perder el aviso es malo, no poder operar es peor.
+try:
+    from engine import enviar_aviso as _aviso
+except Exception as _e:
+    def _aviso(msg):
+        print(f"  [EJECUTOR] (sin Telegram: {_e}) {msg}")
 
 BILLETERA            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 LOCK_FILE            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json.lock")
@@ -45,6 +55,55 @@ LOT_SIZE = {
     "BNBUSDT":  3,
     "AVAXUSDT": 2,
 }
+
+class OrdenIncierta(RuntimeError):
+    """
+    La orden PUDO haberse ejecutado en Binance pero no se pudo confirmar.
+
+    Es la diferencia entre "no se envio" y "se envio y no supe el resultado".
+    Tratar el segundo caso como un fallo comun es lo que produjo la posicion
+    fantasma de ETH (reports/2026-08-29_reconciliacion-posicion-fantasma-eth.md):
+    el bot marco la fila ANULADA y se olvido de una posicion que existia de
+    verdad en Binance.
+
+    Ante esta excepcion NUNCA se asume que no hay posicion: se deja un marcador
+    en signals/ y se avisa por Telegram para reconciliar a mano.
+    """
+
+# Estados que Binance puede devolver en una orden MARKET.
+ESTADOS_EJECUTADOS = ("FILLED", "PARTIALLY_FILLED")
+ESTADOS_RECHAZADOS = ("REJECTED", "EXPIRED", "CANCELED")
+
+def _registrar_orden_incierta(symbol, side, motivo, extra=None):
+    """
+    Deja rastro imborrable de una orden cuyo resultado no se pudo confirmar.
+    Escribe un marcador en signals/ y avisa por Telegram. No lanza: si falla el
+    registro, igual hay que devolver el error al llamador.
+    """
+    ts   = datetime.now().strftime("%Y%m%d_%H%M%S")
+    ruta = os.path.expanduser(f"~/bot-padre-v2/signals/ORDEN_INCIERTA_{symbol}_{side}_{ts}.json")
+    datos = {
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "symbol": symbol, "side": side, "motivo": motivo,
+        "extra": extra or {},
+        "que_hacer": ("Verificar en Binance si la orden se ejecuto. El bot NO actualizo "
+                      "la billetera ni dio la posicion por abierta/cerrada."),
+    }
+    try:
+        with open(ruta, "w") as f:
+            json.dump(datos, f, indent=2, ensure_ascii=False)
+        print(f"  [EJECUTOR] ⚠️ Marcador de orden incierta: {ruta}")
+    except Exception as e:
+        print(f"  [EJECUTOR] ⚠️ No se pudo escribir el marcador de orden incierta: {e}")
+    try:
+        _aviso(f"⚠️ ORDEN INCIERTA — {symbol} {side}\n"
+               f"{motivo}\n\n"
+               f"La orden PUDO ejecutarse en Binance, pero no hubo confirmacion. "
+               f"El bot no toco la billetera.\n"
+               f"VERIFICAR A MANO en Binance antes de operar {symbol} de nuevo.\n"
+               f"Marcador: {os.path.basename(ruta)}")
+    except Exception as e:
+        print(f"  [EJECUTOR] ⚠️ No se pudo avisar de la orden incierta: {e}")
 
 def _leer_modo():
     # Fallback SIMULADOR: si modo.json falta, esta corrupto o se lee a medio
@@ -210,10 +269,49 @@ def _orden_mercado(symbol, side, quote_qty=None, base_qty=None):
     )
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
-            return json.loads(resp.read())
+            respuesta = json.loads(resp.read())
     except urllib.error.HTTPError as e:
-        cuerpo = e.read().decode()
+        # Binance respondio. Un 4xx es un rechazo explicito: la orden NO existe.
+        # Un 5xx es estado desconocido segun la propia doc de Binance: puede
+        # haberse ejecutado igual.
+        try:
+            cuerpo = e.read().decode()
+        except Exception:
+            cuerpo = "(cuerpo ilegible)"
+        if e.code >= 500:
+            raise OrdenIncierta(
+                f"Binance {e.code} (error de servidor, estado desconocido): {cuerpo}")
         raise RuntimeError(f"Binance {e.code}: {cuerpo}")
+    except (socket.timeout, TimeoutError) as e:
+        # La peticion SALIO y no hubo respuesta a tiempo: no se sabe si ejecuto.
+        raise OrdenIncierta(f"timeout sin respuesta de Binance: {e}")
+    except urllib.error.URLError as e:
+        # gaierror = fallo de DNS: no se llego a enviar nada. El resto (conexion
+        # cortada a mitad, reset) si pudo salir.
+        if isinstance(e.reason, socket.gaierror):
+            raise RuntimeError(f"sin conexion (DNS), la orden NO se envio: {e.reason}")
+        raise OrdenIncierta(f"conexion interrumpida sin respuesta: {e.reason}")
+    except json.JSONDecodeError as e:
+        raise OrdenIncierta(f"respuesta de Binance ilegible: {e}")
+
+    # ---- Validacion del status: antes se daba por buena cualquier respuesta ----
+    estado = respuesta.get("status")
+    if estado in ESTADOS_RECHAZADOS:
+        raise RuntimeError(f"Binance rechazo la orden (status={estado}): {respuesta}")
+    if estado not in ESTADOS_EJECUTADOS:
+        # status ausente o desconocido: no se puede afirmar que no exista.
+        raise OrdenIncierta(f"status inesperado en la respuesta: {estado!r}")
+
+    ejecutado = float(respuesta.get("executedQty") or 0)
+    if ejecutado <= 0:
+        raise RuntimeError(f"Binance devolvio status={estado} con executedQty=0: {respuesta}")
+    if estado == "PARTIALLY_FILLED":
+        print(f"  [EJECUTOR] ⚠️ {symbol} {side}: orden PARCIAL "
+              f"({ejecutado} de {params.get('quantity', params.get('quoteOrderQty'))})")
+        _aviso(f"⚠️ ORDEN PARCIAL — {symbol} {side}\n"
+               f"Ejecutado: {ejecutado}\n"
+               f"Queda saldo sin operar en Binance. Revisar antes del proximo ciclo.")
+    return respuesta
 
 def _saldo_libre(moneda):
     """Saldo real disponible de un activo en Binance ahora mismo, con la key
@@ -393,6 +491,12 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None, sl_pct=None):
                     respuesta = _simular_fill(symbol, "BUY", quote_qty=monto)
                 else:
                     respuesta = _orden_mercado(symbol, "BUY", quote_qty=monto)
+            except OrdenIncierta as e:
+                # NO se marca como fallo comun: la posicion puede existir en Binance.
+                _registrar_orden_incierta(symbol, "BUY", str(e), {"monto": monto})
+                return (f"❌ ORDEN INCIERTA COMPRA {moneda}: {e}. "
+                        f"PUEDE haber una posicion abierta en Binance sin registrar — "
+                        f"verificar a mano antes de volver a operar {moneda}."), None
             except Exception as e:
                 return f"❌ ERROR {'simulando' if simulador else 'Binance'} COMPRA: {e}", None
 
@@ -418,6 +522,11 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None, sl_pct=None):
                     respuesta = _simular_fill(symbol, "SELL", base_qty=cantidad_a_vender)
                 else:
                     respuesta = _orden_mercado(symbol, "SELL", base_qty=cantidad_a_vender)
+            except OrdenIncierta as e:
+                _registrar_orden_incierta(symbol, "SELL", str(e),
+                                          {"cantidad": cantidad_a_vender})
+                return (f"❌ ORDEN INCIERTA VENTA {moneda}: {e}. "
+                        f"La venta PUEDE haberse ejecutado — verificar a mano."), None
             except Exception as e:
                 return f"❌ ERROR {'simulando' if simulador else 'Binance'} VENTA: {e}", None
 
@@ -524,6 +633,15 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op, qty=None):
         tag = "[SIM] " if simulador else ""
         return f"✅ {tag}{etiqueta} {moneda}: {verbo} {qty_ej} a ${precio_r}{ajuste_notional}", fill
 
+    except OrdenIncierta as e:
+        # Critico en el cierre: si la venta SI se ejecuto y la fila vuelve a
+        # ABIERTA, el proximo ciclo intentaria vender una posicion inexistente.
+        _registrar_orden_incierta(symbol, lado, str(e),
+                                  {"cantidad": cantidad, "tipo_trade": tipo_trade,
+                                   "precio_entrada": precio_entrada})
+        return (f"❌ ORDEN INCIERTA en cierre {moneda}: {e}. "
+                f"El cierre PUEDE haberse ejecutado en Binance. La fila queda ABIERTA: "
+                f"verificar a mano antes del proximo ciclo para no vender dos veces."), None
     except urllib.error.HTTPError as e:
         cuerpo = e.read().decode()
         return f"❌ Binance {e.code} en cierre {moneda}: {cuerpo}", None

@@ -33,8 +33,15 @@ TIPO_TRADE         = "ALCISTA"
 # Con $5 el SL era matematicamente inejecutable: al tocarlo, la posicion valia
 # menos que el minNotional de $5 de Binance y la venta se rechazaba con -1013.
 # Verificado con precios reales: las 4 monedas fallaban, BTC la peor ($3.74 al
-# SL). Con $7 las 4 pasan. Detalle: reports/2026-08-30_diff-monto-7-y-guardian-entrada.md
-MONTO_FIJO         = 7.0
+# SL). Detalle: reports/2026-08-30_diff-monto-7-y-guardian-entrada.md
+#
+# 2026-08-31: BTC sube a $10 (las otras 3 siguen en $7). Con $7, el truncamiento
+# al stepSize tras la comision dejaba la qty cerrable en 0.00007 BTC = $5.49, con
+# solo 5.7% de margen sobre el minNotional y polvo del 12.4% por trade. Con $10 el
+# margen pasa a 66% y el polvo relativo baja a 7.8%. Efectos secundarios revisados
+# (siguen cabiendo las 4 monedas; el guardian frena en $33.79, antes del umbral de
+# $31): reports/2026-08-31_analisis-efectos-secundarios-btc-10.md
+MONTO_FIJO         = 10.0
 RSI_MIN            = 50
 RSI_MAX            = 70
 STOP_LOSS          = 3.5

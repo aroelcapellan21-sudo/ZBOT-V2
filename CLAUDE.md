@@ -256,6 +256,48 @@ timestamp,accion,symbol,precio,rsi,estado,monto,qty
    (`billetera.json.lock`, `AUDITORIA_LOCK`). Solo corre manual desde Telegram
    (`/reconciliar confirmar`) — vende dinero real, no debe correr sin supervisión.
 
+### Cambios aplicados el 2026-08-31 (puntos ciegos del camino del dinero)
+
+Ambos salen del análisis `reports/2026-08-31_puntos-ciegos-camino-del-dinero.md`, que buscó lugares
+donde el bot puede fallar **en silencio** con dinero real, como pasó con el bug de NOTIONAL.
+
+**1. `MONTO_FIJO` de BTC: $7 → $10** (`francotirador_alcista_btc.py:37`). Solo BTC; ETH, SOL y AVAX
+siguen en $7.
+- **Qué reemplaza:** con $7, el truncamiento al `stepSize` (0.00001) **después** de la comisión
+  dejaba la cantidad cerrable en **0.00007 BTC = $5,49** de un ticket de $7.
+- **Evidencia:** margen sobre el minNotional de solo **5,7%** (bastaba una caída del 8,74% para que
+  el cierre quedara bloqueado, con un SL de 3,5%), y **12,4% de la posición inmovilizada como polvo
+  en cada trade**. Barriendo el precio de BTC entre $40k y $150k, con $7 el margen mínimo es
+  **−18,9%**: a ~$140.000 el guardián de entrada habría rechazado toda operación de BTC. Con $10 el
+  margen mínimo sube a **+37,9%** y el de hoy a 66%.
+- **Efectos secundarios revisados** (`reports/2026-08-31_analisis-efectos-secundarios-btc-10.md`):
+  siguen cabiendo las 4 monedas a la vez ($31 de $37,21); el umbral en que dejarían de caber ($31)
+  queda **por debajo** del bloqueo del guardián ($33,79), así que no se puede alcanzar; el único
+  efecto confirmado es más concentración en BTC (25% → 32%).
+
+**2. `ejecutor.py`: validación de `status` y distinción de orden incierta.**
+- **Qué reemplaza:** antes se daba por buena **cualquier** respuesta HTTP 200 (`status` nunca se
+  miraba), y el `except` de la orden **no distinguía** "no se envió" de "se envió y no supe el
+  resultado". Ese segundo caso marcaba la fila `ANULADA` y el bot se olvidaba de una posición que
+  podía existir de verdad — es exactamente la posición fantasma de ETH
+  (`reports/2026-08-29_reconciliacion-posicion-fantasma-eth.md`).
+- **Qué hace ahora:**
+  - **Rechazo definitivo** (`RuntimeError`, la orden no existe): `status` `REJECTED`/`EXPIRED`/
+    `CANCELED`, `executedQty = 0`, HTTP 4xx, y **fallo de DNS** (la petición nunca salió).
+  - **`OrdenIncierta`** (pudo ejecutarse): timeout, HTTP **5xx** —estado desconocido según la propia
+    doc de Binance—, conexión cortada a mitad, JSON ilegible, y `status` ausente o desconocido.
+    Ante esto **nunca** se asume que no hay posición: se escribe un marcador
+    `signals/ORDEN_INCIERTA_<symbol>_<side>_<ts>.json` y se avisa por Telegram para reconciliar a
+    mano.
+  - **`PARTIALLY_FILLED`** se acepta (la `executedQty` real manda) pero **avisa**, porque queda saldo
+    sin operar en Binance.
+- **Verificación:** 14 escenarios probados con respuestas simuladas (sin tocar Binance ni dinero),
+  14/14 clasificados como corresponde.
+- **No cambia** ninguna estrategia, TP, SL, entrada ni sizing: solo cómo se interpreta la respuesta.
+
+⚠️ **Los cambios en `ejecutor.py` no tienen efecto hasta reiniciar `v2_main`**: el proceso tiene el
+módulo cargado en memoria desde su arranque.
+
 ### Qué no tocar
 > ⚠️ **No restaurar el simulador sobre `auditoria.csv` real.** El backup completo de 386
 > operaciones de paper trading vive en

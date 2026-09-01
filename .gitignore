@@ -45,3 +45,6 @@ keys_testnet.env
 
 # Estado de la validacion en testnet
 historial_testnet.csv
+
+# Investigacion y scripts sueltos — no son codigo del bot
+investigacion/

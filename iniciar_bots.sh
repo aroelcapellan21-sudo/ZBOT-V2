@@ -71,6 +71,88 @@ iniciar() {
     echo "[OK]   $nombre iniciado"
 }
 
+# =========================================
+# Claude Code — arranque propio (no usa iniciar())
+# =========================================
+# iniciar()/proceso_activo() solo saben reconocer comandos "python3 archivo.py":
+# con "claude" el nombre de archivo sale vacio, proceso_activo() da SIEMPRE falso,
+# y la rama de limpieza mata la sesion de Claude que estaba viva. Ya ocurrio:
+# ver "[WIPE] claude_code" en memoria/arranque.log. Por eso Claude Code lleva su
+# propio guard aca abajo y NO se toca iniciar(), que es la que usa el bot.
+
+# Resuelve el binario de claude sin depender del PATH: bajo cron el PATH es
+# /usr/bin:/bin y "claude" NO se encuentra (ni el de nvm ni el de /usr/local/bin).
+resolver_claude() {
+    local nvm_claude
+    if command -v claude >/dev/null 2>&1; then
+        command -v claude
+        return 0
+    fi
+    # Instalacion via nvm (la vigente hoy). Se toma la version mas alta presente.
+    nvm_claude=$(ls -1d "$HOME"/.nvm/versions/node/*/bin/claude 2>/dev/null | sort -V | tail -1)
+    if [ -x "$nvm_claude" ]; then
+        echo "$nvm_claude"
+        return 0
+    fi
+    if [ -x /usr/local/bin/claude ]; then
+        echo /usr/local/bin/claude
+        return 0
+    fi
+    return 1
+}
+
+# ¿Hay un proceso 'claude' vivo, con cwd en el proyecto y colgando de un SCREEN?
+# Mira /proc y no el socket dir de screen (que bajo cron no ve las sesiones).
+# El chequeo del padre SCREEN evita confundirse con un claude que Ariel tenga
+# abierto a mano en una terminal: ese no cuelga de un SCREEN.
+claude_en_screen_activo() {
+    local dir_abs pid cwd ppid pcomm
+    dir_abs=$(readlink -f "$1")
+    while read -r pid; do
+        [ -z "$pid" ] && continue
+        cwd=$(readlink -f "/proc/$pid/cwd" 2>/dev/null)
+        [ "$cwd" = "$dir_abs" ] || continue
+        ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+        [ -z "$ppid" ] && continue
+        # OJO: /proc/<pid>/comm devuelve "screen" en minuscula; el "SCREEN" en
+        # mayuscula que se ve en `pgrep -af` es solo el argv[0]. Comparar en
+        # minuscula, si no el guard nunca detecta la sesion viva.
+        pcomm=$(tr '[:upper:]' '[:lower:]' < "/proc/$ppid/comm" 2>/dev/null)
+        [ "$pcomm" = "screen" ] && return 0
+    done < <(pgrep -x claude)
+    return 1
+}
+
+iniciar_claude() {
+    local nombre=$1
+    local directorio=$2
+    local bin
+
+    # Guard primario: sesion de Claude viva en este directorio -> no tocarla.
+    if claude_en_screen_activo "$directorio"; then
+        echo "[SKIP] $nombre ya está corriendo (sesión Claude Code viva)"
+        return
+    fi
+
+    bin=$(resolver_claude)
+    if [ -z "$bin" ]; then
+        echo "[ERR]  $nombre: no se encontró el binario 'claude' — sesión NO iniciada"
+        return
+    fi
+
+    # Sin Claude vivo: limpiar una screen huerfana con ese nombre antes de relanzar.
+    if screen -list | grep -q "\.${nombre}[[:space:]]"; then
+        echo "[WIPE] $nombre: sesión sin Claude vivo — limpiando"
+        screen -S "$nombre" -X quit 2>/dev/null
+        screen -wipe >/dev/null 2>&1
+    fi
+
+    # TERM explicito: bajo cron viene vacio y la TUI de Claude Code lo necesita.
+    # --remote-control deja la sesion accesible desde el celular sin escanear QR.
+    screen -dmS "$nombre" bash -c "cd $directorio && export TERM=xterm-256color && exec '$bin' --remote-control $nombre"
+    echo "[OK]   $nombre iniciado ($bin, Remote Control activo)"
+}
+
 echo "================================================"
 echo " Z-Bot Padre v2 — Iniciando procesos"
 echo " $(date)"
@@ -126,7 +208,11 @@ iniciar v2_main "$DIR" "$CMD_V2_MAIN"
 
 # --- Rescatados de la copia vieja en $HOME (jun 2026), antes de borrarla ---
 iniciar motor_confluencia ~/motor-confluencia "python3 main.py"
-iniciar claude_code "$DIR" "claude"
+
+# --- Claude Code — sesion accesible desde el celular (Remote Control) ---
+# Reemplaza a la vieja linea `iniciar claude_code "$DIR" "claude"`, que no tenia
+# guard real (mataba la sesion viva) y bajo cron no encontraba el binario.
+iniciar_claude z_code "$DIR"
 
 echo "================================================"
 echo " Todos los procesos iniciados."

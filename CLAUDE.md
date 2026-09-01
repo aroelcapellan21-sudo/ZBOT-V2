@@ -95,8 +95,12 @@ main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca
 ```
 
 ## Procesos en pantalla (screen)
-Cada módulo corre en su propia sesión `screen`. Total esperado: 29 sesiones (verificado
-2026-08-22: 29 activas, coincide).
+Cada módulo corre en su propia sesión `screen`. Total esperado: 30 sesiones (verificado
+2026-09-01: 30 activas, coincide).
+
+⚠️ El conteo anterior decía 29 pero la lista de abajo solo enumeraba 28 nombres: faltaban
+`motor_confluencia` (que ya existía) y la sesión de Claude Code. Ambas están listadas ahora, y
+el total (30) coincide con la lista.
 
 **bot-padre-v2:**
 - `v2_main` → `main.py`
@@ -122,6 +126,29 @@ Cada módulo corre en su propia sesión `screen`. Total esperado: 29 sesiones (v
 - `z_ignition` → `ignition.py`
 - `z_heatmap_radar` → `heatmap.py`
 - `z_wicks` → `wick_analyzer.py`
+
+**Otros proyectos levantados por el mismo script:**
+- `motor_confluencia` → `main.py` de `~/motor-confluencia` (rescatado jun 2026, no es del bot v2)
+
+**Claude Code (desde 2026-09-01):**
+- `z_code` → `claude --remote-control z_code` en `~/bot-padre-v2`
+
+  Sesión de Claude Code que arranca sola tras un corte de luz, para poder entrar desde el celular
+  sin estar frente a la Dell. Reemplaza a la vieja `claude_code`, que entró de arrastre en jun 2026
+  y estaba rota en dos formas (ver `reports/2026-09-01_arranque-automatico-claude-code.md`).
+
+  **No usa `iniciar()` como el resto — tiene su propio bloque en `iniciar_bots.sh`.** Motivo:
+  `proceso_activo()` identifica el proceso extrayendo un nombre de archivo `.py` del comando; con
+  `claude` sale vacío, siempre da "no está corriendo", y la rama de limpieza **mataba la sesión
+  viva** (quedó registrado como `[WIPE] claude_code` en `memoria/arranque.log`). El guard propio
+  (`claude_en_screen_activo()`) mira `/proc`: busca un proceso `claude` con cwd en el proyecto y
+  cuyo padre sea un `screen`.
+
+  ⚠️ Dos detalles que hay que respetar si algún día se toca esa parte:
+  - **El binario se resuelve por ruta absoluta, no por PATH.** Bajo `@reboot` el PATH de cron es
+    `/usr/bin:/bin` y `claude` no está ahí (vive en `~/.nvm/versions/node/<version>/bin/`). Sin
+    esto la screen arranca y muere al instante con `command not found`.
+  - **`TERM` se exporta a mano** (`xterm-256color`): bajo cron viene vacío y Claude Code es una TUI.
 
 Para verificar caídas: `python3 monitor_screens.py`
 

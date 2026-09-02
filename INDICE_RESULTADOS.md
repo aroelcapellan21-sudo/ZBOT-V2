@@ -10,9 +10,10 @@ reportes que son diagnóstico/infraestructura (no backtests de estrategia) no es
 
 **"—"** = dato no disponible/no aplicable en el reporte fuente, no inventado.
 
-**Protocolo de actualización — permanente desde 2026-08-24**: al cerrar cualquier investigación
-nueva (backtest, prueba, auditoría con veredicto), se agrega una fila acá y se actualiza
-`ESTADO_ACTUAL.md` como parte del cierre, sin que haga falta pedirlo.
+**Protocolo de actualización — la regla vive en `CLAUDE.md` desde 2026-09-02** (antes estaba acá,
+y por eso el índice quedó congelado el 24-ago con 62 reportes sin indexar). Ninguna investigación
+se cierra sin su fila acá, sin actualizar `ESTADO_ACTUAL.md`, y sin cargar sus números en
+`data/resultados.db` — que es la fuente consultable (`python3 consultar.py`).
 
 ---
 
@@ -160,3 +161,31 @@ mismo criterio que el torneo.)*
 |---|---|---|---|---|---|---|
 | **Fase A** — WR de moneda_operando según tendencia fuerte vs. lateral de moneda_contexto al momento de la entrada (5 monedas × 4 contextos × 2 criterios = 40 pruebas) | 22/40 pasan filtro rápido (n≥30, ΔWR≥5pp) | — | — | — | 🔴 Ninguna significativa — IC99.875% (Bonferroni/40) cruza cero en las 22; BNB como operando aparece en 7/22, sin confirmar | `2026-08-25_correlacion-5-monedas-fase-ab.md` |
 | **Fase B** — PnL/vela antes vs. después de que moneda_contexto entra en BAJISTA_FUERTE durante una posición ya abierta (40 combinaciones) | máx. 7 (de 40 combos) | — | — | — | ⚪ No evaluable — 0/40 combinaciones llegan a n≥30 casos de alerta válidos; limitación estructural (posiciones duran pocas velas frente a la escala diaria del criterio), no resultado nulo | `2026-08-25_correlacion-5-monedas-fase-ab.md` |
+
+## Cierre 25-ago → 02-sep-2026 — cargado desde `data/resultados.db`
+
+*(Estas filas se generan desde la base de datos, no se escriben a mano. Fuente consultable:
+`python3 consultar.py pruebas --desde 2026-08-25`.)*
+
+| Fecha | Moneda | Fase | Qué se probó | n | WR | PF | Sharpe | Veredicto | Resultado | Reporte fuente |
+|---|---|---|---|---|---|---|---|---|---|---|
+| 08-25 | MULTI | ALCISTA | Activacion del combo O en produccion (SOL ALCISTA + AVAX conectado) | — | — | — | — | APLICADO | Commit 4dd1ba5: director_orquesta.py pasa de 3 a 4 francotiradores. SOL de LATERAL-solo a ALCISTA por fase local, y AVAX deja de estar huerfano. | `reports/2026-08-25_diagnostico-cambio-produccion-avax-sol.md` |
+| 08-26 | MULTI | TODAS | Simulacion hipotetica "meta $100" | — | — | — | — | NO_CONCLUYENTE | NO ES UN BACKTEST — el propio reporte lo advierte en el titulo. Proyeccion hipotetica sin datos historicos detras. No usar como evidencia. | `reports/2026-08-26_simulacion-hipotetica-meta-100-NO-ES-BACKTEST.md` |
+| 08-30 | MULTI | ALCISTA | O — las 4 juntas (BTC+ETH+SOL+AVAX ALCISTA) | 993 | 48.1% | 1.327 | 4.146 | APLICADO | Config de produccion. Las 4 monedas aportan positivamente: sacar cualquiera reduce el PnL total. | `reports/2026-08-30_analisis-completo-combo-4-monedas-aporte-individual.md` |
+| 08-30 | MULTI | ALCISTA | O sin BTC | 694 | 49.0% | 1.350 | 3.660 | DESCARTADO | PF sube pero el PnL cae $10.15. | `reports/2026-08-30_analisis-completo-combo-4-monedas-aporte-individual.md` |
+| 08-30 | MULTI | ALCISTA | O sin ETH | 716 | 45.5% | 1.325 | 3.459 | DESCARTADO | PnL cae $12.68. | `reports/2026-08-30_analisis-completo-combo-4-monedas-aporte-individual.md` |
+| 08-30 | MULTI | ALCISTA | O sin SOL | 760 | 49.6% | 1.362 | 3.997 | DESCARTADO | Mejor PF y menor drawdown de los 5, pero el PnL cae $8.72 (SOL es el aporte mas chico). | `reports/2026-08-30_analisis-completo-combo-4-monedas-aporte-individual.md` |
+| 08-30 | MULTI | ALCISTA | O sin AVAX | 809 | 48.3% | 1.277 | 3.260 | DESCARTADO | PnL cae $14.83, el mayor aporte. | `reports/2026-08-30_analisis-completo-combo-4-monedas-aporte-individual.md` |
+| 08-30 | MULTI | ALCISTA | Walk-forward 3 ventanas del combo O y sus 4 variantes de aporte individual | — | — | — | — | NO_CONCLUYENTE | O mantiene PF>1 en las 3 ventanas (1.523 / 1.362 / 1.142) pero degrada con el tiempo. "Sin BTC" gana en las 3 ventanas; no se aplico. V1 no discrimina SOL/AVAX (no existian aun). | `reports/2026-08-30_walkforward-aporte-individual-combo-4-monedas.md` |
+| 08-30 | MULTI | ALCISTA | Proyeccion del combo O a distintos niveles de capital ($100 a $2,000) | — | — | — | — | NO_CONCLUYENTE | Proyeccion, no backtest nuevo: 0.359%/mes compuesto implicito del combo O. A $1,000 serian ~RD$223/mes. Escalar exige subir el monto por trade proporcionalmente. | `reports/2026-08-30_proyeccion-capital-combo-o-y-honestidad-de-escalar.md` |
+| 08-30 | MULTI | TODAS | Analisis de riesgo de subir el monto por trade ($5 → $7 / $10) | — | — | — | — | APLICADO | Sustento del cambio a $7: con $5 el minNotional de Binance bloqueaba cierres. Efecto secundario cuantificado: menos monedas simultaneas con el mismo capital. | `reports/2026-08-30_analisis-riesgo-subir-monto-por-trade.md` |
+| 08-31 | MULTI | TODAS | Conectar trailing_stop.py vs el trailing roto que corre hoy | 401 | 29.4% | 0.583 | — | DESCARTADO | EMPEORA. PF 0.583 vs 0.919 actual, PnL -$11.33 peor sobre 401 ops, mata 152 de 168 TP, WR 42.1%→29.4%. IC95% cruza cero pero no hay ninguna evidencia de mejora (P(B mejor)=26.4%). | `reports/2026-08-31_auditoria-economica-trailing.md` |
+| 08-31 | MULTI | TODAS | Fix B — breakeven y trailing anclados al maximo del trade (12 combinaciones de parametros) | — | — | 1.000 | — | DESCARTADO | Ninguna de las 12 combinaciones llega a PF>=1.6; la mejor da 1.00 contra 0.98 de hoy (empate dentro del ruido, peor drawdown). El bug es real pero arreglarlo no mejora. | `reports/2026-08-31_backtest-fix-breakeven-trailing.md` |
+| 08-31 | MULTI | TODAS | cerrar_huerfanas() fase GLOBAL vs LOCAL — impacto economico realizado | 1 | — | — | — | NO_CONCLUYENTE | Impacto realizado exactamente $0.00: 0 filas FASE_CAMBIO en auditoria.csv, el mecanismo nunca se disparo. Contrafactual sobre el unico caso con diferencia real: -$0.157 en contra de la logica propuesta (n=1, azaroso). | `reports/2026-08-31_evaluacion-economica-global-vs-local.md` |
+| 08-31 | MULTI | TODAS | cerrar_huerfanas() GLOBAL vs LOCAL — simulacion historica amplia (222 divergencias) | 222 | — | — | — | DESCARTADO | LOCAL da +$6.42 agregado pero no resiste robustez: IC95% -$3.10 a +$16.30 (cruza cero), GLOBAL gana en 54.5% de los casos (test de signo p=0.0219), drawdown 5.8x mayor ($12.92 vs $2.24). 206 de 222 posiciones (92.8%) se cierran igual poco despues. Decision de Ariel 31-ago: no se corrige. | `reports/2026-08-31_simulacion-historica-global-vs-local.md` |
+| 08-31 | MULTI | TODAS | Reconectar el termometro (gate congelado desde el 4-mar) — impacto economico | — | — | — | — | DESCARTADO | Dejarlo desconectado cuesta $0.00 (hoy es un no-op). Conectarlo bloquearia 31.9% del tiempo (66.2% en agosto) y habria cortado 4 de las 8 operaciones reales, cuyo PnL fue +$0.3433: habria costado $0.34. Sobre 393 ops simuladas da -$0.38 (signo opuesto). IC95% incluye el cero en ambas. | `reports/2026-08-31_termometro-impacto-economico.md` |
+| 08-31 | MULTI | ALCISTA | Frecuencia de bloqueo del guardian de entrada con MONTO_FIJO $7 | 0 | — | — | — | APLICADO | Excepcion rara: 0 bloqueos en 1,648 senales reales de 11 meses en las 4 monedas. Con el $5 anterior habrian sido 1,648 de 1,648 (100%). BTC es la unica con riesgo a futuro: su primera banda de bloqueo empieza 27.6% arriba del precio de hoy. | `reports/2026-08-31_frecuencia-bloqueo-guardian-entrada.md` |
+| 08-31 | BTCUSDT | ALCISTA | Efectos secundarios de subir MONTO_FIJO de BTC a $10 | — | — | — | — | APLICADO | Con $7 el margen minimo sobre minNotional barriendo BTC $40k-$150k era -18.9% (a ~$140k toda operacion quedaba bloqueada); con $10 sube a +37.9%. Siguen cabiendo las 4 monedas ($31 de $37.21). Unico efecto confirmado: concentracion en BTC 25% → 32%. | `reports/2026-08-31_analisis-efectos-secundarios-btc-10.md` |
+| 08-31 | MULTI | TODAS | Puntos ciegos del camino del dinero — donde el bot falla en silencio | 14 | — | — | — | APLICADO | Origen de los 2 cambios del 31-ago: MONTO_FIJO de BTC a $10 y validacion de status en ejecutor.py (rechazo definitivo vs OrdenIncierta). 14 escenarios simulados, 14/14 clasificados correctamente. | `reports/2026-08-31_puntos-ciegos-camino-del-dinero.md` |
+| 08-31 | MULTI | TODAS | Auditoria de arquitectura y conexiones — 4 conexiones rotas | 4 | — | — | — | DESCARTADO | Termometro congelado (mar-2026), centinela decorativo, trailing_stop.py huerfano y choque de fase global/local. Efecto economico de repararlos: cero o negativo en los 4 casos. Veredicto: no tocar codigo, solo corregir la documentacion. | `reports/2026-08-31_auditoria-arquitectura-y-conexiones.md` |
+| 09-01 | MULTI | TODAS | Riesgo real por operacion y margen para subir el monto | — | — | — | — | NO_CONCLUYENTE | De los $7 del ticket arriesga $0.29 (4.2% del ticket, 0.79% del capital). Ratio ganancia/perdida: BTC 1.57, ETH 1.02, SOL 1.62, AVAX 1.62. El limite para subir el monto no es el riesgo sino el capital: con $36.86 libres no caben 4 tickets de $10. | `reports/2026-09-01_riesgo-real-y-margen-para-subir-monto.md` |

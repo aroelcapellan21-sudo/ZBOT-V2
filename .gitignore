@@ -48,3 +48,9 @@ historial_testnet.csv
 
 # Investigacion y scripts sueltos — no son codigo del bot
 investigacion/
+
+# Base de datos de resultados de investigacion (binario, no se commitea;
+# INDICE_RESULTADOS.md es el espejo legible que si va a git)
+data/resultados.db
+data/resultados.db-wal
+data/resultados.db-shm

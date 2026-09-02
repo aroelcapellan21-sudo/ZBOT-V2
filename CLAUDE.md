@@ -38,6 +38,43 @@ Notas de aplicación:
 - Los proyectos de investigación separados (`~/simfi/`, `~/estudio_mfemae_v2/`,
   `~/estudio_estrategia_agresiva/`) no están sujetos a esto: no tocan V2.
 
+## 🛑 REGLA PERMANENTE — ninguna investigación se cierra sin registrarla (desde 2026-09-02)
+
+**Ninguna investigación, backtest, prueba o auditoría con veredicto se da por terminada hasta que
+su fila esté agregada en `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md` esté actualizado, y sus números
+estén cargados en `data/resultados.db`. Los tres, no dos de tres. No es un extra ni un "después lo
+indexo": es parte del cierre. Si no está registrado, la investigación no está terminada.**
+
+La fila lleva como mínimo: **fecha · qué se probó · resultado resumido · veredicto · ruta al
+reporte**, más `n`/WR/PF/Sharpe cuando existan.
+
+Notas de aplicación:
+- Se hace **sin que Ariel lo pida**, igual que la regla de guardar reportes en `reports/`.
+- Aplica también a resultados negativos y a los "no concluyentes". El valor del índice es no
+  repetir una prueba ya hecha, y eso incluye sobre todo las que salieron mal.
+- **Si un dato no existe, va `—` (o no se inserta la fila en la DB). Nunca se rellena con un
+  número inventado ni con un 0 que se lea como medición.**
+- No aplica a diagnósticos de infraestructura sin veredicto cuantitativo (chequeo de screens, fix
+  de arranque, reconciliación): ésos van sólo a `reports/`.
+- **`data/resultados.db` es la fuente consultable de los números; `INDICE_RESULTADOS.md` y
+  `ESTADO_ACTUAL.md` son los espejos legibles y son los que se commitean.** Si un número discrepa,
+  manda la DB.
+- ⚠️ **Los dos `.md` se completan agregando filas, NO se regeneran borrando y reescribiendo.**
+  Verificado el 2026-09-02: `INDICE_RESULTADOS.md` tiene prosa y agrupación por moneda que la DB
+  no modela, y `ESTADO_ACTUAL.md` es mayormente narrativo (producción, cola de investigación) más
+  filas de proyectos separados (`~/experimento_director_adaptativo/`) que nunca estuvieron en la
+  DB. Regenerarlos desde cero **borraría** ese contenido. Por eso `exportar_indice()` se niega a
+  sobrescribir `INDICE_RESULTADOS.md`.
+- La DB de resultados es un archivo **separado de `signals/bot.db`** a propósito: `bot.db` es
+  estado vivo de producción. Ningún módulo de producción importa nada de la DB de resultados.
+- ⚠️ La DB registra **lo que se probó, no lo que se ejecutó**. El historial de operaciones reales
+  sigue siendo `auditoria.csv`. No confundir una pérdida simulada con una pérdida de la cuenta.
+
+**Por qué esta regla existe.** El mismo protocolo ya se había fijado el 2026-08-24 — pero escrito
+**dentro de `INDICE_RESULTADOS.md`**, el archivo que él mismo mandaba actualizar. Nadie lee el
+índice antes de cerrar una investigación. Resultado medido: el índice quedó congelado ese día y
+**63 reportes posteriores nunca se indexaron**. Por eso ahora la regla vive acá.
+
 ## Reportes de análisis
 Toda respuesta (análisis, investigación, conclusión — no código) que ocupe más de **15 líneas** se guarda
 automáticamente como archivo en `~/bot-padre-v2/reports/`, sin pedir permiso, y en la terminal se muestra

@@ -4,10 +4,10 @@
 backtests) y a `CLAUDE.md`/`INVESTIGACION.md` (contrato técnico e historial completo). Este
 archivo responde "¿dónde estamos hoy?" en un vistazo — no reemplaza a los otros tres, los resume.
 
-**Protocolo de actualización — permanente desde 2026-08-24**: al cerrar cualquier investigación
-nueva, este archivo (sección "CERRADO RECIENTEMENTE", y "COLA DE INVESTIGACIÓN" si corresponde) se
-actualiza como parte del cierre, junto con `INDICE_RESULTADOS.md`, sin que haga falta pedirlo cada
-vez.
+**Protocolo de actualización — la regla vive en `CLAUDE.md` desde 2026-09-02.** Ninguna
+investigación se cierra sin actualizar este archivo (sección "CERRADO RECIENTEMENTE", y
+"COLA DE INVESTIGACIÓN" si corresponde), sin su fila en `INDICE_RESULTADOS.md`, y sin cargar
+sus números en `data/resultados.db`.
 
 ---
 
@@ -109,6 +109,16 @@ Más reciente primero. Ver `INDICE_RESULTADOS.md` para el detalle de métricas d
 
 | Fecha | Investigación | Veredicto |
 |---|---|---|
+| 02-sep | **[INFRAESTRUCTURA]** Base de datos consultable de resultados (`data/resultados.db`) + regla permanente de indexado en `CLAUDE.md` | Aplicado. 94 pruebas cargadas: 74 del índice histórico + 20 del backfill 25-ago→02-sep. Consultas con `python3 consultar.py`. Ver `2026-09-02_diseno-db-resultados-y-regla-indice.md` |
+| 01-sep | Riesgo real por operación y margen para subir el monto | Informativo — arriesga **0.79% del capital** por operación ($0.29 de un ticket de $7). El límite para subir el monto es el capital, no el riesgo. Ratio ganancia/pérdida: BTC 1.57, **ETH 1.02**, SOL 1.62, AVAX 1.62 |
+| 31-ago | **[PRODUCCIÓN]** Puntos ciegos del camino del dinero | Aplicado: BTC `MONTO_FIJO` $7→$10 y validación de `status` en `ejecutor.py` (rechazo definitivo vs `OrdenIncierta`), 14/14 escenarios simulados correctos |
+| 31-ago | Auditoría económica del trailing — conectar `trailing_stop.py` | 🔴 Descartado — PF 0.583 vs 0.919 actual, mata 152 de 168 TP, WR 42.1%→29.4% |
+| 31-ago | Fix B — breakeven y trailing anclados al máximo (12 combinaciones) | 🔴 Descartado — la mejor da PF 1.00 vs 0.98 actual; ninguna llega al umbral 1.6 |
+| 31-ago | Termómetro — impacto económico de reconectarlo | 🔴 Descartado — bloquearía 31.9% del tiempo (66.2% en agosto) y habría cortado 4 de las 8 operaciones reales (costo $0.34) |
+| 31-ago | `cerrar_huerfanas()` — fase GLOBAL vs LOCAL (222 divergencias + las 8 ops reales) | 🔴 No se corrige (decisión de Ariel, 31-ago) — impacto realizado $0.00, IC95% cruza cero, drawdown 5.8× mayor |
+| 31-ago | Auditoría de arquitectura y conexiones — 4 conexiones rotas | Documentadas, **no reparadas**: efecto económico cero o negativo en las 4 (termómetro, centinela, trailing huérfano, fase global/local) |
+| 30-ago | Aporte individual del combo O (5 escenarios) + walk-forward de 3 ventanas | Las 4 monedas aportan: sacar cualquiera baja el PnL total. "Sin BTC" gana en las 3 ventanas pero no se aplicó |
+| 30-ago | **[PRODUCCIÓN]** Subir `MONTO_FIJO` $5 → $7 | Aplicado — con $5 el `minNotional` de Binance bloqueaba los cierres; 0 bloqueos del guardián de entrada en 1,648 señales reales |
 | 24-ago | **[PRODUCCIÓN]** Activación Combo O — SOL ALCISTA+LATERAL, AVAX conectado por primera vez | Aplicado y verificado en vivo. Diagnóstico previo detectó bloqueador crítico (sizing SOL/AVAX por debajo del mínimo Binance) antes de tocar nada; corregido a `MONTO_FIJO=$5` en ambos. Posiciones BTC/ETH abiertas intactas (snapshots antes/después). Ver `2026-08-25_diagnostico-cambio-produccion-avax-sol.md`, `2026-08-25_diff-final-combo-o.patch` |
 | 24-ago | **[PRODUCCIÓN]** Telegram — línea de francotiradores activos (`/consejero`) y tiempo sin operar (`/disparos`) | 2 cambios chicos aplicados y verificados. `/disparos` reusa infraestructura existente (no comando nuevo) — extiende el loop por moneda ya presente. Ver `2026-08-25_diseno-tiempo-sin-operar.md`, `2026-08-25_diff-tiempo-sin-operar.patch`, `2026-08-25_diff-linea-francotiradores-telegram.patch` |
 | 25-ago | *(proyecto separado, `~/experimento_director_adaptativo/`)* BNB — ¿caída de BTC como señal de ENTRADA? (3 variantes: inmediata, 1 vela después, gate adicional) | 🔴 Descartado, las 3 variantes. Entrada inmediata peor que la real (WR 42.3% vs 45.3%, PF 0.982); con 1 vela de espera queda empatada (no significativo, Δ−0.06% IC95%[−1.13,0.99]); como gate adicional mejora en el punto central (+0.98% vs −0.03%/trade) pero no significativo (IC95%[−1.30,3.25]) y sin consistencia año a año (n=1-3 en varios años). El rebote de 24h es real pero chico (mediana +0.88%) frente al TP real (6.5%) — no sobrevive a un trade completo. Ver `experimento_director_adaptativo/reports/2026-08-25_bnb-entrada-tras-caida-btc.md` |

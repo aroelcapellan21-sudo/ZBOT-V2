@@ -109,6 +109,8 @@ Más reciente primero. Ver `INDICE_RESULTADOS.md` para el detalle de métricas d
 
 | Fecha | Investigación | Veredicto |
 |---|---|---|
+| 02-sep | Ensanchar TP/SL de los 4 francotiradores activos (1.5× y 2×, más variantes asimétricas) | 🟡 Prometedor, **no aplicar todavía** — mejora en las 4 monedas y en las 3 ventanas del walk-forward, pero el bootstrap cruza cero (P(mejor) 83%) y el máximo PF es 1.444, bajo el umbral 1.6. Falta repetirlo con los 12 gates. Ver `2026-09-02_backtest-sl-tp-ensanchado-y-montos.md` |
+| 02-sep | Combinaciones de monto por moneda con $36.86 de capital | 🔴 Dejar 10/7/7/7 — desbalancear por ratio ganancia/pérdida es el peor de 5 combos (el ratio no predice: ETH con 1.02 rinde el doble por dólar que BTC con 1.57), y usar ~$36 deja una zona muerta silenciosa entre $33.79 y $36 donde la 4ª moneda no abre |
 | 02-sep | **[INFRAESTRUCTURA]** Base de datos consultable de resultados (`data/resultados.db`) + regla permanente de indexado en `CLAUDE.md` | Aplicado. 94 pruebas cargadas: 74 del índice histórico + 20 del backfill 25-ago→02-sep. Consultas con `python3 consultar.py`. Ver `2026-09-02_diseno-db-resultados-y-regla-indice.md` |
 | 01-sep | Riesgo real por operación y margen para subir el monto | Informativo — arriesga **0.79% del capital** por operación ($0.29 de un ticket de $7). El límite para subir el monto es el capital, no el riesgo. Ratio ganancia/pérdida: BTC 1.57, **ETH 1.02**, SOL 1.62, AVAX 1.62 |
 | 31-ago | **[PRODUCCIÓN]** Puntos ciegos del camino del dinero | Aplicado: BTC `MONTO_FIJO` $7→$10 y validación de `status` en `ejecutor.py` (rechazo definitivo vs `OrdenIncierta`), 14/14 escenarios simulados correctos |

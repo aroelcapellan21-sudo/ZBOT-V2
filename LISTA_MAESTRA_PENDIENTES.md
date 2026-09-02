@@ -126,6 +126,22 @@ Sistema C (OOS + walk-forward + bootstrap) · **Traducción obligatoria: RD$/mes
 `investigacion/scripts/gate_confianza_pro.py`, ~20 `test_*_btc.py` (donchian, rvol, squeeze, pullback). Exploraciones sin
 reporte. Decidir cuáles merecen tiempo **antes** de invertirlo.
 
+## 🔟 Diversificación real de la cartera (correlación 0,544)
+
+- **Estado:** 📌 hipótesis registrada 2026-09-01, sin investigar.
+- **Origen:** subproducto de `EXP_0005` (`~/estudio_mfemae_v2/`), cuyo objetivo principal —usar
+  MFE/MAE como filtro de régimen— **se descartó** (no predice: ρ +0,03, p corregido 1,00).
+- **El dato:** las series de régimen (MFE/MAE) de BTC/ETH/SOL/AVAX correlacionan **0,544** de media
+  entre pares sobre 66 meses. Las 4 están en régimen malo **a la vez el 30,3%** de los meses.
+- **La hipótesis:** si el régimen es común, operar 4 monedas no reparte el riesgo tanto como sugiere
+  el número de posiciones. Hoy el sizing las trata como independientes ($10 BTC + $7 × 3).
+- **Qué habría que medir:** la correlación de los **retornos de las operaciones reales** de V2 (no la
+  de MFE/MAE, que es sólo un proxy de régimen), y el drawdown conjunto esperado contra el que
+  asumiría independencia.
+- **⚠️ No accionar sin eso.** Sólo entonces tendría sentido evaluar `MAX_OP_TOTAL` o el sizing — y
+  con el análisis de efectos secundarios que exige la regla de capital.
+- **Traducción obligatoria:** si implicara cambiar el sizing, cuantificar el efecto en RD$/mes.
+
 ---
 
 # Advertencia metodológica común

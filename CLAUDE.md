@@ -20,6 +20,24 @@ Notas de aplicación:
 - Si en una misma tarea Ariel dice "hazlo directamente", esta regla **sigue vigente**: se prepara el
   diff, se muestra, y se espera. La instrucción de velocidad no cancela el paso de revisión.
 
+## 🛑 REGLA PERMANENTE — investigación y evidencia antes de proponer (desde 2026-09-01)
+
+**Cualquier posible modificación de Z-Bot V2 debe pasar primero por investigación, pruebas y
+evidencia. Si se encuentra una mejora viable, se entrega primero la propuesta/diff concreta para
+revisión y aprobación explícita. No se aplican cambios directamente.**
+
+Orden obligatorio: **investigar → medir → proponer con diff → esperar aprobación explícita →
+recién entonces aplicar.** No se salta ningún paso.
+
+Notas de aplicación:
+- Un hallazgo interesante **no es** una propuesta de cambio. Se registra como hipótesis y se
+  investiga aparte antes de proponer nada.
+- La propuesta incluye: evidencia, impacto esperado (en RD$/mes cuando aplique), riesgos y el diff
+  exacto.
+- El silencio no es aprobación.
+- Los proyectos de investigación separados (`~/simfi/`, `~/estudio_mfemae_v2/`,
+  `~/estudio_estrategia_agresiva/`) no están sujetos a esto: no tocan V2.
+
 ## Reportes de análisis
 Toda respuesta (análisis, investigación, conclusión — no código) que ocupe más de **15 líneas** se guarda
 automáticamente como archivo en `~/bot-padre-v2/reports/`, sin pedir permiso, y en la terminal se muestra

@@ -81,17 +81,20 @@ iniciar() {
 # propio guard aca abajo y NO se toca iniciar(), que es la que usa el bot.
 
 # Resuelve el binario de claude sin depender del PATH: bajo cron el PATH es
-# /usr/bin:/bin y "claude" NO se encuentra (ni el de nvm ni el de /usr/local/bin).
+# /usr/bin:/bin y "claude" NO se encuentra por PATH ahi. Se prioriza la
+# instalacion de nvm (la mas nueva) porque /usr/local/bin SI esta en el PATH
+# por defecto del sistema incluso bajo cron -- eso hacia que "command -v"
+# devolviera siempre la version vieja de /usr/local/bin en vez de la de nvm.
 resolver_claude() {
     local nvm_claude
-    if command -v claude >/dev/null 2>&1; then
-        command -v claude
-        return 0
-    fi
     # Instalacion via nvm (la vigente hoy). Se toma la version mas alta presente.
     nvm_claude=$(ls -1d "$HOME"/.nvm/versions/node/*/bin/claude 2>/dev/null | sort -V | tail -1)
     if [ -x "$nvm_claude" ]; then
         echo "$nvm_claude"
+        return 0
+    fi
+    if command -v claude >/dev/null 2>&1; then
+        command -v claude
         return 0
     fi
     if [ -x /usr/local/bin/claude ]; then

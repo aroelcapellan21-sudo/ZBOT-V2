@@ -27,16 +27,24 @@ VEREDICTOS = ("APLICADO", "PROMETEDOR", "DESCARTADO", "NO_CONCLUYENTE")
 # el 73,4% de los trades historicos de reports/raw/ no registran fase.
 FASES = ("ALCISTA", "BAJISTA", "LATERAL", "TODAS", "DESCONOCIDA")
 
-# Columnas NOT NULL de trades_backtest. Un trade al que le falte cualquiera de
-# estas NO se puede insertar: el INSERT OR IGNORE de agregar_trades se traga la
-# violacion en silencio y la reporta como "duplicado". Verificado el 2026-09-02:
-# 1.913 trades sin precio se reportaron como insertados-ya-existentes y crearon
-# 12 pruebas con metricas y CERO filas. Por eso se valida antes, y ruidosamente.
-_CAMPOS_NOT_NULL = ("symbol", "fase", "ts_entrada", "precio_entrada")
-
-
 class TradesIncompletos(ValueError):
     """Trades a los que les falta un campo NOT NULL del esquema."""
+
+
+def _campos_not_null():
+    """Columnas NOT NULL reales de trades_backtest, leidas del esquema.
+
+    Se consulta la DB en vez de mantener una constante a proposito: una lista
+    escrita a mano se desincroniza del esquema y la validacion pasa a mentir.
+    Eso ya paso el 2026-09-02 en sentido inverso — INSERT OR IGNORE se tragaba
+    la violacion de NOT NULL y la reportaba como "duplicado": 1.913 trades sin
+    precio salieron como "ya existentes" y dejaron 12 pruebas con metricas y
+    CERO filas. Leyendo el esquema, cambiar la tabla no puede dejar el chequeo
+    desactualizado.
+    """
+    with _conn() as conn:
+        return tuple(r[1] for r in conn.execute("PRAGMA table_info(trades_backtest)")
+                     if r[3] and r[1] not in ("id", "prueba_id"))
 
 
 def _validar_trades(trades):
@@ -46,9 +54,10 @@ def _validar_trades(trades):
     registrada con sus metricas y sin una sola fila de trade, que es exactamente
     el estado inconsistente que este chequeo existe para evitar.
     """
+    obligatorios = _campos_not_null()
     faltan = {}
     for t in trades:
-        for c in _CAMPOS_NOT_NULL:
+        for c in obligatorios:
             if t.get(c) is None:
                 faltan[c] = faltan.get(c, 0) + 1
     if faltan:
@@ -129,7 +138,7 @@ def init_db():
                 fase            TEXT NOT NULL,
                 ts_entrada      TEXT NOT NULL,
                 ts_salida       TEXT,
-                precio_entrada  REAL NOT NULL,
+                precio_entrada  REAL,
                 precio_salida   REAL,
                 motivo_cierre   TEXT,
                 monto_usdt      REAL,

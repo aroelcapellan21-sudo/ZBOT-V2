@@ -43,6 +43,13 @@ CLAVES_MINIMAS = {"ts_entrada", "cambio_pct"}
 # por symbol/fase las sumaria como operaciones del sistema.
 RAMAS_EXCLUIDAS = {"bloqueadas_aisladas"}
 PAT_MONEDA = re.compile(r"(btc|eth|sol|bnb|avax|link|xrp)", re.I)
+# Cuando la rama del JSON ES el nombre de una moneda, esa manda sobre el nombre
+# del archivo. Sin esto, la rama "ETH" de orden_condiciones_entrada_btc_eth
+# quedaba como BTCUSDT: sus trades no traen `symbol`, asi que moneda_de() caia
+# al nombre del archivo y PAT_MONEDA encuentra "btc" primero en "..._btc_eth_".
+# Detectado el 2026-09-02 sobre una copia, antes de importar: eran 287 trades
+# de ETH que iban a quedar etiquetados BTC.
+PAT_RAMA_MONEDA = re.compile(r"^(BTC|ETH|SOL|BNB|AVAX|LINK|XRP)(USDT)?$", re.I)
 PAT_FASE = re.compile(r"(alcista|bajista|lateral)", re.I)
 # La fecha del nombre del archivo NO es contenido de la prueba: dos corridas del
 # mismo estudio en dias distintos son la misma prueba. origen_archivo conserva
@@ -188,6 +195,17 @@ def importar(dry=False, solo=None):
             if not trades:
                 c["bloques_sin_trades"] += 1
                 continue
+            # La rama gana sobre el nombre del archivo: ver PAT_RAMA_MONEDA.
+            # Va ANTES del hash de serie: si el symbol cambiara despues, la
+            # dedup estaria comparando datos que todavia van a cambiar.
+            for parte in rama:
+                m = PAT_RAMA_MONEDA.match(parte)
+                if m:
+                    simbolo = m.group(1).upper() + "USDT"
+                    for t in trades:
+                        t["symbol"] = simbolo
+                    break
+
             # La dedup por serie se aplica SOLO a las ramas que habilita el
             # criterio nuevo. Aplicarla a todas borraria escenarios legitimos:
             # `fase2b_gates · calidad_atr_0.2` da la misma serie que `baseline`

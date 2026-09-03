@@ -10,7 +10,10 @@
 
 import os
 import json
+import math
 import sqlite3
+import hashlib
+from collections import namedtuple
 from datetime import datetime
 
 # Override por entorno para poder testear sin tocar la DB real
@@ -20,7 +23,34 @@ DB_PATH = os.environ.get(
 )
 
 VEREDICTOS = ("APLICADO", "PROMETEDOR", "DESCARTADO", "NO_CONCLUYENTE")
-FASES = ("ALCISTA", "BAJISTA", "LATERAL", "TODAS")
+# DESCONOCIDA = la fase no consta en los datos. NO significa "las tres":
+# el 73,4% de los trades historicos de reports/raw/ no registran fase.
+FASES = ("ALCISTA", "BAJISTA", "LATERAL", "TODAS", "DESCONOCIDA")
+
+ResultadoRegistro = namedtuple(
+    "ResultadoRegistro",
+    "prueba_id creada trades_insertados trades_ignorados")
+
+# Columnas agregadas el 2026-09-02. Solo ALTER TABLE ADD COLUMN: no se borra
+# ni se reescribe ninguna fila existente.
+_COLUMNAS_NUEVAS = {
+    "pruebas": [
+        ("origen_archivo", "TEXT"),    # reports/raw/<archivo> que la origino
+        ("hash_datos",     "TEXT"),    # sha1 del contenido -> idempotencia
+        ("escenario",      "TEXT"),    # ACTUAL | DOBLE_2x | rama del JSON anidado
+        ("tp_pct",         "REAL"),
+        ("sl_pct",         "REAL"),
+        ("monto_usdt",     "REAL"),
+        ("capital_usdt",   "REAL"),
+    ],
+    "metricas": [("fuente", "TEXT DEFAULT 'reportada'")],
+    "trades_backtest": [
+        ("rsi_entrada",        "REAL"),
+        ("velas",              "INTEGER"),
+        ("trade_id_origen",    "TEXT"),
+        ("ts_salida_derivada", "INTEGER DEFAULT 0"),  # 1 = calculada, no leida
+    ],
+}
 
 
 def _conn():
@@ -81,6 +111,7 @@ def init_db():
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pruebas_fecha       ON pruebas(fecha)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_symbol_fase_ts ON trades_backtest(symbol, fase, ts_entrada)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_prueba         ON trades_backtest(prueba_id)")
+        _migrar(conn)
         conn.execute("""
             CREATE VIEW IF NOT EXISTS v_indice AS
             SELECT p.id, p.fecha, p.moneda, p.fase, p.tema,
@@ -93,6 +124,24 @@ def init_db():
             GROUP BY p.id
         """)
     return DB_PATH
+
+
+def _migrar(conn):
+    """Aditiva e idempotente. Solo ALTER TABLE ADD COLUMN y CREATE INDEX.
+    No hay DROP, DELETE, UPDATE masivo ni reconstruccion de tablas."""
+    for tabla, cols in _COLUMNAS_NUEVAS.items():
+        existentes = {r[1] for r in conn.execute(f"PRAGMA table_info({tabla})")}
+        for nombre, tipo in cols:
+            if nombre not in existentes:
+                conn.execute(f"ALTER TABLE {tabla} ADD COLUMN {nombre} {tipo}")
+    # Verificado 2026-09-02: los 3.492 trades existentes dan 3.492 claves
+    # distintas, asi que el UNIQUE se crea sin conflicto.
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_trades_clave "
+                 "ON trades_backtest(prueba_id, symbol, ts_entrada)")
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS ux_pruebas_hash "
+                 "ON pruebas(hash_datos) WHERE hash_datos IS NOT NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_trades_ts "
+                 "ON trades_backtest(ts_entrada)")
 
 
 def registrar_prueba(fecha, tema, tipo, veredicto, resumen,
@@ -116,28 +165,193 @@ def registrar_prueba(fecha, tema, tipo, veredicto, resumen,
         return cur.lastrowid
 
 
-def agregar_metricas(prueba_id, metricas, unidades=None):
+def agregar_metricas(prueba_id, metricas, unidades=None, fuente="reportada"):
     """metricas: dict {nombre: valor}. Un valor None NO se inserta (dato ausente != 0)."""
     unidades = unidades or {}
-    filas = [(prueba_id, k, float(v), unidades.get(k))
+    filas = [(prueba_id, k, float(v), unidades.get(k), fuente)
              for k, v in metricas.items() if v is not None]
     with _conn() as conn:
         conn.executemany(
-            "INSERT OR REPLACE INTO metricas (prueba_id, nombre, valor, unidad) VALUES (?,?,?,?)",
+            "INSERT OR REPLACE INTO metricas (prueba_id, nombre, valor, unidad, fuente) "
+            "VALUES (?,?,?,?,?)",
             filas)
     return len(filas)
 
 
 def agregar_trades(prueba_id, trades):
-    """trades: lista de dicts con las claves de la tabla trades_backtest."""
+    """trades: lista de dicts con las claves de la tabla trades_backtest.
+
+    UNICO camino de insercion de trades del sistema. INSERT OR IGNORE contra el
+    indice ux_trades_clave: reejecutar no duplica. Devuelve cuantos entraron.
+    """
     campos = ("symbol", "fase", "ts_entrada", "ts_salida", "precio_entrada",
-              "precio_salida", "motivo_cierre", "monto_usdt", "pnl_pct", "pnl_usdt")
+              "precio_salida", "motivo_cierre", "monto_usdt", "pnl_pct", "pnl_usdt",
+              "rsi_entrada", "velas", "trade_id_origen", "ts_salida_derivada")
     filas = [tuple([prueba_id] + [t.get(c) for c in campos]) for t in trades]
     with _conn() as conn:
-        conn.executemany(
-            f"INSERT INTO trades_backtest (prueba_id, {','.join(campos)}) "
+        cur = conn.executemany(
+            f"INSERT OR IGNORE INTO trades_backtest (prueba_id, {','.join(campos)}) "
             f"VALUES ({','.join('?' * (len(campos) + 1))})", filas)
-    return len(filas)
+        return cur.rowcount
+
+
+# ── Hash determinista del contenido completo (v2) ─────────────────────────────
+_CAMPOS_TRADE = ("symbol", "fase", "ts_entrada", "ts_salida", "precio_entrada",
+                 "precio_salida", "motivo_cierre", "pnl_pct", "pnl_usdt",
+                 "rsi_entrada", "velas", "trade_id_origen", "ts_salida_derivada")
+_CAMPOS_META = ("tema", "moneda", "fase", "escenario", "tp_pct", "sl_pct",
+                "monto_usdt", "capital_usdt")
+
+
+def _norm(v):
+    """Normaliza un valor para que el hash no dependa del formato de origen."""
+    if v is None or v == "":
+        return None
+    if isinstance(v, bool):
+        return int(v)
+    if isinstance(v, (int, float)):
+        return round(float(v), 10)
+    s = str(v).strip()
+    if not s:
+        return None
+    try:  # timestamp -> ISO canonico (con espacio o con T, con o sin zona)
+        return datetime.fromisoformat(s.replace(" ", "T")).replace(
+            tzinfo=None).isoformat()
+    except ValueError:
+        pass
+    try:
+        return round(float(s), 10)
+    except ValueError:
+        return s
+
+
+def _hash_prueba(meta, trades):
+    """SHA-1 del contenido normalizado completo: mismos datos -> mismo hash,
+    cualquier diferencia real -> hash distinto. Independiente del orden de las
+    claves, del orden de los trades y del formato del JSON/CSV de origen."""
+    filas = [[_norm(t.get(c)) for c in _CAMPOS_TRADE] for t in trades]
+    filas.sort(key=lambda f: json.dumps(f, default=str))
+    payload = {"v": 2,
+               "meta": {c: _norm(meta.get(c)) for c in _CAMPOS_META},
+               "trades": filas}
+    crudo = json.dumps(payload, sort_keys=True, separators=(",", ":"),
+                       ensure_ascii=False, default=str)
+    return hashlib.sha1(crudo.encode("utf-8")).hexdigest()
+
+
+# ── Metricas canonicas — SIN capital ficticio ─────────────────────────────────
+_UNIDADES = {"wr": "%", "pf": "ratio", "n": "conteo", "sharpe": "ratio",
+             "dd_max_pct": "%", "dd_max_pp": "pp", "dd_max_usdt": "USDT",
+             "pnl_usdt": "USDT", "pnl_pct_total": "%", "expectancy_usdt": "USDT",
+             "expectancy_pct": "%", "peor5_usdt": "USDT", "peor5_pct": "%",
+             "racha_perdidas": "conteo", "racha_ganancias": "conteo",
+             "tp_alcanzados": "conteo"}
+
+
+def calcular_metricas(trades, capital_usdt=None):
+    """Metricas desde los trades. Reglas:
+      - dato ausente = metrica ausente. Nunca un 0 ni un capital supuesto.
+      - si todos los trades traen pnl_usdt -> base USDT; si no, base %.
+      - dd_max_pct (drawdown sobre capital) SOLO si hay capital_usdt real.
+        Sin capital se emite dd_max_pp, que es otra cosa y se llama distinto.
+    Formulas heredadas de los scripts *_bootstrap_sistema_c_* (PF, WR,
+    expectancy, racha, peor5) y Sharpe de optimizador_completo.py:76
+    (media/std * sqrt(252)). No se introduce ninguna formula nueva.
+    """
+    n = len(trades)
+    if n == 0:
+        return {}
+    usa_usd = all(t.get("pnl_usdt") is not None for t in trades)
+    clave = "pnl_usdt" if usa_usd else "pnl_pct"
+    if not all(t.get(clave) is not None for t in trades):
+        return {"n": n}  # sin serie completa no se calcula nada mas
+
+    v = [t[clave] for t in sorted(
+        trades, key=lambda t: (str(t.get("ts_salida") or t["ts_entrada"]),
+                               str(t["ts_entrada"])))]
+    g = [x for x in v if x > 0]
+    p = [x for x in v if x <= 0]
+    total_g, total_p = sum(g), abs(sum(p))
+
+    curva = pico = caida = 0.0
+    for x in v:
+        curva += x
+        pico = max(pico, curva)
+        caida = max(caida, pico - curva)
+
+    def racha(cond):
+        mx = act = 0
+        for x in v:
+            act = act + 1 if cond(x) else 0
+            mx = max(mx, act)
+        return mx
+
+    media = sum(v) / n
+    std = math.sqrt(sum((x - media) ** 2 for x in v) / n)
+    suf = "usdt" if usa_usd else "pct"
+
+    m = {
+        "n": n,
+        "wr": 100 * len(g) / n,
+        "pf": (total_g / total_p) if total_p else None,  # sin perdidas -> ausente
+        f"expectancy_{suf}": media,
+        f"peor5_{suf}": min((sum(v[i:i + 5]) for i in range(max(1, n - 4))),
+                            default=None),
+        "racha_perdidas": racha(lambda x: x <= 0),
+        "racha_ganancias": racha(lambda x: x > 0),
+        "sharpe": (media / std) * math.sqrt(252) if std else None,
+        "tp_alcanzados": sum(1 for t in trades if t.get("motivo_cierre") == "TP"),
+    }
+    if usa_usd:
+        m["pnl_usdt"] = sum(v)
+        m["dd_max_usdt"] = caida
+        if capital_usdt:  # solo con capital REAL
+            m["dd_max_pct"] = 100 * caida / capital_usdt
+    else:
+        m["pnl_pct_total"] = sum(v)
+        m["dd_max_pp"] = caida  # puntos porcentuales, NO % de cuenta
+    return m
+
+
+def registrar_backtest(*, tema, moneda, fase, trades, veredicto="NO_CONCLUYENTE",
+                       resumen="", fecha=None, tipo="backtest", escenario=None,
+                       tp_pct=None, sl_pct=None, monto_usdt=None, capital_usdt=None,
+                       ventana_desde=None, ventana_hasta=None, parametros=None,
+                       reporte=None, origen_archivo=None, commit_git=None,
+                       metricas_extra=None):
+    """UNICO punto que registra una prueba completa (prueba + metricas + trades).
+    Idempotente por hash de contenido. Devuelve ResultadoRegistro."""
+    init_db()
+    meta = dict(tema=tema, moneda=moneda, fase=fase, escenario=escenario,
+                tp_pct=tp_pct, sl_pct=sl_pct, monto_usdt=monto_usdt,
+                capital_usdt=capital_usdt)
+    h = _hash_prueba(meta, trades)
+    with _conn() as conn:
+        ya = conn.execute("SELECT id FROM pruebas WHERE hash_datos=?", (h,)).fetchone()
+    if ya:
+        return ResultadoRegistro(ya[0], False, 0, len(trades))
+
+    if trades:
+        ventana_desde = ventana_desde or str(min(t["ts_entrada"] for t in trades))[:10]
+        ventana_hasta = ventana_hasta or str(max(
+            (t.get("ts_salida") or t["ts_entrada"]) for t in trades))[:10]
+
+    pid = registrar_prueba(
+        fecha=fecha or datetime.now().strftime("%Y-%m-%d"), tema=tema, tipo=tipo,
+        veredicto=veredicto, resumen=resumen, moneda=moneda, fase=fase,
+        ventana_desde=ventana_desde, ventana_hasta=ventana_hasta,
+        parametros=parametros, reporte=reporte, commit_git=commit_git)
+    with _conn() as conn:
+        conn.execute("UPDATE pruebas SET origen_archivo=?, hash_datos=?, escenario=?,"
+                     " tp_pct=?, sl_pct=?, monto_usdt=?, capital_usdt=? WHERE id=?",
+                     (origen_archivo, h, escenario, tp_pct, sl_pct,
+                      monto_usdt, capital_usdt, pid))
+    agregar_metricas(pid, calcular_metricas(trades, capital_usdt),
+                     unidades=_UNIDADES, fuente="recalculada")
+    if metricas_extra:
+        agregar_metricas(pid, metricas_extra, fuente="reportada")
+    insertados = agregar_trades(pid, trades)  # unico insert de trades
+    return ResultadoRegistro(pid, True, insertados, len(trades) - insertados)
 
 
 def _fmt(valor, decimales=2, sufijo=""):

@@ -242,7 +242,7 @@ def _hash_prueba(meta, trades):
 # ── Metricas canonicas — SIN capital ficticio ─────────────────────────────────
 _UNIDADES = {"wr": "%", "pf": "ratio", "n": "conteo", "sharpe": "ratio",
              "dd_max_pct": "%", "dd_max_pp": "pp", "dd_max_usdt": "USDT",
-             "pnl_usdt": "USDT", "pnl_pct_total": "%", "expectancy_usdt": "USDT",
+             "pnl_usdt": "USDT", "suma_pct_trades": "pp", "expectancy_usdt": "USDT",
              "expectancy_pct": "%", "peor5_usdt": "USDT", "peor5_pct": "%",
              "racha_perdidas": "conteo", "racha_ganancias": "conteo",
              "tp_alcanzados": "conteo"}
@@ -254,6 +254,13 @@ def calcular_metricas(trades, capital_usdt=None):
       - si todos los trades traen pnl_usdt -> base USDT; si no, base %.
       - dd_max_pct (drawdown sobre capital) SOLO si hay capital_usdt real.
         Sin capital se emite dd_max_pp, que es otra cosa y se llama distinto.
+      - suma_pct_trades es la SUMA ARITMETICA de los cambios porcentuales por
+        trade. NO es retorno sobre capital ni retorno compuesto. Con MONTO_FIJO
+        (el sizing real del bot) se convierte a USD multiplicando por el monto
+        por trade; componerla no representa nada, porque el bot no reinvierte.
+        Se llama distinto de pnl_pct_total, su nombre anterior, justamente
+        porque ese nombre se leia como retorno y en series largas infla el
+        resultado (993 trades: 1.126 pp frente a 46,4% de retorno real).
     Formulas heredadas de los scripts *_bootstrap_sistema_c_* (PF, WR,
     expectancy, racha, peor5) y Sharpe de optimizador_completo.py:76
     (media/std * sqrt(252)). No se introduce ninguna formula nueva.
@@ -308,7 +315,7 @@ def calcular_metricas(trades, capital_usdt=None):
         if capital_usdt:  # solo con capital REAL
             m["dd_max_pct"] = 100 * caida / capital_usdt
     else:
-        m["pnl_pct_total"] = sum(v)
+        m["suma_pct_trades"] = sum(v)   # pp sumados, NO retorno — ver docstring
         m["dd_max_pp"] = caida  # puntos porcentuales, NO % de cuenta
     return m
 

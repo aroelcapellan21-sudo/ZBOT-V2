@@ -22,6 +22,7 @@ import argparse
 import collections
 import csv
 import glob
+import hashlib
 import json
 import os
 import re
@@ -31,6 +32,16 @@ import resultados_db as R
 
 RAW = os.path.expanduser("~/bot-padre-v2/reports/raw")
 CLAVES_TRADE = {"entrada", "salida", "ts_entrada", "symbol", "cambio_pct"}
+# Segundo criterio de deteccion, agregado el 2026-09-02. El umbral de >=3 claves
+# de CLAVES_TRADE discriminaba por si el archivo habia guardado los PRECIOS, no
+# por si eran trades: dejaba fuera los `trades_reales` de las auditorias de
+# gates (interseccion 2), que son trades tan reales como los que si entraban.
+CLAVES_MINIMAS = {"ts_entrada", "cambio_pct"}
+# Ramas contrafactuales: senales que el gate BLOQUEO, simuladas como si se
+# hubieran ejecutado. Tienen forma de trade pero NO ocurrieron: son el grupo de
+# control de esas auditorias. No entran a trades_backtest, porque una consulta
+# por symbol/fase las sumaria como operaciones del sistema.
+RAMAS_EXCLUIDAS = {"bloqueadas_aisladas"}
 PAT_MONEDA = re.compile(r"(btc|eth|sol|bnb|avax|link|xrp)", re.I)
 PAT_FASE = re.compile(r"(alcista|bajista|lateral)", re.I)
 # La fecha del nombre del archivo NO es contenido de la prueba: dos corridas del
@@ -115,14 +126,33 @@ def canonico_csv(f):
 def bloques_de_trades(obj, ruta=()):
     """Devuelve (ruta_dentro_del_json, lista). Cada rama = un escenario propio."""
     if (isinstance(obj, list) and obj and isinstance(obj[0], dict)
-            and len(set(obj[0]) & CLAVES_TRADE) >= 3):
-        yield ruta, obj
+            and (len(set(obj[0]) & CLAVES_TRADE) >= 3
+                 or CLAVES_MINIMAS <= set(obj[0]))):
+        if not (ruta and ruta[-1] in RAMAS_EXCLUIDAS):
+            # 3er elemento: True si entra por el criterio NUEVO. La dedup por
+            # serie se aplica solo a esas, ver importar().
+            yield ruta, obj, len(set(obj[0]) & CLAVES_TRADE) < 3
     elif isinstance(obj, dict):
         for k, v in obj.items():
             yield from bloques_de_trades(v, ruta + (str(k),))
     elif isinstance(obj, list):
         for i, v in enumerate(obj[:80]):
             yield from bloques_de_trades(v, ruta + (str(i),))
+
+
+def hash_serie(trades):
+    """SHA-1 de la serie de trades SOLA, sin la metadata de la prueba.
+
+    Distinto de R._hash_prueba, que incluye el tema: dos archivos con la misma
+    serie tienen hash_prueba distinto (el tema sale del nombre) pero el mismo
+    hash_serie. Es lo que evita registrar 3 veces el baseline de BTC, guardado
+    una vez por cada gate auditado (calidad, estadistico, horario: 242 trades
+    identicos, verificado el 2026-09-02).
+    """
+    filas = [[R._norm(t.get(c)) for c in R._CAMPOS_TRADE] for t in trades]
+    filas.sort(key=lambda f: json.dumps(f, default=str))
+    return hashlib.sha1(
+        json.dumps(filas, sort_keys=True, default=str).encode("utf-8")).hexdigest()
 
 
 def fecha_de(nombre):
@@ -134,6 +164,7 @@ def importar(dry=False, solo=None):
     if not dry:
         R.init_db()
     c = collections.Counter()
+    series_vistas = {}   # hash_serie -> etiqueta de la primera que la trajo
     archivos = sorted(glob.glob(f"{RAW}/*.json") + glob.glob(f"{RAW}/*.csv"))
     for ruta in archivos:
         base = os.path.basename(ruta)
@@ -142,21 +173,37 @@ def importar(dry=False, solo=None):
             continue
         try:
             if es_csv:
-                bloques = [((), [canonico_csv(f) for f in csv.DictReader(open(ruta))])]
+                bloques = [((), [canonico_csv(f) for f in csv.DictReader(open(ruta))], False)]
             else:
-                bloques = [(r, [canonico(t, ruta) for t in tr])
-                           for r, tr in bloques_de_trades(json.load(open(ruta)))]
+                bloques = [(r, [canonico(t, ruta) for t in tr], nuevo)
+                           for r, tr, nuevo in bloques_de_trades(json.load(open(ruta)))]
             c["archivos_ok"] += 1
         except Exception as e:
             c["errores"] += 1
             print(f"  [ERROR] {base}: {e}")
             continue
 
-        for rama, trades in bloques:
+        for rama, trades, por_criterio_nuevo in bloques:
             trades = [t for t in trades if t["symbol"] and t["ts_entrada"]]
             if not trades:
                 c["bloques_sin_trades"] += 1
                 continue
+            # La dedup por serie se aplica SOLO a las ramas que habilita el
+            # criterio nuevo. Aplicarla a todas borraria escenarios legitimos:
+            # `fase2b_gates · calidad_atr_0.2` da la misma serie que `baseline`
+            # porque ese gate no bloqueo nada, y eso ES el resultado del estudio.
+            # Medido el 2026-09-02: sin esta condicion se perdian 21 pruebas ya
+            # importadas y validas.
+            hs = hash_serie(trades) if por_criterio_nuevo else None
+            if hs and hs in series_vistas:
+                c["series_repetidas"] += 1
+                c["trades_en_series_repetidas"] += len(trades)
+                print(f"  [SERIE] {base} :: {'/'.join(rama) or 'baseline'} -> misma serie "
+                      f"que {series_vistas[hs]} ({len(trades)} trades no se reimportan)")
+                continue
+            if hs:
+                series_vistas[hs] = f"{base} :: {'/'.join(rama) or 'baseline'}"
+
             escenario = "/".join(rama) if rama else "baseline"
             stem = PAT_FECHA.sub("", base.rsplit(".", 1)[0])
             monedas = {t["symbol"] for t in trades}
@@ -178,7 +225,16 @@ def importar(dry=False, solo=None):
                 print(f"  [DRY] {base:<52} {escenario:<26} {len(trades):>6} trades")
                 continue
 
-            r = R.registrar_backtest(trades=trades, **meta)  # unico insert
+            try:
+                r = R.registrar_backtest(trades=trades, **meta)  # unico insert
+            except R.TradesIncompletos as e:
+                # El esquema exige precio_entrada NOT NULL y estas series solo
+                # guardaron cambio_pct. No se registra nada: ni prueba huerfana
+                # ni trade a medias. Se cuenta y se sigue con el resto.
+                c["bloques_sin_campos_obligatorios"] += 1
+                c["trades_no_importables"] += len(trades)
+                print(f"  [SIN CAMPOS] {base} :: {escenario} -> {e}")
+                continue
             if r.creada:
                 c["pruebas_nuevas"] += 1
                 c["trades_insertados"] += r.trades_insertados
@@ -192,7 +248,9 @@ def importar(dry=False, solo=None):
     print("\n" + "=" * 62)
     for k in ("archivos_ok", "errores", "pruebas_nuevas", "pruebas_existentes",
               "trades_insertados", "trades_ya_existentes",
-              "trades_excluidos_por_duplicado", "bloques_sin_trades"):
+              "trades_excluidos_por_duplicado", "series_repetidas",
+              "trades_en_series_repetidas", "bloques_sin_campos_obligatorios",
+              "trades_no_importables", "bloques_sin_trades"):
         print(f"  {k:<32} {c[k]:>8,}")
     return c
 

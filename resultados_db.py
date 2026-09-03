@@ -27,6 +27,36 @@ VEREDICTOS = ("APLICADO", "PROMETEDOR", "DESCARTADO", "NO_CONCLUYENTE")
 # el 73,4% de los trades historicos de reports/raw/ no registran fase.
 FASES = ("ALCISTA", "BAJISTA", "LATERAL", "TODAS", "DESCONOCIDA")
 
+# Columnas NOT NULL de trades_backtest. Un trade al que le falte cualquiera de
+# estas NO se puede insertar: el INSERT OR IGNORE de agregar_trades se traga la
+# violacion en silencio y la reporta como "duplicado". Verificado el 2026-09-02:
+# 1.913 trades sin precio se reportaron como insertados-ya-existentes y crearon
+# 12 pruebas con metricas y CERO filas. Por eso se valida antes, y ruidosamente.
+_CAMPOS_NOT_NULL = ("symbol", "fase", "ts_entrada", "precio_entrada")
+
+
+class TradesIncompletos(ValueError):
+    """Trades a los que les falta un campo NOT NULL del esquema."""
+
+
+def _validar_trades(trades):
+    """Levanta TradesIncompletos si algun trade no se podria insertar.
+
+    Se llama ANTES de crear la prueba: si se llamara despues, la prueba quedaria
+    registrada con sus metricas y sin una sola fila de trade, que es exactamente
+    el estado inconsistente que este chequeo existe para evitar.
+    """
+    faltan = {}
+    for t in trades:
+        for c in _CAMPOS_NOT_NULL:
+            if t.get(c) is None:
+                faltan[c] = faltan.get(c, 0) + 1
+    if faltan:
+        detalle = ", ".join(f"{c}: {n}" for c, n in sorted(faltan.items()))
+        raise TradesIncompletos(
+            f"{len(trades)} trades, faltan campos obligatorios -> {detalle}")
+
+
 ResultadoRegistro = namedtuple(
     "ResultadoRegistro",
     "prueba_id creada trades_insertados trades_ignorados")
@@ -183,16 +213,24 @@ def agregar_trades(prueba_id, trades):
 
     UNICO camino de insercion de trades del sistema. INSERT OR IGNORE contra el
     indice ux_trades_clave: reejecutar no duplica. Devuelve cuantos entraron.
+
+    Valida primero los campos NOT NULL: OR IGNORE tambien se traga esas
+    violaciones, y sin la validacion un rechazo se reporta como duplicado.
+    El conteo de insertados se MIDE (COUNT antes/despues), no se deduce de
+    cur.rowcount, que en executemany no distingue lo ignorado de lo escrito.
     """
+    _validar_trades(trades)
     campos = ("symbol", "fase", "ts_entrada", "ts_salida", "precio_entrada",
               "precio_salida", "motivo_cierre", "monto_usdt", "pnl_pct", "pnl_usdt",
               "rsi_entrada", "velas", "trade_id_origen", "ts_salida_derivada")
     filas = [tuple([prueba_id] + [t.get(c) for c in campos]) for t in trades]
     with _conn() as conn:
-        cur = conn.executemany(
+        antes = conn.execute("SELECT COUNT(*) FROM trades_backtest").fetchone()[0]
+        conn.executemany(
             f"INSERT OR IGNORE INTO trades_backtest (prueba_id, {','.join(campos)}) "
             f"VALUES ({','.join('?' * (len(campos) + 1))})", filas)
-        return cur.rowcount
+        despues = conn.execute("SELECT COUNT(*) FROM trades_backtest").fetchone()[0]
+        return despues - antes
 
 
 # ── Hash determinista del contenido completo (v2) ─────────────────────────────
@@ -329,6 +367,8 @@ def registrar_backtest(*, tema, moneda, fase, trades, veredicto="NO_CONCLUYENTE"
     """UNICO punto que registra una prueba completa (prueba + metricas + trades).
     Idempotente por hash de contenido. Devuelve ResultadoRegistro."""
     init_db()
+    if trades:
+        _validar_trades(trades)   # antes de crear nada: ver _validar_trades
     meta = dict(tema=tema, moneda=moneda, fase=fase, escenario=escenario,
                 tp_pct=tp_pct, sl_pct=sl_pct, monto_usdt=monto_usdt,
                 capital_usdt=capital_usdt)

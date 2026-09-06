@@ -59,6 +59,23 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## ⚠️ Hallazgo transversal 06-sep — los backtests a 4h sobreestiman
+
+**Tarea 1A cerrada.** El bot real evalúa cada 240 s (`sleep_segundos`), o sea cada 4 minutos; todos
+los backtests de este índice se corrieron a 4 horas. Simular a la resolución real da **PF 1.202
+contra 1.384**, y WR **45.7% contra 49.7%**, con 81.5% más trades. Consistente en las 4 monedas, sin
+una sola excepción.
+
+Mecanismo medido: los 1.204 trades que **sólo** aparecen a 4m rinden PF 1.142, contra PF 1.606 de los
+215 que ambas resoluciones ven. Mirar más seguido no encuentra mejores oportunidades: encuentra más
+oportunidades mediocres.
+
+**Cómo leer el resto de este archivo a partir de ahora:** las comparaciones *relativas* entre
+estrategias siguen valiendo (todas se midieron igual), pero el **nivel absoluto está inflado**. Antes
+de aplicar cualquier cambio que dependa de cruzar el umbral PF ≥ 1.6, revalidarlo a 4 minutos.
+
+Detalle: `reports/2026-09-06_tarea1a-4m-vs-4h-comparacion.md`.
+
 ## COLA DE INVESTIGACIÓN
 
 Ordenada por prioridad/impacto potencial, no por fecha.

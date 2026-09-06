@@ -150,8 +150,9 @@ main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca
 ```
 
 ## Procesos en pantalla (screen)
-Cada módulo corre en su propia sesión `screen`. Total esperado: 30 sesiones (verificado
-2026-09-01: 30 activas, coincide).
+Cada módulo corre en su propia sesión `screen`. Total esperado: **29 sesiones** desde el
+2026-09-06, cuando `z_executor` se apagó a propósito (eran 30; verificado 2026-09-01: 30 activas,
+coincidía).
 
 ⚠️ El conteo anterior decía 29 pero la lista de abajo solo enumeraba 28 nombres: faltaban
 `motor_confluencia` (que ya existía) y la sesión de Claude Code. Ambas están listadas ahora, y
@@ -170,7 +171,11 @@ el total (30) coincide con la lista.
 **zbot/radar:**
 - `z_auditor` → `auditor_supremo.py`
 - `z_webserver` → `z_webserver.py`
-- `z_executor` → `radar_executor.py`
+- ~~`z_executor` → `radar_executor.py`~~ — **APAGADO el 2026-09-06 por decisión de Ariel.** El
+  score del radar no tiene valor predictivo (control pareado lo iguala, correlación negativa sobre
+  n=432k) y el proceso consumía 1.016 MB de RAM sin aportar nada. La línea sigue en
+  `iniciar_bots.sh` pero comentada; para reactivarlo hay que descomentarla **y** volver a agregar
+  `z_executor` a `SCREENS_ESPERADOS` en `monitor_screens.py`.
 - `z_squeeze` → `squeeze_detector.py`
 - `z_macd` → `macd_engine.py`
 - `z_rsi_adv` → `rsi_advanced.py`

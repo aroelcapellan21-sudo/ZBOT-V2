@@ -190,7 +190,13 @@ iniciar z_wicks        ~/zbot/radar "python3 wick_analyzer.py"
 # --- Radar (zbot) ---
 iniciar z_auditor    ~/zbot/radar "python3 auditor_supremo.py"
 iniciar z_webserver  ~/zbot/radar "python3 z_webserver.py"
-iniciar z_executor   ~/zbot/radar "python3 radar_executor.py"
+# z_executor DESACTIVADO el 2026-09-06 por decision de Ariel. Dos motivos:
+#   1. El score del radar no tiene valor predictivo (control pareado lo iguala,
+#      correlacion negativa sobre n=432k). Ya estaba anotado "no reactivar".
+#   2. Consumia 1.016 MB de RAM sin aportar nada. Se libero ese giga durante la
+#      Tarea 1A, que estaba swapeando en el tramo final.
+# Para reactivarlo: descomentar la linea de abajo.
+# iniciar z_executor   ~/zbot/radar "python3 radar_executor.py"
 
 # --- Core del bot ---
 iniciar z_diagnostico  "$DIR" "python3 auto_diagnostico.py"

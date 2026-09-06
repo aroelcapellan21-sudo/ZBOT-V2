@@ -11,7 +11,9 @@ SCREENS_ESPERADOS = [
     "z_heatmap", "z_correlation", "z_squeeze", "z_macd", "z_rsi_adv",
     "z_vol_engine", "z_sentiment", "z_orderblocks", "z_timeframes",
     "z_ignition", "z_heatmap_radar", "z_wicks", "z_auditor",
-    "z_webserver", "z_tunnel", "z_executor", "z_dashboard_v2",
+    # z_executor sacado el 2026-09-06: el proceso se apago a proposito (score del
+    # radar sin valor predictivo) y dejarlo aca lo reportaria como caido para siempre.
+    "z_webserver", "z_tunnel", "z_dashboard_v2",
     "z_diagnostico", "z_asistente"
 ]
 

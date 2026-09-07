@@ -1,0 +1,36 @@
+# Configuracion de las herramientas del bloque de laboratorio (L6-L10, 07-sep-2026).
+# NO es un paquete instalable: el proyecto se corre con scripts sueltos.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# -q para que la salida entre en una pantalla; -ra para ver por que se saltea algo
+addopts = "-q -ra"
+
+[tool.ruff]
+# 298 archivos y 65.635 lineas escritos sin linter. Activar todo de golpe daria
+# miles de avisos y el CI naceria en rojo, que es peor que no tenerlo: se
+# aprende a ignorarlo. Se empieza por los errores que ROMPEN en ejecucion y se
+# suma severidad despues, con el repo ya en verde.
+line-length = 110
+target-version = "py311"
+exclude = [".venv-lab", "_archivo_bots_anteriores", "data_1m", "reports"]
+
+[tool.ruff.lint]
+# E9  errores de sintaxis y de compilacion
+# F   pyflakes: nombres indefinidos, imports rotos, variables sin usar
+# B   bugbear: patrones que casi siempre son bugs (mutable default, etc.)
+select = ["E9", "F", "B"]
+# F401 (import sin usar) y F841 (variable asignada sin usar) son ruido en
+# scripts de investigacion; se revisan aparte, no bloquean.
+ignore = ["F401", "F841"]
+
+[tool.mypy]
+python_version = "3.11"
+# El codigo no tiene anotaciones de tipo. Exigirlas de entrada daria miles de
+# errores. Esta config busca lo que rompe SIN anotaciones: llamadas a funciones
+# que no existen, atributos inexistentes, argumentos de mas.
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_untyped_defs = false
+warn_unused_ignores = true
+exclude = "(\\.venv-lab|_archivo_bots_anteriores|reports)"

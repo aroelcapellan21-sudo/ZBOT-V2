@@ -54,3 +54,10 @@ investigacion/
 data/resultados.db
 data/resultados.db-wal
 data/resultados.db-shm
+
+# laboratorio (L6-L10)
+.venv-lab/
+.pytest_cache/
+__pycache__/
+.mypy_cache/
+.ruff_cache/

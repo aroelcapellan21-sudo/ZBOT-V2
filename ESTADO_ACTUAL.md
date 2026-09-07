@@ -59,6 +59,34 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔴 L3 — el ranking del torneo NO se sostiene entre años (07-sep)
+
+**Elegir "la mejor combinación" mirando todo el histórico selecciona ruido.** Partiendo los **2.790
+trades** del torneo ya guardados en `resultados.db` por año:
+
+| | |
+|---|---|
+| ρ medio del orden entre años | **+0,010** (21 pares) — indistinguible del azar |
+| El mejor global (`avax_alcista`) | gana **1 de 7 años**; 8º, 8º y 9º en tres de ellos |
+| Controlando por moneda (sólo fases entre sí) | **ρ −0,058** (103 pares) |
+
+**La objeción obvia no lo salva.** Comparar `avax_alcista` contra `bnb_lateral` mezcla "qué
+estrategia es mejor" con "qué moneda se movió ese año" — por eso se repitió dentro de cada moneda, y
+sigue dando azar. **El desorden viene de la elección misma.** Sólo AVAX muestra algo de señal
+(ρ +0,233, gana 4/6).
+
+**Qué sigue valiendo:** cada PF, WR y n del torneo está bien medido y se puede citar.
+**Qué NO:** que alguna combinación sea "la mejor".
+
+Coincide con el bootstrap del Ítem 2 (los 7 IC 95 % cruzaban el cero). **Dos métodos independientes,
+la misma conclusión: no hay señal suficiente para elegir un ganador.**
+
+⚠️ **El torneo dejó de estar etiquetado como "REFERENCIA PRINCIPAL"** en `INDICE_RESULTADOS.md`.
+Antes de usarlo para decidir una configuración, exigirle que gane **fuera** de la ventana donde se la
+eligió — un filtro que **ninguna comparación registrada hasta hoy pasó, porque nunca se aplicó**.
+
+Detalle: `reports/2026-09-07_L3-validacion-fuera-de-muestra.md`.
+
 ## 🔬 laboratorio/ — los chequeos permanentes del simulador (desde 07-sep)
 
 Dos scripts que **se vuelven a correr cuando haga falta** y **fallan con exit code** si algo se

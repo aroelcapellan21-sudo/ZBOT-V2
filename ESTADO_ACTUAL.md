@@ -59,6 +59,31 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔬 laboratorio/ — los chequeos permanentes del simulador (desde 07-sep)
+
+Dos scripts que **se vuelven a correr cuando haga falta** y **fallan con exit code** si algo se
+rompió, así que sirven para CI:
+
+- **`laboratorio/verificar_datos.py`** (L1) — huecos, duplicados, OHLC imposible, cruce entre las dos
+  fuentes, muestra contra Binance, e impacto de los huecos sobre las ventanas ya registradas.
+  Correrlo tras actualizar `data_1m/` o el backup 4h.
+- **`laboratorio/verificar_reproducibilidad.py`** (L2) — el mismo tramo cambiando una cosa por vez.
+  Correrlo tras tocar el simulador.
+
+**L2 · Reproducibilidad: los 4 tests pasan** (misma corrida ×2 · distinto `PYTHONHASHSEED` ·
+distinto `--tmpdir` · bandera obsoleta no-op). El test B era el que valía: el orden de `SYMS` **sí**
+cambia con la semilla de hash, pero **el resultado no depende de eso** — medido, no razonado.
+
+⚠️ **El asterisco, y no es menor:** eso prueba reproducibilidad *el mismo día, en la misma máquina,
+con los mismos datos*. **No a lo largo del tiempo.** `FECHA_FIN = datetime.now()` y las velas de 4 h
+se bajan frescas en cada arranque: la Tarea 1A y `CONTROL4H` corrieron con **19.823 vs 19.826 velas**
+por unas horas de diferencia.
+
+**Resuelto con una huella de datos** en cada resultado (`_huella_datos`): velas y rango por moneda +
+**md5 de los 5 `.npy`**, calculada una vez al arranque (~2,7 s para 1,45 GB). Ahora dos corridas que
+difieren se pueden distinguir entre **"cambió el simulador"** y **"cambiaron los datos"** — que hasta
+hoy era indistinguible.
+
 ## 🔧 L1 · Integridad de datos — el backup 4h estaba corrido 4 h, ya está corregido (07-sep)
 
 **Los datos siempre estuvieron bien; las etiquetas de tiempo del backup, no.** Cada fila de los CSV

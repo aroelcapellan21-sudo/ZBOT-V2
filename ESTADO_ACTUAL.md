@@ -59,6 +59,35 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🟡 L4 — Monte Carlo: el barajado ingenuo miente (07-sep)
+
+**El hallazgo es metodológico, y casi queda registrada una falsa alarma.**
+
+Barajando **trade a trade**, 41 de 108 estudios daban el drawdown observado por debajo del percentil
+5 — o sea "el riesgo real es 1,70× mayor de lo medido". **Barajando por bloques de 20 trades quedan
+14.**
+
+| Barajado | DD obs < pct 5 | Típicos |
+|---|---|---|
+| trade a trade | **41** | 66 |
+| **bloques de 20** | **14** | **92** |
+
+El barajado libre **destruye la estructura temporal** y genera secuencias de pérdidas que la
+estrategia real nunca produjo. **Dos tercios de la alarma eran artefacto del método.**
+`laboratorio/monte_carlo.py` quedó con bloques de 20 por defecto.
+
+**Lo que sí queda:** 14 de 108 (13 %) conservan el DD bajo el percentil 5 — más del 5 % esperable,
+pero acotado y con estimación gruesa.
+
+**Y la buena noticia del bootstrap:** en los estudios grandes el **signo del resultado es robusto**
+(P(>0) ≈ 100 %, IC 95 % enteramente positivos).
+
+> **Contraste con L3, y es el punto: cuánto rinde una configuración está bien medido. Cuál es la
+> mejor, no.** L4 confirma la primera mitad; L3 había demolido la segunda.
+
+⚠️ **Unidades:** los drawdowns están en **puntos porcentuales sumados por trade**, no en % de la
+cuenta. 30 puntos con $7 por trade son **$2,10 ≈ 5,7 %** de un capital de $36,86.
+
 ## 🔴 L3 — el ranking del torneo NO se sostiene entre años (07-sep)
 
 **Elegir "la mejor combinación" mirando todo el histórico selecciona ruido.** Partiendo los **2.790

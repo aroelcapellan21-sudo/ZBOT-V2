@@ -59,6 +59,42 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔧 L1 · Integridad de datos — el backup 4h estaba corrido 4 h, ya está corregido (07-sep)
+
+**Los datos siempre estuvieron bien; las etiquetas de tiempo del backup, no.** Cada fila de los CSV
+de `~/bot-padre-v3-backup/data/historico_4h/` decía ser **4 horas más temprano** de lo que era.
+
+Detectado cruzando dos fuentes independientes: los `data_1m` agregados a 4 h contra el backup.
+Diferían en el 98,5–99,2 % de las velas. Probando desplazamientos, `backup[t] == 1m[t+4h]` con
+**mediana 0,000000 % y 100,0 % de velas iguales**.
+
+**Corregido en la fuente el 07-sep** (los 13 CSV, +4 h por fila, precios intactos). Verificado
+después: las dos fuentes coinciden al **100 %**. Respaldo en `historico_4h_pre_correccion_desfase/`
+y una marca que impide aplicarlo dos veces — **una segunda pasada dejaría los datos +8 h**.
+
+**Por qué se corrigió en la fuente y no con una bandera:** de los **58 `.py` que leen ese backup**,
+**35 no corregían nada** y **9 sólo ajustaban el índice de inicio** (la ventana quedaba bien, las
+horas seguían mal por dentro). **Ninguno de los 58 tenía los timestamps correctos.** Una bandera
+opcional deja el error a un olvido de distancia.
+
+- Se quitó la compensación de los **9** de `sistema_c/` (Uso A).
+- **No se tocaron los 6** que usan `hours=4 * velas` para calcular duración (Uso B) — no tienen relación.
+- La bandera `--corregir-desfase` del sandbox quedó como **no-op**, no eliminada: 4 lanzadores la
+  pasan y los checkpoints reanudables la llevan en su firma. Verificado: con y sin ella, resultado idéntico.
+
+⚠️ **Esto NO altera ningún resultado ya registrado** — los estudios viejos corrieron con los datos
+como estaban. Lo que cambia es que **de acá en adelante todos leen la hora correcta**. Si se rehace
+un estudio viejo dará distinto en lo que dependa de la hora, y eso es lo correcto.
+
+### Lo demás que midió L1
+
+**Los `data_1m` son exactos**: 48/48 velas de muestra idénticas a la API de Binance, y las **15,8 M
+de velas** con OHLC coherente (cero duplicados, cero timestamps hacia atrás, ninguna con `high<low`).
+
+**Huecos: 20.153 minutos = 0,097 %** del total. Caen dentro del torneo (0,43 % de la ventana), los 12
+gates (0,43 %) y el ensanchado de TP/SL (0,41 %); **cero en los 8 escenarios del Ítem 2**. Decisión:
+**no rellenarlos** — un precio interpolado puede disparar un TP que nunca existió.
+
 ## 🔴 El bot opera en la fase MÁS QUIETA del mercado y está ciego 73–85% del año (07-sep-2026)
 
 Medido sobre 2026 completo: 89.516 ciclos de 4 min, 248,7 días, fase **LOCAL** de cada moneda —que

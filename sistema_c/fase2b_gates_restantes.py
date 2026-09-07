@@ -120,7 +120,11 @@ SERIES = {SYMBOL: serie, "BTCUSDT": serie_btc}
 TS_LISTAS = {sym: [v[0] for v in s] for sym, s in SERIES.items()}
 
 _inicio_dt = datetime.strptime(FECHA_INICIO_ANALISIS, "%Y-%m-%d %H:%M:%S")
-_inicio_ajustado = (_inicio_dt - timedelta(hours=4)).strftime("%Y-%m-%d %H:%M:%S")
+# El backup 4h se corrigio en la fuente el 2026-09-07 (+4h en cada fila): sus
+# timestamps ya son la hora UTC real. Antes se restaban 4h aca para compensar,
+# lo que acertaba la VENTANA pero dejaba las horas mal por dentro. Ver
+# reports/2026-09-07_L1-integridad-datos-historicos.md
+_inicio_ajustado = _inicio_dt.strftime("%Y-%m-%d %H:%M:%S")
 idx_ini = next(i for i, v in enumerate(serie) if v[0] >= _inicio_ajustado)
 idx_fin = len(serie) - 1
 if serie[-1][0] > FECHA_FIN_ANALISIS:

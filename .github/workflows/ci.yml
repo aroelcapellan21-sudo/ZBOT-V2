@@ -1,0 +1,55 @@
+# CI del bloque de laboratorio (L7, 07-sep-2026).
+#
+# Filosofia, y esta escrita a proposito para que no se pierda:
+#
+#   Un CI que nace en rojo se aprende a ignorar, y entonces no sirve para nada.
+#   Este repo tiene 298 archivos y 65.635 lineas escritas sin linter: activar
+#   todas las reglas de golpe daria cientos de avisos cosmeticos y el CI seria
+#   ruido desde el dia uno.
+#
+#   Por eso se separa en dos niveles:
+#
+#     BLOQUEA  lo que rompe en ejecucion: los tests, y los errores de ruff que
+#              son bugs de verdad (nombre indefinido, sintaxis, redefinicion).
+#     AVISA    lo cosmetico y los tipos: se ven en el log, no frenan el push.
+#              Son el backlog, y la idea es bajarlos hasta poder promoverlos.
+#
+# Estado al crearlo: pytest 31/31 verde · ruff estricto 3 hallazgos (2 son bugs
+# reales, ver la cola) · mypy 36 errores en 4 archivos de la ruta de produccion.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  laboratorio:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar herramientas
+        run: pip install pytest ruff mypy hypothesis numpy scipy
+
+      # ── BLOQUEA ───────────────────────────────────────────────────────────
+      - name: Tests del camino del dinero
+        run: pytest tests/ -q
+        # Los tests de auditoria.csv se saltean solos si el archivo no existe
+        # (no se versiona: es estado vivo de produccion).
+
+      - name: ruff — solo lo que rompe en ejecucion
+        run: ruff check . --select E9,F821,F811 --ignore F401,F841,F541
+
+      # ── AVISA (no frena) ──────────────────────────────────────────────────
+      - name: ruff completo (informativo)
+        run: ruff check . --statistics || true
+
+      - name: mypy sobre la ruta de produccion (informativo)
+        run: mypy || true

@@ -310,7 +310,10 @@ try:
     SL_REG, TP_REG = 0.05, 0.06
 
     trades = []; en_pos = False
-    ep = er = sl_p = tp_p = 0.0; ets = None; e_ema = None
+    # ets_ms se asigna al abrir posicion (mas abajo) y solo se lee dentro de
+    # `if en_pos`, asi que en la practica siempre esta definido. Se inicializa
+    # igual para que el invariante sea explicito y ruff no lo marque (F821).
+    ep = er = sl_p = tp_p = 0.0; ets = None; ets_ms = 0; e_ema = None
 
     for i in range(60, len(closes_all)):
         ventana = closes_all[max(0, i - 60):i]

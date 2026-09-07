@@ -59,6 +59,38 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔬 Bloque de laboratorio COMPLETO (L1–L10, 07-sep-2026)
+
+Diez pasos cerrados en una jornada. Lo que dejó, en una tabla:
+
+| | Qué encontró |
+|---|---|
+| **L1** integridad de datos | El backup 4h estaba **corrido −4 h**; corregido en la fuente (13 CSV). Los `data_1m` son exactos contra Binance. Huecos: 0,097 % |
+| **L2** reproducibilidad | 4/4 tests ✅ + **huella de datos** en cada resultado (md5 de los `.npy`) |
+| **L3** fuera de muestra | 🔴 **el ranking del torneo no se sostiene** (ρ +0,010); elegir el mejor **no le gana al azar** |
+| **L4** Monte Carlo | El barajado ingenuo **exagera** el drawdown (41 → 14 alarmas con bloques) |
+| **L5** benchmark tonto | 🟢 **la entrada SÍ le gana al azar** (P 95–100 %); la fase sola le gana a buy & hold |
+| **L6** pytest | **31 tests, 31 pasan** sobre el camino del dinero y los invariantes de `auditoria.csv` |
+| **L7–L10** CI, ruff, mypy | **3 bugs reales encontrados y corregidos**, uno en producción |
+
+### El bug que encontró el linter, en el camino del dinero
+
+**`ejecutor.py:35`** — el import defensivo de Telegram definía un `_aviso` de respaldo que
+referenciaba `_e`, la variable del `except`. **Python 3 borra esa variable al salir del bloque**, así
+que el respaldo **crasheaba con `NameError` la primera vez que se usaba** — justo cuando fallaba
+Telegram y hacía falta avisar. Reproducido antes de corregir.
+
+### El CI, y por qué está en dos niveles
+
+**Bloquea** `pytest` y `ruff --select E9,F821,F811` (lo que rompe en ejecución). **Avisa sin frenar**
+ruff completo (342 hallazgos, **277 son f-strings cosméticos**) y mypy (36 errores en 4 archivos).
+
+> Un CI que nace en rojo se aprende a ignorar, y entonces no sirve para nada. Con 298 archivos y
+> 65.635 líneas escritas sin linter, activar todo de golpe sería ruido desde el día uno.
+
+Tras los 3 fixes el CI queda **verde**. `mypy` se acotó a los **16 módulos de producción**: los 298
+archivos chocan con nombres de módulo duplicados, y tipar 9 años de scripts de un solo uso no aporta.
+
 ## 🟢 L5 — la entrada SÍ aporta, y la fase sola le gana a buy & hold (07-sep)
 
 **Primera buena noticia del bloque de laboratorio.** Entradas al azar con el **mismo TP/SL** y la

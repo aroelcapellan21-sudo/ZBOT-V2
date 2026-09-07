@@ -31,8 +31,15 @@ from gestor_billetera import registrar_historial_billetera
 try:
     from engine import enviar_aviso as _aviso
 except Exception as _e:
+    # El motivo se guarda en una variable NORMAL antes de definir la funcion.
+    # En Python 3 la variable del `except ... as _e` se BORRA al salir del
+    # bloque, asi que una closure que la referencie tira NameError la primera
+    # vez que se usa — justo cuando hace falta avisar de que Telegram fallo.
+    # Detectado por ruff (F821) el 2026-09-07 y reproducido.
+    _motivo_sin_telegram = str(_e)
+
     def _aviso(msg):
-        print(f"  [EJECUTOR] (sin Telegram: {_e}) {msg}")
+        print(f"  [EJECUTOR] (sin Telegram: {_motivo_sin_telegram}) {msg}")
 
 BILLETERA            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json")
 LOCK_FILE            = os.path.expanduser("~/bot-padre-v2/signals/billetera.json.lock")

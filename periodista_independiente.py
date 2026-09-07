@@ -1,6 +1,5 @@
 import os
 import requests
-import os
 import csv
 from datetime import datetime
 

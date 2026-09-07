@@ -33,4 +33,14 @@ ignore_missing_imports = true
 check_untyped_defs = true
 disallow_untyped_defs = false
 warn_unused_ignores = true
-exclude = "(\\.venv-lab|_archivo_bots_anteriores|reports)"
+# Se acota a la RUTA DE PRODUCCION, no a los 298 archivos. Los scripts de
+# investigacion son de un solo uso y comparten nombres de modulo entre carpetas
+# (mypy corta con "duplicate module named ..."), asi que tiparlos no aporta y
+# rompe la corrida. Lo que importa que no se rompa es el camino del dinero.
+files = [
+    "ejecutor.py", "main.py", "utils.py", "guardian_riesgo.py",
+    "gestor_billetera.py", "gestor_correlacion.py", "gestor_bajistas.py",
+    "director_orquesta.py", "reconciliar.py", "limitador_diario.py",
+    "filtro_horario.py", "filtro_eventos.py", "filtro_calidad.py",
+    "detector_multitimeframe.py", "termometro.py", "memoria_propia.py",
+]

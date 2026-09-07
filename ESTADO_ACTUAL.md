@@ -77,16 +77,45 @@ es la que despacha `director_orquesta.py:248`, no el voto global.
 **El bot no puede operar entre el 73 % y el 85 % del año.** AVAX, con dinero real, tiene fase
 ALCISTA sólo 37 de 249 días.
 
-### Y donde no mira, hay más movimiento que donde mira
+### ✅ Confirmado con 2021–2025: la cobertura NUNCA supera el 41 %
 
-| Fase | Velas 4h | Rango medio | Volumen medio |
-|---|---|---|---|
-| ALCISTA | 1.609 | 1,62 % | 168.195 |
-| LATERAL | **4.197** | 1,50 % | 175.807 |
-| **BAJISTA** | 1.659 | **2,26 %** | **245.817** |
+| Año | ALCISTA promedio de las 4 que operan |
+|---|---|
+| 2021 | **41,0 %** ← el mejor |
+| 2022 | **14,5 %** ← el peor |
+| 2023 | 33,9 % |
+| 2024 | 30,1 % |
+| 2025 | 20,4 % |
+| 2026 | 20,6 % |
 
-**BAJISTA tiene 40 % más rango y 46 % más volumen que ALCISTA. LATERAL tiene 2,6× más velas con
-apenas 7 % menos de rango.** El bot opera justo en la fase más quieta de las tres.
+**En seis años el bot nunca pudo operar más del 41 % del tiempo.** Incluso en el mejor año estuvo
+ciego el 59 %; en el peor, el 85,5 %. Promedio de los seis: 26,8 %.
+
+⚠️ 2026 (20,6 %) está **por debajo** del promedio: el rango real es **14,5 %–41,0 %**, no el
+"15 %–27 %" que sugería medir sólo 2026.
+
+### ⚠️ CORREGIDO — lo de BAJISTA era un dato de 2026, no un patrón
+
+Se registró el 07-sep que *"BAJISTA tiene 40 % más rango y 46 % más volumen que ALCISTA"*. **Con
+2021–2025 eso no se sostiene:**
+
+| Año | rango BAJISTA / ALCISTA | |
+|---|---|---|
+| 2021 | 0,94× | ← se invierte |
+| 2022 | 1,27× | |
+| 2023 | **0,65×** | ← se invierte fuerte |
+| 2024 | 1,10× | |
+| 2025 | 1,22× | |
+| 2026 | 1,40× | ← el año que se había medido |
+
+**Sólo 4 de 6 años.** En volumen es peor: 0,52× en 2021 y 0,44× en 2023. **No usar ese dato como
+argumento para investigar BAJISTA.**
+
+### ✅ Lo que SÍ se sostiene: LATERAL es la mayor parte del año
+
+**5 de 6 años** LATERAL tiene más velas que ALCISTA (hasta **2,93×** en 2022), con rango entre
+**0,62× y 0,93×** (mediana 0,89×). La mayor parte del año, con movimiento apenas menor. **Éste es
+el hallazgo robusto de los tres**, y es el que sostiene el Ítem 2c.
 
 ### ⚠️ ALCANCE de todo el trabajo anterior sobre francotiradores ALCISTA
 

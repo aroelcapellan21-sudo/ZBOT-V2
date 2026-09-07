@@ -59,6 +59,82 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔴 El bot casi no está operando su estrategia (medido 07-sep-2026)
+
+**En 2026, el 89% de los cierres del bot son por cambio de fase global, no por TP ni por SL.**
+Simulación de 2026 completo a 4 minutos, con el simulador ya corregido: **210 de 237 cierres** son
+`FASE_CAMBIO`. Sólo 27 llegan a TP o SL.
+
+El voto de `detectar_fase_global()` —5 monedas, y basta que 2 dejen de estar ALCISTA para que caiga
+a LATERAL— barre las posiciones antes de que la lógica de TP/SL tenga ocasión de actuar. Causa
+mecánica: el umbral duro sin histéresis de `detectar_fase()` (`utils.py:92`, `cambio > 1.0`),
+evaluado cada 240 s.
+
+> **Los 8 escenarios probados dan EXACTAMENTE 12 TP.** Apagar el churn de 210 cierres a 24 (−89%)
+> no hace que **ni una sola** operación más llegue al take profit. Los trades que el mecanismo
+> cierra no son trades que iban a ganar.
+
+### Estado: 🟡 NO CONCLUYENTE — decisión abierta, NO archivada
+
+Las 3 soluciones se midieron juntas (8 combinaciones) y **ninguna es significativa**: los 7 IC 95%
+cruzan el cero. La mejor (zona muerta 0,25) da +$2,83 con P(mejor)=80,1%. Los 8 pierden plata
+(PF 0,603–0,774): la mejor reduce la pérdida de −$12,22 a −$9,38.
+
+**Esto NO se archiva como "no sirve".** No es una apuesta de rendimiento que falló: es un **defecto
+de diseño real** — hoy el bot cierra posiciones que su propia lógica de entrada considera válidas.
+Lo que falta no es voluntad, es evidencia.
+
+**⚠️ QUÉ FALTA PARA DECIDIR DE VERDAD:**
+
+> **Medir el impacto del cambio de duración por trade sobre el perfil de riesgo.** Las soluciones
+> alargan mucho el trade medio: **14,9 h** en el baseline → **32,3 h** con la zona muerta →
+> **83,0 h** con las tres. Eso cambia el drawdown máximo y la exposición simultánea, y **este
+> estudio no lo midió**. Sin ese número no se puede aprobar ni rechazar: se estaría cambiando el
+> perfil de riesgo del bot a ciegas.
+
+Detalle: `reports/2026-09-07_item2-paso2-ocho-escenarios.md`.
+
+**Y más grande que el ítem:** con PF 0,774 en el mejor caso, el problema no es sólo el director.
+Antes de seguir parcheando `cerrar_huerfanas()` corresponde preguntarse por qué la fase global
+cambia 200+ veces en 8 meses.
+
+## 🛑 LEER ANTES DE CITAR CUALQUIER BACKTEST DE ESTE ARCHIVO (06-sep-2026)
+
+**El simulador tenía tres fallos de fidelidad. Todo resultado anterior al 06-sep-2026 los arrastra.**
+Esto no invalida el historial, pero cambia cómo hay que leerlo. Si venís de otra sesión o de otra
+herramienta y no tenés el contexto: esto es lo que necesitás saber, no hace falta reconstruir nada.
+
+**La causa raíz es una sola, y ya estaba documentada el 03-sep para el RSI:** el bot real evalúa cada
+240 s y ve la **vela de 4h EN CURSO**; el simulador miraba **velas cerradas**. Apareció en tres
+lugares distintos:
+
+| # | Fallo | Efecto medido | Estado |
+|---|---|---|---|
+| 1 | La fase de despacho (`_pop_gate` → `_fase_actual`) usaba velas cerradas | El simulador abría **5 veces** donde producción intentó **190** en la misma ventana | ✅ corregido 06-sep |
+| 2 | `_f_urlopen` **ignoraba el parámetro `interval`**: servía velas de 4h aunque le pidieran 1h o 1d | `detector_multitimeframe` comparaba **tres veces la misma serie**. Era el bloqueo dominante: **2.380 → 644** tras el fix | ✅ corregido 06-sep |
+| 3 | `data_1m/` desactualizado (terminaba el 04-sep) y **sin BNB**, que entra en el voto de fase global | Recortaba la ventana de simulación **en silencio**; el voto se calculaba sobre 4 monedas en vez de 5 | ✅ corregido 06-sep |
+
+**Qué significa en la práctica:**
+
+- **Las comparaciones RELATIVAS entre estrategias siguen valiendo**: todas se midieron con el mismo
+  simulador y el mismo sesgo.
+- **Los niveles ABSOLUTOS están sesgados a la baja en frecuencia.** El simulador subestimaba cuántas
+  veces se opera. Cualquier cifra de "trades por semana" o "operaciones al mes" anterior al 06-sep
+  es un piso, no una medición.
+- **Los fallos 1 y 2 sólo afectan al modo `--paso 4m`.** A 4 horas cada paso ES una vela cerrada, así
+  que no hay "vela en curso" que perder. Los backtests a 4h no los sufren — pero sí sufren lo del
+  hallazgo de abajo (sobreestiman el resultado).
+- **Correcciones aplicadas en `~/tarea1a_4m/sandbox_director.py`.** `sandbox_multi_fix.py`, el que
+  midió la Tarea 1A, **todavía las tiene**: rehacer esa prueba con el simulador corregido.
+
+Detalle completo: `reports/2026-09-06_item2-paso1-fidelidad.md` y la auditoría que ya había
+señalado la causa raíz, `reports/2026-09-03_tarea1-auditoria-confiabilidad-simulador.md`.
+
+**Fidelidad tras corregir**, contra las 2.316 líneas `ORQUESTA` que el bot dejó en `eventos.log`:
+fase global coincide en el **87,3%** de los ciclos (510/584) y produce **31 transiciones contra 33
+reales**. El modelo sirve para comparar soluciones entre sí; **sobreestima los cierres forzados un
+14%**, así que no se le pueden pedir números absolutos.
+
 ## ⚠️ Hallazgo transversal 06-sep — los backtests a 4h sobreestiman
 
 **Tarea 1A cerrada.** El bot real evalúa cada 240 s (`sleep_segundos`), o sea cada 4 minutos; todos

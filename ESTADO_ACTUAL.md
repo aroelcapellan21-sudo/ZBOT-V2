@@ -59,6 +59,57 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔴 El bot opera en la fase MÁS QUIETA del mercado y está ciego 73–85% del año (07-sep-2026)
+
+Medido sobre 2026 completo: 89.516 ciclos de 4 min, 248,7 días, fase **LOCAL** de cada moneda —que
+es la que despacha `director_orquesta.py:248`, no el voto global.
+
+### Cobertura real: sólo hay francotiradores ALCISTA activos
+
+| Moneda | ALCISTA | LATERAL | BAJISTA | Días operables (de 248,7) |
+|---|---|---|---|---|
+| ETH | **27,0 %** | 48,7 % | 24,3 % | 67,1 |
+| BNB | 25,3 % | 51,3 % | 23,4 % | 62,8 · *no opera, huérfano* |
+| BTC | 22,6 % | 56,3 % | 21,1 % | 56,2 |
+| SOL | 17,9 % | 64,6 % | 17,5 % | 44,4 |
+| AVAX | **14,9 %** | 60,1 % | 24,9 % | **37,2** |
+
+**El bot no puede operar entre el 73 % y el 85 % del año.** AVAX, con dinero real, tiene fase
+ALCISTA sólo 37 de 249 días.
+
+### Y donde no mira, hay más movimiento que donde mira
+
+| Fase | Velas 4h | Rango medio | Volumen medio |
+|---|---|---|---|
+| ALCISTA | 1.609 | 1,62 % | 168.195 |
+| LATERAL | **4.197** | 1,50 % | 175.807 |
+| **BAJISTA** | 1.659 | **2,26 %** | **245.817** |
+
+**BAJISTA tiene 40 % más rango y 46 % más volumen que ALCISTA. LATERAL tiene 2,6× más velas con
+apenas 7 % menos de rango.** El bot opera justo en la fase más quieta de las tres.
+
+### ⚠️ ALCANCE de todo el trabajo anterior sobre francotiradores ALCISTA
+
+**El torneo de francotiradores, la auditoría de los 12 gates y el ensanchado de TP/SL midieron una
+estrategia que sólo puede actuar ~1/5 del año.**
+
+**No quedan invalidados** —las comparaciones entre configuraciones ALCISTA siguen valiendo entre
+sí— pero **su alcance está acotado a esa ventana**. Cualquier proyección de rendimiento anual a
+partir de ellos hereda ese techo.
+
+### Qué dispara los cambios de fase (para saber dónde aplicar histéresis)
+
+`cambio_7d` **55,1 %** de los cruces que cambian la fase · `cambio_30d` **31,6 %** ·
+`precio vs EMA200` **13,3 %**. Una histéresis sobre 7 días cubre la mitad del problema; para llegar
+al 87 % hay que aplicarla también al de 30 días.
+
+Detalle: `reports/2026-09-07_item2bc-condiciones-y-cobertura.md`.
+
+**Nota de negocio, NO tarea de código:** activar BAJISTA en real exige reescribir `ejecutor.py` para
+Futuros (hoy `cerrar_posicion` cierra shorts con BUY spot) **y** abrir esa cuenta. Es decisión de
+Ariel, independiente de investigar el valor potencial. **LATERAL, en cambio, es operable en SPOT hoy
+mismo** y es el 48–65 % del año.
+
 ## 🔴 El bot casi no está operando su estrategia (medido 07-sep-2026)
 
 **En 2026, el 89% de los cierres del bot son por cambio de fase global, no por TP ni por SL.**

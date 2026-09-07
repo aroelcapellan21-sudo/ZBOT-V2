@@ -78,6 +78,34 @@ sigue dando azar. **El desorden viene de la elección misma.** Sólo AVAX muestr
 **Qué sigue valiendo:** cada PF, WR y n del torneo está bien medido y se puede citar.
 **Qué NO:** que alguna combinación sea "la mejor".
 
+### Y el walk-forward lo confirma: elegir el mejor no le gana al azar
+
+Diseño: elegir la mejor combinación **con los datos hasta el mes N**, medir el mes **N+1**, correr la
+ventana y repetir. Contra elegir **al azar** y contra el **techo** (elegir con el futuro a la vista).
+
+| Historia mínima | Meses sin operar | Ventaja sobre el azar | P(>0) |
+|---|---|---|---|
+| 12 m | incluidos | +67,41 % | 76,7 % |
+| 24 m | incluidos | +64,64 % | 76,5 % |
+| 36 m | **excluidos** | +4,00 % | 50,8 % |
+| 48 m | **excluidos** | **−24,78 %** | **36,4 %** |
+
+**Se desarma en dos direcciones:** cuanta **más** historia se exige para elegir, **menos** ventaja hay
+(al revés de lo esperable si funcionara); y **excluyendo los meses en que la elegida no operó** —la
+comparación justa, porque su resultado cuenta 0 mientras el azar incluye combos que sí operaron, y en
+meses malos *no operar parece una virtud*— la ventaja se evapora y termina invirtiéndose.
+
+**Techo:** elegir con el futuro daría **+1.334,77 %**. El método captura **10,7 %**.
+
+> 🔴 **Tercera vía independiente con la misma conclusión.** Bootstrap del Ítem 2 (7 IC 95 % cruzando
+> el cero) · estabilidad del ranking entre años (ρ +0,010) · walk-forward (P = 77,4 % con el corte
+> más favorable, 36,4 % con el más exigente). **Ya es un patrón sobre el método de selección, no una
+> coincidencia.**
+
+**Regla que queda:** cualquier configuración que se proponga aplicar tiene que mostrar que **gana
+fuera de la ventana donde se la eligió** y que **le gana al azar**. Se verifica con
+`laboratorio/validar_fuera_muestra.py`.
+
 Coincide con el bootstrap del Ítem 2 (los 7 IC 95 % cruzaban el cero). **Dos métodos independientes,
 la misma conclusión: no hay señal suficiente para elegir un ganador.**
 

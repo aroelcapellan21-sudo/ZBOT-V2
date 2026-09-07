@@ -59,6 +59,42 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🟢 L5 — la entrada SÍ aporta, y la fase sola le gana a buy & hold (07-sep)
+
+**Primera buena noticia del bloque de laboratorio.** Entradas al azar con el **mismo TP/SL** y la
+**misma cantidad de trades** que el bot:
+
+| Moneda | Bot | Azar | **P(bot > azar)** |
+|---|---|---|---|
+| BTC | +199,1 % | +36,6 % | **95,0 %** |
+| ETH | +269,3 % | −43,2 % | **100 %** |
+| SOL | +80,9 % | −108,9 % | **97,5 %** |
+| AVAX | +146,5 % | −117,2 % | **100 %** |
+
+**En 4 de 4 monedas la lógica de entrada supera al azar.** Los 12 gates, el RSI y las EMAs
+seleccionan algo real.
+
+**Y la referencia trivial que más incomoda:** estar comprado **sólo cuando la fase dice ALCISTA**,
+sin un solo filtro, **le gana a buy & hold en 4 de 5 monedas con la mitad del drawdown** — BTC
++2.837 % vs +1.426 % (DD −46,5 % vs −83,9 %); AVAX **+10.826 % vs +89 %**.
+
+⚠️ La primera versión daba **+22.900.366 %** por un look-ahead (decidía la fase con el cierre de la
+vela *i* y cobraba el retorno de esa misma vela). Corregido a decidir con velas cerradas hasta *i−1*.
+
+### El cuadro que arman L3, L4 y L5 juntos
+
+| Pregunta | Respuesta | De dónde |
+|---|---|---|
+| ¿La entrada aporta sobre el azar? | **Sí** (P 95–100 %) | L5 |
+| ¿Está bien medida su magnitud? | **Sí** (bootstrap robusto) | L4 |
+| ¿Se puede saber cuál variante es la mejor? | **No** (el ranking es ruido) | L3 |
+| ¿Cuánto del año puede operar? | **15–41 %** | Ítem 2b/2c |
+| ¿Le gana a lo trivial? | **La fase sola ya le gana a buy & hold** | L5 |
+
+**Lectura sugerida —no veredicto medido—:** el valor parece estar más en **estar dentro en el
+régimen correcto** que en afinar qué combinación de gates se usa. Confirmarlo es trabajo de la
+revisión posterior a los 10 pasos.
+
 ## 🟡 L4 — Monte Carlo: el barajado ingenuo miente (07-sep)
 
 **El hallazgo es metodológico, y casi queda registrada una falsa alarma.**

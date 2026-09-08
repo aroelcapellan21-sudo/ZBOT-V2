@@ -59,6 +59,68 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🟡 `cerrar_huerfanas()` cierra el 88,6 % de las operaciones — etapa 1 medida (07-sep-2026)
+
+**Estado: PROMETEDOR, sin diff preparado.** La etapa 2 (2020-09-22 → hoy) está corriendo y es la
+que decide. Reporte: `reports/2026-09-07_huerfanas-etapa1-2026.md`.
+
+### El hallazgo estructural (éste sí es firme)
+
+`cerrar_huerfanas()` (`director_orquesta.py:35`) cierra por la fuerza toda posición cuya acción no
+coincide con la **fase global** nueva. Su propósito nunca se declaró en el código, y **nunca se
+había medido**: los 8 escenarios del Ítem 2 no la desactivaban (el de PF 0,774 era *zona muerta*,
+que recorta los cierres forzados de 210 a 91 pero deja el mecanismo en pie).
+
+Medido ahora sobre 2026 con el simulador honesto: **de los 237 trades, 210 (88,6 %) los cierra este
+mecanismo.** El TP y el SL casi no intervienen. Y esos cierres cortos son los que pierden:
+
+| trades de la rama CON | n | PnL | WR |
+|---|---:|---:|---:|
+| duración < 12 h (mayormente forzados) | 170 | −$3,73 | 21,2 % |
+| duración ≥ 12 h | 67 | −$1,49 | 34,3 % |
+
+**El 71 % de la pérdida sale de los cierres que produce este mecanismo**, con 13 pp menos de win
+rate que los que se dejan correr. Quien lea la documentación anterior creería que el bot sale por
+TP o por SL; en los hechos sale por cambio de régimen casi siempre.
+
+### La ventaja de quitarlo: real en agregado, no confirmada en el tiempo
+
+| | CON (hoy) | SIN | |
+|---|---:|---:|---|
+| Trades | 237 | 40 | |
+| Win rate | 24,9 % | 35,0 % | 🟢 |
+| PnL | −$5,22 | −$2,27 | 🟢 |
+| Profit factor | 0,619 | 0,738 | 🟢 |
+| Máx. drawdown | $5,67 (15,4 %) | $3,32 (9,0 %) | 🟢 −41 % |
+| Racha perdedora | 14 | 7 | 🟢 |
+| Duración media | 14,9 h | 118,7 h | 🔴 8× |
+| % del calendario expuesto | 59,1 % | 79,6 % | 🔴 |
+
+**Las dos ramas pierden dinero.** SIN pierde menos: es *menos malo*, no rentable.
+
+**Lo que distingue este resultado del análisis fase global vs local:** la ventaja **sobrevive a las
+8 exclusiones de sensibilidad** (+$1,06 a +$3,53 quitando el mejor trade, los 3 mejores, el mejor
+mes, o cualquiera de las 4 monedas). El de fase global vs local se daba vuelta ante casi cualquier
+exclusión; éste no se da vuelta en ninguna.
+
+**Lo que todavía falta:** el walk-forward mensual da **4 de 7 meses** a favor y el IC95 % bootstrap
+de la diferencia mensual **cruza cero** ([−0,2645, +1,1345]). La rama SIN tiene sólo 40 trades en 8
+meses. Sobre 7 períodos, 4-3 es indistinguible de una moneda al aire.
+
+### Dos datos que conviene no perder
+
+- **El drawdown de la rama CON llega al 15,4 %, por encima del límite de 10 % del guardián.** En la
+  rama SIN queda en 9,0 %, por debajo. Quitar el mecanismo alejaría al bot del bloqueo, no lo
+  acercaría.
+- **La concurrencia no cambia** (máximo 2 posiciones simultáneas en ambas ramas, topadas por
+  `MAX_TRADES_MISMA_DIR=2`). Lo que sube es el *tiempo* expuesto, no la cantidad de apuestas a la
+  vez. Ésta era la medición que el Ítem 2 había dejado explícitamente pendiente.
+
+### Qué NO se hizo
+
+No se tocó producción, no se preparó ningún diff, no se aplicó nada. El bot sigue en REAL con
+`cerrar_huerfanas()` activa, por decisión de Ariel de seguir observándolo en vivo mientras se mide.
+
 ## 🔬 Bloque de laboratorio COMPLETO (L1–L10, 07-sep-2026)
 
 Diez pasos cerrados en una jornada. Lo que dejó, en una tabla:

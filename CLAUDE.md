@@ -695,10 +695,26 @@ de 16 cambios.
 > timestamp y **no se estimaron**.
 >
 > **BTC concentra el polvo:** $4,77 de los $4,98, a razón de **~$0,79 por vuelta = 8,2 % del ticket**
-> (compra 0,00011988 BTC y el `stepSize` de 0,00001 deja 0,00000988 sin vender). Su saldo de polvo
-> pasó de 0 a ~$5,5 en cuatro días: **~13 % del capital**. `cerrar_huerfanas()` no crea el polvo
-> —todo cierre trunca— pero **multiplicaba los cierres**: 31 en 5 días, con duración mediana de
-> **20 minutos**. Detalle: `reports/2026-09-09_impacto-realizado-cerrar-huerfanas.md`, prueba 295.
+> (compra 0,00011988 BTC y el `stepSize` de 0,00001 deja 0,00000988 sin vender).
+> `cerrar_huerfanas()` no crea el polvo —todo cierre trunca— pero **multiplicaba los cierres**:
+> 31 en 5 días, con duración mediana de **20 minutos**.
+> Detalle: `reports/2026-09-09_impacto-realizado-cerrar-huerfanas.md`, prueba 295.
+>
+> 🔴 **CORREGIDO EL MISMO DÍA (17:40) — el polvo NO está en la cuenta.** `/api/v3/account` da
+> **BTC = 0,0** real contra 6,916e-05 en `billetera.json`, y **USDT $29,0076** real contra
+> $23,3342 registrado: las dos diferencias **se compensan**, ese BTC se vendió de verdad y la
+> contabilidad no lo registró. **Sigue en pie el mecanismo** —Binance confirma compras de
+> 0,00012 y ventas de 0,00011— y el efecto sobre la caja de cada vuelta; **NO es cierto que hoy
+> haya ~$5 inmovilizados ni que sean ~13 % del capital**. Se midió desde
+> `historial_billetera.csv` sin cruzarlo contra el saldo real.
+>
+> ⚠️ **Y el hallazgo que dejó:** `billetera.json` está **desincronizado de la cuenta y nada lo
+> detecta** — y es el archivo con el que decide `guardian_riesgo.py`. Hoy el error es
+> conservador y casi se cancela, pero por casualidad. `/reconciliar` **no** lo arregla: vende
+> polvo real, no cuadra un archivo que declara de más. **Dato útil:** con la comisión pagada en
+> BNB el polvo **deja de generarse** (se compra y se vende la cantidad redonda) y además abarata
+> un 28 %; hoy el BNB de la cuenta es 0.
+> Detalle: `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`
 
 **Lo que se creía el 31-ago (y sostuvo la decisión de entonces):** impacto realizado $0,00, con
 **0 filas `FASE_CAMBIO`** en `auditoria.csv` en toda la ventana — el mecanismo **no había llegado a

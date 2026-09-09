@@ -39,8 +39,10 @@ Lo siguiente que se toma es el **ítem 1**.
 
 - [ ] **1 · L11 — Pruebas 2 y 3 de la evaluación del laboratorio** *(ex Ítem 13)* — 🟡 **a un tercio**
 
-  La **Prueba 1 (engaño controlado) cerró el 09-sep** con dos puntos ciegos medidos (ver "Ya
-  cerrado"). Faltan las otras dos, que son **auditorías de lectura**, no corridas del arnés:
+  La **Prueba 1 (engaño controlado) cerró el 09-sep** con dos puntos ciegos medidos y la
+  **Prueba 2 (cobertura de errores) cerró el 09-sep 17:40** — los tres huecos existen, ninguno
+  da vuelta la decisión de `cerrar_huerfanas()` (prueba **297**,
+  `reports/2026-09-09_L11-prueba2-cobertura-de-errores.md`). **Falta sólo la Prueba 3.**
 
   **Prueba 2 · Cobertura de errores no probados.** Tres cosas que existen en la realidad y el
   sandbox no modela:
@@ -166,9 +168,20 @@ Lo siguiente que se toma es el **ítem 1**.
 numeración propia. **No bloquean la cola de investigación** y no compiten por su orden: se toman en
 huecos.)*
 
-- [ ] **M1 · Polvo inmovilizado** — 🔴 **ya no es teórico: ~$5 atrapados hoy**, medidos el 09-sep
-  (BTC concentra $4,77, a ~$0,79 por vuelta = 8,2 % del ticket). Se barren sólo con
-  `/reconciliar confirmar`, que **vende dinero real** y es manual por diseño: decisión de Ariel.
+- [ ] **M1 · Polvo inmovilizado** — 🟡 **corregido el 09-sep 17:40: en la cuenta NO hay polvo.**
+  `/api/v3/account` da BTC = 0,0 real contra 6,916e-05 en `billetera.json`. El mecanismo es real
+  (~$0,79 por vuelta = 8,2 % del ticket) pero **el saldo atrapado sólo existe en el archivo**.
+  Dato útil: **cuando la comisión se paga en BNB el polvo deja de generarse** (se compra y se
+  vende la cantidad redonda) y además abarata la comisión un 28 %. Hoy el BNB de la cuenta es 0.
+  Ver `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`.
+- [ ] **M11 · `billetera.json` desincronizado de Binance** — 🔴 **nuevo, 09-sep.** USDT $23,33 en
+  el archivo contra **$29,01** real; BTC y AVAX declaran saldos que la cuenta no tiene. **El
+  guardián de riesgo decide con ese archivo.** Hoy el error es conservador y casi se cancela
+  ($36,59 calculado contra ~$36,28 real), pero es casualidad. `/reconciliar` **no** lo arregla:
+  está hecho para vender polvo real, no para cuadrar un archivo que declara de más. Tres
+  decisiones pendientes de Ariel en el reporte. Encaja con el ítem 3 (auditoría de conexiones):
+  no existe ninguna verificación archivo-contra-cuenta.
+
 - [ ] **M2 · `memoria_propia.json` no se actualiza** — causa ligada a `FASE_CAMBIO`, sin corregir.
 - [ ] **M3 · SOL LATERAL, filtro de volatilidad k=2,0** — "prometedor no confirmado": el mejor
   resultado de la línea de volatilidad (PF 1,768, Sharpe 1,704, +$3,53) pero depende de **una sola

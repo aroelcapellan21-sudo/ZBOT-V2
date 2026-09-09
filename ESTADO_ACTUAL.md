@@ -108,8 +108,17 @@ al pasar `MONTO_FIJO` a $7/$10.
 De las 24 que se pudieron emparejar con su cierre real: efecto sobre la caja **−$5,0973**, pero
 **+$4,9754 de eso es polvo inmovilizado** (cripto sin vender por truncamiento al `stepSize`) y sólo
 **−$0,1219 es pérdida efectiva por precio**. **BTC concentra el polvo:** ~$0,79 por vuelta, el
-**8,2 % del ticket cada vez**; su saldo de polvo pasó de 0 a ~$5,5 en cuatro días, **~13 % del
-capital** en cripto que no respalda ninguna posición. El mecanismo no crea el polvo —todo cierre
+**8,2 % del ticket cada vez**.
+
+> 🔴 **CORREGIDO EL 2026-09-09 17:40 — el polvo NO está en la cuenta.** `/api/v3/account` da
+> **BTC = 0,0** real contra 6,916e-05 en `billetera.json`, y USDT **29,0076** real contra
+> 23,3342 registrado: las dos diferencias se compensan, ese BTC se vendió de verdad y la
+> contabilidad no lo registró. **Sigue en pie el mecanismo** (Binance confirma compras de
+> 0,00012 y ventas de 0,00011) y el efecto sobre la caja de cada vuelta; **no es cierto que
+> hoy haya ~$5 inmovilizados ni que sean ~13 % del capital**. Se midió desde
+> `historial_billetera.csv` sin cruzarlo contra el saldo real.
+> Detalle: `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`
+ El mecanismo no crea el polvo —todo cierre
 trunca— pero **multiplica los cierres**: 31 en 5 días, duración mediana de 20 minutos.
 
 ### El hallazgo estructural (éste sí es firme)

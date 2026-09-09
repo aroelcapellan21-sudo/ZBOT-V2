@@ -132,8 +132,8 @@ modo antes de asumir que sigue vigente si pasó mucho tiempo. Detalle completo d
 ## Arquitectura
 ```
 main.py                  ← orquestador principal (NO ejecuta órdenes, NO toca capital)
-├── director_orquesta.py ← fase LOCAL por moneda → BTC/ETH/SOL/AVAX. Ojo: cerrar_huerfanas()
-│                          usa la fase GLOBAL, ver sección al final
+├── director_orquesta.py ← fase LOCAL por moneda → BTC/ETH/SOL/AVAX. cerrar_huerfanas()
+│                          DESACTIVADA 09-sep (ade1ae0), ver sección al final
 ├── director_<activo>.py ← uno por activo, decide qué francotirador activar
 │   └── francotirador_<fase>_<activo>.py ← genera señales de entrada
 ├── ejecutor.py          ← ÚNICO autorizado para abrir/cerrar posiciones
@@ -629,12 +629,30 @@ funciona y cubre drawdown máximo y pérdida diaria — esa es la red de segurid
 Evidencia completa: `reports/2026-08-31_termometro-impacto-economico.md` y
 `reports/2026-08-31_auditoria-arquitectura-y-conexiones.md`.
 
-## ⚠️ `cerrar_huerfanas()` usa fase GLOBAL mientras la apertura usa fase LOCAL (2026-08-31)
+## 🛑 `cerrar_huerfanas()` está DESACTIVADA desde el 2026-09-09 (commit `ade1ae0`)
 
-**Este caso NO es como los tres anteriores.** El trailing, el termómetro y el centinela son inercia
-benigna: dejarlos rotos no hace daño. Éste es una **contradicción de diseño real y hoy ejecutable**,
-pero **la evidencia económica no alcanza para justificar el cambio**. Se documenta con esa distinción
-explícita para que quien lo mire decida con los números a la vista, no con la intuición.
+> **LEER PRIMERO.** La llamada en `director_orquesta.py:208` está comentada con OK explícito de
+> Ariel. El mecanismo **ya no corre**, así que la discusión de fase GLOBAL vs LOCAL que sigue
+> **quedó sin objeto**: no hay cierre forzado que pueda usar una fase u otra. Todo lo de abajo se
+> conserva como historia de cómo se llegó acá, no como descripción del sistema de hoy.
+>
+> **Motivo (etapa 2, 6 años, 783.358 pasos de 4 min):** dejarla cuesta **−$31,02** (PnL +$3,77 con
+> ella, +$34,79 sin ella), gana en **7 de 7 años** y **4 de 4 monedas**, IC 95 % **[+17,06 · +45,13]**
+> sin cruzar cero. Evidencia: `reports/2026-09-09_huerfanas-etapa2-6anos.md`. DB: pruebas 293 y 294.
+>
+> **Las posiciones NO quedaron sin guardián.** La razón declarada de la función —"evita que queden
+> sin TP/SL"— ya estaba cubierta desde el 30-ago por `_proteger_otras_fases()` (commit `f9d6c2c`) en
+> los 4 directores conectados, y por fase **LOCAL**, que cambia 5,2× más seguido que la global.
+>
+> **Para reactivarla** hay que descomentar esa línea, y eso exige evidencia nueva más OK de Ariel.
+
+### Historia (2026-08-31) — la contradicción que tenía mientras corría
+
+**Este caso NO era como los tres anteriores.** El trailing, el termómetro y el centinela son inercia
+benigna: dejarlos rotos no hace daño. Éste era una **contradicción de diseño real y ejecutable**,
+pero en su momento **la evidencia económica no alcanzó para justificar el cambio**. Se documenta con
+esa distinción explícita para que quien lo mire decida con los números a la vista, no con la
+intuición.
 
 ### La contradicción
 
@@ -666,8 +684,25 @@ de 16 cambios.
 
 ### Evidencia económica — no alcanza
 
-**Impacto realizado: $0,00.** Hay **0 filas `FASE_CAMBIO`** en `auditoria.csv` en toda la ventana:
-el mecanismo **nunca llegó a dispararse**. La causa más consistente es que `cerrar_posicion()`
+> ⚠️ **CORREGIDO EL 2026-09-09 — este párrafo dejó de ser cierto.** El mecanismo **sí se disparó
+> con dinero real: 31 filas `FASE_CAMBIO`** entre el **3 y el 7 de septiembre de 2026** (16 AVAX,
+> 8 BTC, 7 SOL), exactamente lo que esta misma sección anticipaba al pasar `MONTO_FIJO` a $7/$10.
+>
+> **El costo real no fue el que se esperaba.** De las 24 que se pudieron emparejar con su cierre:
+> efecto sobre la caja **−$5,0973**, pero de eso **+$4,9754 es polvo inmovilizado** (cripto sin
+> vender por el truncamiento al `stepSize`, que no está perdida pero no respalda ninguna posición) y
+> sólo **−$0,1219 es pérdida efectiva por precio**. Las otras 7 filas no tienen `COMPRA` con ese
+> timestamp y **no se estimaron**.
+>
+> **BTC concentra el polvo:** $4,77 de los $4,98, a razón de **~$0,79 por vuelta = 8,2 % del ticket**
+> (compra 0,00011988 BTC y el `stepSize` de 0,00001 deja 0,00000988 sin vender). Su saldo de polvo
+> pasó de 0 a ~$5,5 en cuatro días: **~13 % del capital**. `cerrar_huerfanas()` no crea el polvo
+> —todo cierre trunca— pero **multiplicaba los cierres**: 31 en 5 días, con duración mediana de
+> **20 minutos**. Detalle: `reports/2026-09-09_impacto-realizado-cerrar-huerfanas.md`, prueba 295.
+
+**Lo que se creía el 31-ago (y sostuvo la decisión de entonces):** impacto realizado $0,00, con
+**0 filas `FASE_CAMBIO`** en `auditoria.csv` en toda la ventana — el mecanismo **no había llegado a
+dispararse**. La causa más consistente es que `cerrar_posicion()`
 fallaba por el bug de NOTIONAL (`MONTO_FIJO` era $5 y el mínimo de Binance es $5), lo que explica
 que las 4 posiciones del período terminaran cerradas **a mano** (`MANUAL_WIN`/`MANUAL_LOSS`). No está
 probado al 100%: esos avisos van a Telegram y los `print` al screen, y ninguno se conserva.
@@ -696,7 +731,12 @@ la diferencia sale de **16 casos**. Y a escala actual ($7/op sobre $37) la venta
 **Veredicto: 🔴 NO TOCAR por economía.** No hay mejora demostrada, se invierte ante cualquier
 exclusión, y viene con casi 6× más drawdown.
 
-### ✅ DECISIÓN TOMADA (Ariel, 2026-08-31)
+### ✅ DECISIÓN TOMADA (Ariel, 2026-08-31) — ⛔ REEMPLAZADA EL 2026-09-09
+
+> Esta decisión era sobre **cómo** corregir el mecanismo (fase local en vez de global). El 09-sep
+> Ariel decidió **desactivar el mecanismo entero** con la evidencia de la etapa 2, así que la
+> pregunta que ésta cerraba ya no existe. Se conserva porque explica por qué durante nueve días la
+> respuesta correcta fue "no tocar".
 
 **Decisión: no se corrige por ahora. Motivo: beneficio esperado indistinguible de cero y el
 drawdown simulado sube ~6×.**
@@ -715,7 +755,8 @@ fue de ~1,14 cambios de fase global por día, con **63,2%** de los ciclos tenien
 cuya fase local difiere de la global.
 
 **Qué mirar si algún día aparece:** una fila con estado `FASE_CAMBIO` en `auditoria.csv` cuya moneda
-seguía en su fase local original. Ese sería el primer caso real — hasta hoy no hubo ninguno.
+seguía en su fase local original. ✅ **Apareció: 31 veces entre el 3 y el 7-sep de 2026** (ver el
+recuadro de arriba). No van a sumarse más mientras la llamada siga comentada.
 
 ### Si se decide corregirlo
 

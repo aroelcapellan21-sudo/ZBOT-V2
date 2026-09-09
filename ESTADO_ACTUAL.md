@@ -600,6 +600,37 @@ Detalle: `reports/2026-09-06_tarea1a-4m-vs-4h-comparacion.md`.
 
 Ordenada por prioridad/impacto potencial, no por fecha.
 
+### 🔴 ALTA PRIORIDAD — reabrir los `NO_CONCLUYENTE` que el instrumento no podía ver (09-sep-2026)
+
+**Pedido explícito de Ariel el 09-sep, a raíz del L11.** No se hizo todavía: queda anotado acá para
+que no se pierda.
+
+**Qué hay que hacer.** Revisar los `NO_CONCLUYENTE` archivados en `INDICE_RESULTADOS.md` y separar
+dos cosas que hasta hoy se leían igual: los que **midieron que no hay ventaja** y los que
+**tenían una ventaja real que el laboratorio no tenía potencia para detectar**. El L11 midió el
+umbral: con ~240 trades no distingue del azar una ventaja de **+0,485 pp por trade**, y detecta
+apenas el 17 % de las de +0,250 pp.
+
+**Por dónde empezar: por los de MENOS trades.** Son los más vulnerables — cuanto más chica la
+muestra, más alto el umbral de detección, así que un `NO_CONCLUYENTE` con n bajo es casi
+indistinguible de "no se midió". Los de n grande son los más creíbles como negativos de verdad.
+
+**Cómo hacerlo sin repetir el error:**
+- La consulta sale de `data/resultados.db`, que tiene `n` por prueba
+  (`python3 consultar.py`), no de leer el `.md` a ojo.
+- **Reevaluar contra el azar, no contra cero** — `~/lab_eval/benchmark_tonto.py` ya hace eso y es
+  re-ejecutable. La vara vieja ("IC 95 % > 0") aprobó 100 de 100 estrategias de ruido puro.
+- Para cada candidato, la pregunta no es "¿dio positivo?" sino **"¿cuántos trades harían falta para
+  que una ventaja de este tamaño fuera detectable?"**. Eso convierte cada caso archivado en una
+  decisión concreta: juntar más muestra, o cerrarlo de verdad.
+- ⚠️ **Esto NO es permiso para resucitar hallazgos.** Un `NO_CONCLUYENTE` que vuelve a la mesa sigue
+  necesitando evidencia propia, diff y OK explícito antes de tocar nada. Lo que cambia es que ya no
+  se puede archivar uno diciendo "no hay ventaja" cuando lo que hubo fue falta de potencia.
+
+Base: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`, prueba **296** en la DB.
+
+### El resto de la cola
+
 1. ~~Decisión pendiente — ¿reemplazar/ampliar la config de producción?~~ **Resuelto 24-ago: Combo O
    activado en producción** (ver "En producción ahora"). Nota viva: el peor caso teórico de $20
    simultáneos (4×$5) en la práctica queda capado en $10 por `MAX_TRADES_MISMA_DIR=2`, que sigue sin

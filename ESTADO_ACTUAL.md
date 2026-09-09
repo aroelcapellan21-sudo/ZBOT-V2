@@ -59,10 +59,58 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
-## 🟡 `cerrar_huerfanas()` cierra el 88,6 % de las operaciones — etapa 1 medida (07-sep-2026)
+## 🟢 `cerrar_huerfanas()` — la etapa 2 decidió: quitarla gana $31 en 6 años (09-sep-2026)
 
-**Estado: PROMETEDOR, sin diff preparado.** La etapa 2 (2020-09-22 → hoy) está corriendo y es la
-que decide. Reporte: `reports/2026-09-07_huerfanas-etapa1-2026.md`.
+**Estado: PROMETEDOR con diff preparado, esperando OK de Ariel.** La etapa 2 terminó el 09-sep a
+las 08:24 (ambas ramas `exit=0`). Reportes: `reports/2026-09-09_huerfanas-etapa2-6anos.md` (la
+decisión), `reports/2026-09-09_impacto-realizado-cerrar-huerfanas.md` (los 31 cierres reales) y
+`reports/2026-09-07_huerfanas-etapa1-2026.md` (la etapa 1, abajo).
+
+### La etapa 2, sobre 2020-09-22 → 2026-09-08 (783.358 pasos de 4 min)
+
+| | CON (hoy) | SIN | |
+|---|---:|---:|---|
+| Trades | 2.675 | 1.106 | |
+| Win rate | 35,3 % | 44,1 % | 🟢 |
+| PnL | +$3,77 | **+$34,79** | 🟢 **+$31,02** |
+| Profit factor | 1,015 | 1,164 | 🟢 |
+| Máx. drawdown | $14,91 (40,5 %) | $6,52 (17,7 %) | 🟢 −56 % |
+| Sharpe | 0,084 | 1,159 | 🟢 |
+| Racha perdedora | 27 | 10 | 🟢 |
+| Duración mediana | 3,5 h | 16,3 h | 🔴 |
+| Aperturas | 2.677 | 1.108 | 🔴 opera menos de la mitad |
+
+**Gana en 7 de 7 años calendario y en 4 de 4 monedas** (BTC cambia de signo: −$7,03 → +$9,32).
+Bootstrap por bloque mensual: **IC 95 % [+$17,06 · +$45,13], no cruza cero**, P(delta ≤ 0) = 0,0000;
+test de signo **42/61 meses, p = 0,0044**; sin los 5 mejores meses sigue **+$19,94**. El "piso
+mecánico" que invalidó otros IC **no aplica**: SIN empeora en 23 de 65 meses.
+
+**De dónde salen los $31, exacto:** +$17,07 de **1.801 reaperturas que sólo existen en CON**,
++$14,31 de 307 trades con la misma entrada y salida distinta, −$0,36 de 232 que sólo existen en SIN.
+Es el mecanismo ya documentado —cierra por voto global, el director reabre porque la fase local no
+cambió— medido de punta a punta.
+
+⚠️ **Cuatro asteriscos que hay que leer antes de citar esto:**
+- **Las huellas de datos no son idénticas al final** (CON hasta las 04:00, SIN hasta las 20:00 del
+  08-sep: 4 velas en 6 años). La próxima corrida pareada congela la huella antes de arrancar.
+- **A escala actual son ~$0,43/mes.** Lo que vale no es el monto: son 1.801 operaciones inútiles
+  menos y la mitad de drawdown.
+- **Ambas ramas superan el límite de 10 % del guardián** (40,5 % y 17,7 %). Quitarlo aleja del
+  bloqueo, no lo evita.
+- **El bot operaría menos de la mitad.** Si algún día se busca frecuencia, este cambio va en contra.
+
+### Y ya se disparó con dinero real: 31 veces, del 3 al 7 de septiembre
+
+`CLAUDE.md` dice (31-ago) *"0 filas `FASE_CAMBIO`, el mecanismo nunca llegó a dispararse"*. **Quedó
+desactualizado**: hay **31** (16 AVAX, 8 BTC, 7 SOL), exactamente lo que ese mismo archivo anticipó
+al pasar `MONTO_FIJO` a $7/$10.
+
+De las 24 que se pudieron emparejar con su cierre real: efecto sobre la caja **−$5,0973**, pero
+**+$4,9754 de eso es polvo inmovilizado** (cripto sin vender por truncamiento al `stepSize`) y sólo
+**−$0,1219 es pérdida efectiva por precio**. **BTC concentra el polvo:** ~$0,79 por vuelta, el
+**8,2 % del ticket cada vez**; su saldo de polvo pasó de 0 a ~$5,5 en cuatro días, **~13 % del
+capital** en cripto que no respalda ninguna posición. El mecanismo no crea el polvo —todo cierre
+trunca— pero **multiplica los cierres**: 31 en 5 días, duración mediana de 20 minutos.
 
 ### El hallazgo estructural (éste sí es firme)
 
@@ -118,8 +166,48 @@ meses. Sobre 7 períodos, 4-3 es indistinguible de una moneda al aire.
 
 ### Qué NO se hizo
 
-No se tocó producción, no se preparó ningún diff, no se aplicó nada. El bot sigue en REAL con
-`cerrar_huerfanas()` activa, por decisión de Ariel de seguir observándolo en vivo mientras se mide.
+No se tocó producción, no se aplicó nada. El bot sigue en REAL con `cerrar_huerfanas()` activa.
+**El diff está preparado y esperando OK explícito de Ariel** — una sola línea en
+`director_orquesta.py:208`. Tampoco se barrió el polvo: `/reconciliar` vende dinero real y es
+manual por diseño.
+
+**Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
+(impacto realizado).
+
+## 🔴 L11 — el laboratorio no ve ventajas chicas, y su vara más citada aprueba al ruido (09-sep-2026)
+
+**Ítem 13 cerrado.** Reporte: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`. Se le dieron
+de comer **600 estrategias sintéticas con ventaja conocida por diseño** (6 valores de `p` × 100
+semillas, ~240 trades cada una, BTC 2020-2026) y se midió si las distingue del ruido. Criterios
+**pre-registrados el 08-sep**, antes de ver un número.
+
+| p (probabilidad de acertar el desenlace) | detectadas por **L5** (contra el azar) | por **L4-bootstrap** (contra cero) |
+|---|---:|---:|
+| **0,50 — ruido puro** | **0 de 100** ✅ | **100 de 100** 🔴 |
+| 0,52 | 5 % | 100 % |
+| 0,55 | 17 % | 100 % |
+| 0,60 | **40 %** | 100 % |
+
+**🔴 Punto ciego 1 — indulgencia.** El criterio *"IC 95 % del total no cruza cero"* —el bootstrap
+citado en todo `INDICE_RESULTADOS.md`— **aprobó las 100 estrategias sin ninguna información**. La
+causa: entrar al azar en BTC 2020-2026 rinde **+1,5517 % por trade** por deriva del mercado, así que
+cualquier vara contra **cero** aprueba al ruido. **No invalida** su uso *comparativo* (A contra B,
+que es como se usa en casi todas las filas); **sí** invalida leer "IC 95 % > 0" como "la estrategia
+sirve".
+
+**🔴 Punto ciego 2 — falta de potencia.** Con la vara correcta los falsos positivos son **0,0 %**,
+pero **ninguna** ventaja inyectada se detecta en ≥ 50 % de las semillas: ni siquiera `p = 0,60`, que
+son **+0,485 pp por trade** (~$0,034 en un ticket de $7). **Umbral medido: con ~240 trades el
+laboratorio no distingue del azar una ventaja de ese tamaño.**
+
+**Cómo cambia la lectura de este archivo:** la mayoría de los **NO CONCLUYENTE** registrados no
+dicen *"no hay ventaja"* — dicen *"el instrumento no la ve a esta escala"*. Son cosas distintas y
+hasta hoy se leían igual. Contraste del mismo día: la etapa 2 de `cerrar_huerfanas()` (+$31,02,
+IC 95 % [+17,06 · +45,13] sobre 65 meses) está **muy por encima** de ese umbral, y por eso resiste.
+
+**Pendiente:** la Prueba 2 (comisión variable, fallas de exchange, dependencia de un período) y la
+Prueba 3 (Deflated Sharpe, PBO/CSCV, Minimum Backtest Length) **no se corrieron**. Medido sólo sobre
+BTC 4h. La base real no se tocó: todo sobre una copia. Registrado como prueba **296**.
 
 ## 🔬 Bloque de laboratorio COMPLETO (L1–L10, 07-sep-2026)
 

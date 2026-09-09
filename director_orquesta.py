@@ -205,7 +205,14 @@ def ejecutar_ciclo():
     )
 
     if fase_anterior is not None and fase_global != fase_anterior:
-        cerrar_huerfanas(fase_global)
+        # cerrar_huerfanas(fase_global)  <- DESACTIVADA el 2026-09-09 con OK de Ariel.
+        # Etapa 2 (6 anios, 783.358 pasos): dejarla cuesta -$31.02 (PnL +$3.77 CON vs
+        # +$34.79 SIN), gana en 7/7 anios y 4/4 monedas, IC95% [+17.06,+45.13] sin cruzar
+        # cero. Las posiciones NO quedan sin guardian: _proteger_otras_fases() en cada
+        # director_<moneda>.py (commit f9d6c2c) corre revisar_cierres de las fases que no
+        # se evaluan ese ciclo, y lo hace por fase LOCAL, que es 5.2x mas frecuente.
+        # Ver reports/2026-09-09_huerfanas-etapa2-6anos.md
+        pass
         if fase_global == "BAJISTA":
             mensaje = (
                 f"🔻 DIRECTOR DE ORQUESTA\n"

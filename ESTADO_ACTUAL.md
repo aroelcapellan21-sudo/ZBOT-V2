@@ -183,7 +183,18 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
-## 🔴 L11 — el laboratorio no ve ventajas chicas, y su vara más citada aprueba al ruido (09-sep-2026)
+## 🔴 L11 — el laboratorio mide bien y elige mal (09-sep-2026, CERRADO)
+
+> **Cerrado con las 3 pruebas el 09-sep.** Además de los dos puntos ciegos de abajo, la
+> **Prueba 2** midió que la comisión del sandbox sobreestima un 18 %, que en producción **falla
+> el 92 % de los intentos de apertura sin registrar el motivo**, y que **20 de 126 estudios
+> (15,9 %) cambian de signo** al quitarles un año. La **Prueba 3** cerró con el resultado más
+> duro: **DSR 0 de 121** —ningún estudio del proyecto supera la corrección por prueba
+> múltiple— y **PBO 48,6 %**, que coincide con el ρ +0,010 de L3 por una vía independiente.
+> Quedan abiertas dos de las siete sins: *survivorship* (sin medir, ahora ítem 4b de la cola) y
+> *overfitting*. Pruebas **296**, **297** y **298**.
+> `reports/2026-09-09_L11-prueba2-cobertura-de-errores.md` ·
+> `reports/2026-09-09_L11-prueba3-estandares-externos.md`
 
 **Ítem 13 cerrado.** Reporte: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`. Se le dieron
 de comer **600 estrategias sintéticas con ventaja conocida por diseño** (6 valores de `p` × 100

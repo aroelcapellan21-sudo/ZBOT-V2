@@ -37,37 +37,10 @@ Lo siguiente que se toma es el **ítem 1**.
 
 ## Cola de investigación, en orden
 
-- [ ] **1 · L11 — Pruebas 2 y 3 de la evaluación del laboratorio** *(ex Ítem 13)* — 🟡 **a un tercio**
+- [x] **1 · L11 — evaluación del laboratorio** *(ex Ítem 13)* — ✅ **CERRADO el 09-sep. 🔴 el
+  laboratorio mide bien y elige mal.** Las tres pruebas están en "Ya cerrado".
 
-  La **Prueba 1 (engaño controlado) cerró el 09-sep** con dos puntos ciegos medidos y la
-  **Prueba 2 (cobertura de errores) cerró el 09-sep 17:40** — los tres huecos existen, ninguno
-  da vuelta la decisión de `cerrar_huerfanas()` (prueba **297**,
-  `reports/2026-09-09_L11-prueba2-cobertura-de-errores.md`). **Falta sólo la Prueba 3.**
-
-  **Prueba 2 · Cobertura de errores no probados.** Tres cosas que existen en la realidad y el
-  sandbox no modela:
-  1. **Comisión fija `0.001` para 2020-2026.** Verificar cuánto se movió la real (descuento por BNB,
-     escalones VIP, promociones de comisión cero) y cuantificar el efecto sobre lo ya registrado.
-     Con trades de $7-10 la comisión es una fracción grande del resultado.
-  2. **El sandbox siempre llena la orden.** Producción tiene `OrdenIncierta`, HTTP 5xx, rechazos por
-     NOTIONAL y caídas de API — y las caídas ocurren durante los crashes, que es justo cuando el SL
-     tiene que ejecutar. **Un backtest que no puede fallar al salir sobreestima el SL por
-     construcción.** Medir cuánto.
-  3. **Dependencia de un solo período extremo.** Generalizar a norma lo que la etapa 1 hizo a mano
-     (8 exclusiones): recalcular cada estudio excluyendo un año/trimestre por vez y marcar los que
-     **se dan vuelta**.
-
-  **Prueba 3 · Comparación contra estándares externos.** Tabla punto por punto de qué cubre el
-  laboratorio, qué a medias y qué le falta, contra **Deflated Sharpe Ratio** (corrige por cuántas
-  pruebas se hicieron — pertinente: ~296 pruebas registradas y **ninguna corrección por prueba
-  múltiple**), **PBO/CSCV**, **Minimum Backtest Length** y el checklist de las "siete sins".
-  ⚠️ Las fórmulas se verifican contra las fuentes al ejecutar, no se citan de memoria.
-
-  Plan con criterios pre-registrados: `reports/2026-09-08_plan-evaluacion-laboratorio.md`.
-  Arnés ya construido y re-ejecutable en `~/lab_eval/` (`correr.sh`, `prueba1_engano.py`,
-  `benchmark_tonto.py`).
-
-- [ ] **2 · Revisión de los hallazgos anteriores con las herramientas nuevas** *(ex "revisión con
+- [ ] **2 · Revisión de los hallazgos anteriores con las herramientas nuevas** 🔜 **← EL QUE SIGUE** *(ex "revisión con
   herramientas nuevas" de la cola de Drive + ex "ítem de alta prioridad" de `ESTADO_ACTUAL.md` —
   **eran el mismo trabajo escrito dos veces**, unificados acá el 09-sep)*
 
@@ -124,8 +97,15 @@ Lo siguiente que se toma es el **ítem 1**.
 
   **Pospuesto el 07-sep**, no descartado: su premisa —LATERAL es la mayor parte del año, con
   movimiento comparable— quedó **confirmada en 5 de 6 años** (hasta 2,93× más velas que ALCISTA en
-  2022, con rango 0,62-0,93× y mediana 0,89×). Se mide cuando el laboratorio esté blindado; con
-  L1-L10 cerrados y L11 en curso, ya está cerca de su turno.
+  2022, con rango 0,62-0,93× y mediana 0,89×). Se medía "cuando el laboratorio esté blindado";
+  **con L1-L11 cerrados esa condición ya se cumplió** — con la salvedad que dejó el L11: el
+  laboratorio mide bien pero no sirve para elegir la mejor de muchas variantes.
+
+- [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*
+  Las 5 monedas del bot se eligieron entre las que **hoy** están arriba, y nunca se testeó
+  sobre monedas que se hundieron o salieron del top. La "segunda lista" (XRP, LINK, UNI,
+  NEAR, ADA) arrastra el mismo sesgo. Es una de las **dos sins graves** que quedaron abiertas.
+  Sin número todavía: nadie sabe cuánto infla los resultados registrados.
 
 - [ ] **5 · ¿El cupo `MAX_OP_TOTAL` 1→2 depende de un año bueno?** *(ex Ítem 3)* — verificar por año
   antes de aplicarlo. ⚠️ Ojo con lo ya medido: `MAX_TRADES_MISMA_DIR=2` topa el bot en 2 posiciones
@@ -221,9 +201,115 @@ laboratorio no era lo bastante sólido para sostener conclusiones nuevas.
 - [x] **L9 · mypy** — ✅ 07-sep: acotado a los 16 módulos de producción
 - [x] **L10 · hypothesis** — ✅ 07-sep: 12 property-based sobre el camino del dinero.
   ⚠️ Se había marcado cerrado con la librería sólo **instalada** y sin un test escrito; se corrigió.
-- [ ] **L11 · ¿es fuerte el laboratorio?** — 🟡 **1 de 3 pruebas.** Es el **ítem 1** de la cola.
+- [x] **L11 · ¿es fuerte el laboratorio?** — ✅ **CERRADO 09-sep, 3 de 3 pruebas.** 🔴 mide bien y elige mal.
 
 ## Ya cerrado
+
+- [x] **12 · Carrera entre `watchdog.py` e `iniciar_bots.sh` + watchdog ciego** *(ex Ítem 12)*
+  — ✅ **RESUELTO el 08-sep 01:11, commit `3592e89`, pusheado y verificado en vivo.**
+  *(Migrado a esta sección el 09-sep: en la unificación de la cola había quedado en el
+  bloque de ítems abiertos, con su `[x]` pero fuera de "Ya cerrado". Texto original
+  completo, tal como estaba en `~/zbot-drive/cola/zbot-cola.md.bak_pre_unificacion`:)*
+
+  - [x] **Ítem 12 · INFRAESTRUCTURA — ✅ RESUELTO 08-sep 01:11 (era 🔴 URGENTE)** —
+    Arreglar la carrera entre `watchdog.py` (cron `*/5`) e `iniciar_bots.sh` (`@reboot sleep 30`) al
+    levantar `v2_main`. **No es urgente y no bloquea nada**: se resuelve en cualquier hueco, sin
+    esperar al cierre de `cerrar_huerfanas()` ni al resto de la cola.
+
+    **Qué pasó el 08-sep** (corte de luz, arranque del sistema 00:29):
+    - `00:30:02` el watchdog ve el bot caído y lo relanza **suelto, sin screen**.
+    - `00:30:07` `iniciar_bots.sh` llega a `v2_main`, encuentra el proceso vivo y lo saltea:
+      `[SKIP] v2_main ya está corriendo (proceso vivo)` — la screen nunca se crea.
+    - Resultado: bot vivo y en REAL, pero **huérfano** (`ppid=1`), `screen -r v2_main` no existe y
+      `monitor_screens.py` lo daba por caído (`❌ Caídos: ['v2_main']`). Corregido a mano a las 00:40
+      con 0 posiciones abiertas.
+
+    **Por qué no es urgente:** la garantía de modo REAL **no se perdió** — el watchdog también lee
+    `~/.bot_real_confirmado` y exporta `BOT_REAL_CONFIRMADO=true` (verificado en
+    `/proc/<pid>/environ` del proceso que él levantó). El daño es de observabilidad, no de dinero.
+
+    **Lo que sí se pierde mientras dura:** `reiniciar_bot()` lanza con
+    `stdout=DEVNULL, stderr=DEVNULL` (`watchdog.py:69-74`), así que el log del bot **no queda en
+    ningún lado** — ni en una screen ni en un archivo. Si algo falla en ese período, no hay rastro.
+
+    **Opciones a evaluar cuando llegue el turno** (medir antes de elegir, ninguna aplicada):
+    1. Que el watchdog espere unos segundos tras un reinicio antes de actuar (p. ej. no hacer nada si
+       el `uptime` es menor a ~90 s, dejando que `iniciar_bots.sh` haga su trabajo primero).
+    2. Que los dos se coordinen con un archivo compartido de "ya está levantando el bot"
+       (`flock`, como ya hace `subir_drive.sh`) antes de intentar levantarlo.
+    3. Que el watchdog levante **dentro de screen**, igual que `iniciar_bots.sh`. No resuelve la
+       carrera, pero la vuelve inofensiva: gane quien gane, el bot queda observable.
+
+    ### 🔴 CONFIRMADO el 08-sep 01:00 — el watchdog está ciego (esto es lo urgente del ítem)
+
+    Lo que estaba anotado como hipótesis **se verificó y es cierto**. `bot_esta_vivo()`
+    (`watchdog.py:52-60`) usa `pgrep -f main.py`, que matchea por substring y cruza proyectos:
+    el `main.py` de `~/motor-confluencia` cuenta como "el bot".
+
+    Verificación sin tocar producción (el namespace de PIDs sin privilegios está bloqueado):
+    se emuló `pgrep -f "main.py"` sobre `/proc`, se **validó la emulación contra el `pgrep` real**
+    en el mismo instante (`emulacion == pgrep real: True`, mismos 4 PIDs) y recién entonces se
+    aplicó el contrafactual quitando los PIDs de `v2_main`:
+
+    ```
+    Lo que SEGUIRÍA matcheando:  3452 (screen motor_confluencia) · 3454 (~/motor-confluencia)
+    => pgrep returncode 0  =>  bot_esta_vivo() devolvería True  con v2_main MUERTO
+    ```
+
+    **Por qué es urgente:**
+    - Es la **única recuperación automática** que existe. `monitor_screens.py` corre cada 60 s pero
+      sólo escribe `estado_screens.json`: no manda Telegram ni reinicia nada.
+    - El **SL del bot es lógico, no una orden en Binance**: si `v2_main` muere con una posición
+      abierta, queda **sin stop** hasta que alguien lo note a ojo.
+    - El fallo es **silencioso por construcción**: el log escribe `Bot vivo. Todo OK.` igual.
+    - `motor_confluencia` entró a `iniciar_bots.sh` el **18-ago** (`4305772`), así que está vivo
+      siempre que lo esté la máquina.
+
+    **Lo que NO se afirma:** no hay evidencia de que ya haya fallado en silencio — ese caso no deja
+    rastro. Las 18 detecciones de `memoria/watchdog.log` prueban que detecta *cuando no hay otro
+    `main.py` vivo*, no que detecte siempre.
+
+    **No se tocó código.** El arreglo (acotar el patrón a este proyecto verificando el `cwd` del PID,
+    o usar un pidfile) es un cambio a un módulo de producción: va con diff a aprobación de Ariel,
+    junto con las 3 opciones de la carrera de arriba, en una sola pasada por `watchdog.py`.
+
+    Reporte: `reports/2026-09-08_watchdog-ciego-pgrep-cruzado.md`
+    **APLICADO el 08-sep 01:11** (commit `3592e89`, pusheado) tras aprobación de Ariel: fix del
+    `pgrep` por `cwd` verificado contra `/proc` (no pidfile) + opciones 1 y 3 de la carrera;
+    la opción 2 (`flock`) descartada con motivo. **Verificado en vivo, no en emulación:** con
+    0 posiciones abiertas, `motor_confluencia` vivo y `v2_main` matado a propósito, el `pgrep`
+    viejo seguía devolviendo returncode 0 ("bot vivo") mientras el bot estaba muerto; el código
+    nuevo dio `bot_esta_vivo(): False`, lo reinició **dentro de la screen** `v2_main` (PID 5530,
+    `ppid` = la screen), con `BOT_REAL_CONFIRMADO=true`, y `monitor_screens.py` quedó en
+    `27 activos / 0 caídos`.
+    Queda abierto, anotado y sin tocar: `proceso_activo()` de `iniciar_bots.sh` compara `cwd`
+    pero no exige que el proceso sea un python (mismo agujero, otro archivo), y los `except:`
+    desnudos de `cargar_token()`/`enviar_telegram()`.
+    `reports/2026-09-08_propuesta-fix-watchdog.md`
+
+
+- [x] **L11 · Pruebas 2 y 3 — el laboratorio queda CERRADO (09-sep) — 🔴 mide bien y elige mal.**
+  - **Prueba 2 · cobertura de errores** (prueba 297). Los tres huecos existen, ninguno da vuelta la
+    decisión de hoy. **La comisión no es fija:** 0,0822 % efectiva real sobre 162 trades de la
+    cuenta contra el 0,1 % del sandbox — sobreestima **18 %**, y la ventaja de quitar
+    `cerrar_huerfanas()` baja de +$31,02 a **+$26,51** sin darse vuelta. **El sandbox siempre llena
+    la orden:** en producción falla el **92 %** de los intentos de apertura (473 de 514 filas
+    `ANULADA`) **y el motivo no queda registrado en ningún lado**. **Jackknife:** 20 de 126 estudios
+    (15,9 %) cambian de signo al quitar un año; 2021 los da vuelta en 12 de 20.
+  - **Prueba 3 · estándares externos** (prueba 298). **DSR: 0 de 121 estudios** superan la
+    corrección por prueba múltiple (93 de 121 pasan el PSR contra cero; el SR máximo esperado por
+    azar con 297 ensayos es +0,2188 por trade y el mejor DSR del proyecto es 0,726). **PBO por
+    CSCV: 48,6 %** sobre 108 meses × 11 configuraciones — elegir la mejor del torneo es casi una
+    moneda al aire, y **coincide con el ρ +0,010 de L3 por otra vía**. **MinTRL:** 19,1 % de los
+    estudios no tienen largo suficiente ni contra cero. **Siete sins:** 3 ✅, 2 🟡, 2 🔴 — quedan
+    abiertas *survivorship* (ver ítem 4b) y *overfitting*, ya cuantificada.
+  - ⚠️ **Las fórmulas se verificaron contra las fuentes al ejecutar, y hizo falta:** el extractor
+    del PDF devolvió el signo de la asimetría cambiado y sin el cuadrado en el término de curtosis.
+  - **Por qué la decisión de hoy sigue en pie:** `cerrar_huerfanas()` no fue elegir entre 297
+    candidatos, fue una comparación **pareada** entre dos ramas con la misma lógica y los mismos
+    datos. Lo que estas pruebas invalidan es la **selección** del mejor entre muchos.
+  - Reportes: `reports/2026-09-09_L11-prueba2-cobertura-de-errores.md`,
+    `reports/2026-09-09_L11-prueba3-estandares-externos.md`
 
 - [x] **`cerrar_huerfanas()` · etapa 2 y decisión final (09-sep) — 🟢 APLICADO, commit `ade1ae0`.**
   Sobre **2020-09-22 → 2026-09-08** (783.358 pasos de 4 min, las dos ramas completas):

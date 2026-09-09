@@ -1,0 +1,481 @@
+# Cola de trabajo — Z-Bot Padre v2
+
+**Última actualización: 2026-09-09 (Claude Code)**
+
+> ⚠️ **FUENTE DE VERDAD ÚNICA.** Este archivo vive en el repo (`~/bot-padre-v2/COLA.md`), se
+> versiona en git y se sincroniza solo a Drive junto con `reports/`.
+>
+> **Hasta el 09-sep había DOS colas con numeraciones distintas y sin un solo ítem en común:**
+> `~/zbot-drive/cola/zbot-cola.md` (ítems 2-14) y la sección "COLA DE INVESTIGACIÓN" de
+> `ESTADO_ACTUAL.md` (ítems 1-10). Sumaban 20 ítems abiertos que nadie veía juntos, y el trabajo
+> de "revisar los hallazgos anteriores" estaba escrito **dos veces**. Decisión de Ariel el 09-sep:
+> unificar acá. Las dos colas viejas quedan apuntando a este archivo; el original de Drive se
+> conserva en `~/zbot-drive/cola/zbot-cola.md.bak_pre_unificacion`.
+>
+> **La numeración vieja se conserva entre paréntesis** (`ex Ítem 13`) porque los reportes ya
+> escritos la citan.
+
+**Regla fija:** una investigación a la vez, veredicto cerrado antes de pasar a la siguiente. Nada se
+inserta antes de lo que ya está en curso, ni siquiera si Ariel lo propone en el momento.
+✅ **Reafirmada el 09-sep**, cuando el ítem 2 podría haberse colado delante del 1 que está a un
+tercio: se respetó el orden.
+
+---
+
+## En curso
+
+**Nada.** La investigación de `cerrar_huerfanas()` —lo único que figuraba acá— se cerró y se
+**aplicó** el 09-sep (commit `ade1ae0`). Ver "Ya cerrado".
+
+Lo siguiente que se toma es el **ítem 1**.
+
+## Orden confirmado por Ariel (09-sep)
+
+> **1 (terminar Pruebas 2 y 3) → 2 → 3 (resolver la causa raíz, no sólo el síntoma) → 4 →
+> 5, 6, 7, 8, 9, 10, 11, 12**, respetando la regla de no insertar nada delante de lo que está a
+> mitad de camino.
+
+## Cola de investigación, en orden
+
+- [ ] **1 · L11 — Pruebas 2 y 3 de la evaluación del laboratorio** *(ex Ítem 13)* — 🟡 **a un tercio**
+
+  La **Prueba 1 (engaño controlado) cerró el 09-sep** con dos puntos ciegos medidos (ver "Ya
+  cerrado"). Faltan las otras dos, que son **auditorías de lectura**, no corridas del arnés:
+
+  **Prueba 2 · Cobertura de errores no probados.** Tres cosas que existen en la realidad y el
+  sandbox no modela:
+  1. **Comisión fija `0.001` para 2020-2026.** Verificar cuánto se movió la real (descuento por BNB,
+     escalones VIP, promociones de comisión cero) y cuantificar el efecto sobre lo ya registrado.
+     Con trades de $7-10 la comisión es una fracción grande del resultado.
+  2. **El sandbox siempre llena la orden.** Producción tiene `OrdenIncierta`, HTTP 5xx, rechazos por
+     NOTIONAL y caídas de API — y las caídas ocurren durante los crashes, que es justo cuando el SL
+     tiene que ejecutar. **Un backtest que no puede fallar al salir sobreestima el SL por
+     construcción.** Medir cuánto.
+  3. **Dependencia de un solo período extremo.** Generalizar a norma lo que la etapa 1 hizo a mano
+     (8 exclusiones): recalcular cada estudio excluyendo un año/trimestre por vez y marcar los que
+     **se dan vuelta**.
+
+  **Prueba 3 · Comparación contra estándares externos.** Tabla punto por punto de qué cubre el
+  laboratorio, qué a medias y qué le falta, contra **Deflated Sharpe Ratio** (corrige por cuántas
+  pruebas se hicieron — pertinente: ~296 pruebas registradas y **ninguna corrección por prueba
+  múltiple**), **PBO/CSCV**, **Minimum Backtest Length** y el checklist de las "siete sins".
+  ⚠️ Las fórmulas se verifican contra las fuentes al ejecutar, no se citan de memoria.
+
+  Plan con criterios pre-registrados: `reports/2026-09-08_plan-evaluacion-laboratorio.md`.
+  Arnés ya construido y re-ejecutable en `~/lab_eval/` (`correr.sh`, `prueba1_engano.py`,
+  `benchmark_tonto.py`).
+
+- [ ] **2 · Revisión de los hallazgos anteriores con las herramientas nuevas** *(ex "revisión con
+  herramientas nuevas" de la cola de Drive + ex "ítem de alta prioridad" de `ESTADO_ACTUAL.md` —
+  **eran el mismo trabajo escrito dos veces**, unificados acá el 09-sep)*
+
+  Revisar los **`NO_CONCLUYENTE`** archivados en `INDICE_RESULTADOS.md` y separar dos cosas que
+  hasta hoy se leían igual: los que **midieron que no hay ventaja** y los que **tenían una ventaja
+  real que el laboratorio no tenía potencia para detectar**.
+
+  El L11 midió el umbral: con ~240 trades no distingue del azar una ventaja de **+0,485 pp por
+  trade**, y detecta apenas el 17 % de las de +0,250 pp.
+
+  - **Empezar por los de MENOS trades** — son los más vulnerables: cuanto más chica la muestra, más
+    alto el umbral, así que un `NO_CONCLUYENTE` con n bajo es casi indistinguible de "no se midió".
+  - La consulta sale de `data/resultados.db`, que tiene `n` por prueba (`python3 consultar.py`), no
+    de leer el `.md` a ojo.
+  - **Reevaluar contra el azar, no contra cero** (`~/lab_eval/benchmark_tonto.py`). La vara vieja
+    ("IC 95 % > 0") aprobó 100 de 100 estrategias de ruido puro.
+  - La pregunta no es "¿dio positivo?" sino **"¿cuántos trades harían falta para que una ventaja de
+    este tamaño fuera detectable?"** — eso convierte cada caso archivado en una decisión: juntar más
+    muestra, o cerrarlo de verdad.
+  - ⚠️ **NO es permiso para resucitar hallazgos.** Un `NO_CONCLUYENTE` que vuelve a la mesa sigue
+    necesitando evidencia propia, diff y OK explícito antes de tocar nada. Lo que cambia es que ya
+    no se puede archivar uno diciendo "no hay ventaja" cuando lo que hubo fue falta de potencia.
+
+  Base: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`, prueba **296**.
+
+- [ ] **3 · Auditoría de conexiones y sincronizaciones** *(ex Ítem 14)* — 🟡 parcial
+
+  Pedido por Ariel el 08-sep. Verificar que esté sana toda conexión del proyecto que dependa del
+  sistema: GitHub, backup rsync al disco externo, sincronización a Drive, túnel de Cloudflare,
+  Telegram y API de Binance.
+
+  **Estado verificado el 09-sep 16:50** (chequeo, no la auditoría):
+
+  | Conexión | Estado |
+  |---|---|
+  | **GitHub** | 🟢 Sano. `origin/main` al día en `bd96d90` |
+  | **Backup rsync** | 🟢 **Corrió bien**: `[2026-09-09 02:03:04] === Backup OK ===`, 2,13 GB. El disco dejó de desconectarse tras la reconexión física del 08-sep |
+  | **Drive (reportes)** | 🟢 296/296 `.md`, verificación diaria 07:05 sin diferencias |
+  | **Drive (esta cola)** | 🟡 → resuelto el 09-sep al mover la cola al repo y sumarla al vigía |
+  | Túnel, Telegram, Binance | ⬜ **sin auditar** |
+
+  🎯 **Lo que Ariel pidió el 09-sep: resolver la causa raíz, no el síntoma.** El disco se arregló
+  físicamente, pero **el backup sigue sin forma de avisar si falla**: el script escribe su error en
+  `~/rsync-backup.log` y **nadie lee ese log**. Comparar con Drive, que sí tiene verificación diaria
+  automática, archivo de estado y log de verificaciones: **el backup no tiene ninguna de las tres.**
+  Esa asimetría es la razón de que una caída pueda durar 32 días, no el punto de montaje.
+
+  **Entregable:** estado de cada conexión y, para cada una, **cómo se enteraría alguien si se cae**.
+
+  **Queda abierto sin explicación** (anotado el 08-sep): la corrida del **06-sep** arrancó, resolvió
+  el montaje, empezó a copiar y **nunca escribió `Backup OK`**.
+
+- [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)*
+
+  **Pospuesto el 07-sep**, no descartado: su premisa —LATERAL es la mayor parte del año, con
+  movimiento comparable— quedó **confirmada en 5 de 6 años** (hasta 2,93× más velas que ALCISTA en
+  2022, con rango 0,62-0,93× y mediana 0,89×). Se mide cuando el laboratorio esté blindado; con
+  L1-L10 cerrados y L11 en curso, ya está cerca de su turno.
+
+- [ ] **5 · ¿El cupo `MAX_OP_TOTAL` 1→2 depende de un año bueno?** *(ex Ítem 3)* — verificar por año
+  antes de aplicarlo. ⚠️ Ojo con lo ya medido: `MAX_TRADES_MISMA_DIR=2` topa el bot en 2 posiciones
+  totales, así que subir `MAX_OP_TOTAL` solo no alcanza.
+
+- [ ] **6 · Sensibilidad del RSI en subidas fuertes** *(ex Ítem 4)* — entradas tardías tras enfriarse
+  desde arriba contra entradas normales desde abajo.
+
+- [ ] **7 · ¿El guardián de riesgo se acercó alguna vez al 10 % de drawdown?** *(ex Ítem 5)*
+  ⚠️ **Dato nuevo del 09-sep:** en simulación de 6 años lo **supera** en las dos ramas —40,5 % con
+  `cerrar_huerfanas()` y 17,7 % sin ella—. Falta la pregunta original: si el **real** se acercó.
+
+- [ ] **8 · Evaluar "Confluencia 3-Filtros"** *(ex Ítem 6, propuesta externa)* — el filtro 1
+  (volumen+calidad) es testeable en paralelo; los filtros 2 (multi-timeframe) y 3 (capital dinámico)
+  dependen del resto. Las proyecciones del documento original (65-70 % WR, +25-35 % mensual)
+  **no son referencia real**.
+
+- [ ] **9 · Por qué BNB quedó huérfano** *(ex Ítem 7)* — francotirador programado y nunca llamado,
+  mientras AVAX sí está activo. Ariel considera el patrón alcista de BNB más fiel que el de AVAX; no
+  hay veredicto de que AVAX le haya ganado: BNB simplemente nunca se conectó.
+
+- [ ] **10 · Exposición conjunta y candado de montos** *(ex Ítem 8)* — (a) medir la exposición de
+  BTC/ETH/SOL/AVAX al **mismo** movimiento de mercado, en vez de tratarlas como 4 apuestas
+  independientes (enlaza con la hipótesis de correlación 0,544 y con que caen juntas el 30 % de los
+  meses); (b) verificar que **ningún componente pueda modificar montos sin autorización**.
+
+- [ ] **11 · Cuántos movimientos fuertes hay por año y cuántos captura la estrategia** *(ex Ítem 10)*
+  — por moneda, con umbral a definir, medido con el simulador honesto, para calcular expectativa
+  real (no promesa) con capital chico y grande. Conecta con la cobertura del 15-41 % del año: la
+  ganancia probablemente se concentra en pocos eventos fuertes, no en operar seguido.
+
+- [ ] **12 · Evaluar motor-confluencia sobre su historial completo** *(ex Ítem 11)* — proyecto
+  separado, capital simulado, multi-mercado. No sólo el dashboard reciente de 11 operaciones (9 % de
+  win rate): calcular WR y PnL acumulado reales, y revisar si su "score de confluencia" comparte el
+  problema ya confirmado en el radar de zbot (puntaje combinado sin valor predictivo, n=432.156).
+
+## Mantenimiento y deuda técnica
+
+*(Migrados el 09-sep desde la sección "COLA DE INVESTIGACIÓN" de `ESTADO_ACTUAL.md`, que tenía
+numeración propia. **No bloquean la cola de investigación** y no compiten por su orden: se toman en
+huecos.)*
+
+- [ ] **M1 · Polvo inmovilizado** — 🔴 **ya no es teórico: ~$5 atrapados hoy**, medidos el 09-sep
+  (BTC concentra $4,77, a ~$0,79 por vuelta = 8,2 % del ticket). Se barren sólo con
+  `/reconciliar confirmar`, que **vende dinero real** y es manual por diseño: decisión de Ariel.
+- [ ] **M2 · `memoria_propia.json` no se actualiza** — causa ligada a `FASE_CAMBIO`, sin corregir.
+- [ ] **M3 · SOL LATERAL, filtro de volatilidad k=2,0** — "prometedor no confirmado": el mejor
+  resultado de la línea de volatilidad (PF 1,768, Sharpe 1,704, +$3,53) pero depende de **una sola
+  ventana de 6 meses**. Re-testear cuando haya más historia de SOL.
+- [ ] **M4 · Combo N** (BTC+ETH+AVAX-BAJISTA, Sharpe 3,96) — mejor que el combo O en backtest, pero
+  **requiere Futuros**. No descartado: fuera de alcance sin esa cuenta.
+- [ ] **M5 · Bajistas en Futuros** — el torneo confirma señal real (grupo BAJISTA PF 1,074), pero
+  activarlos exige cuenta de Futuros **y reescribir `ejecutor.py:cerrar_posicion`**. No es tarea de
+  backtest.
+- [ ] **M6 · `resumen_capital.py` con rutas rotas** — tras mover `~/bot-padre-v4/v5/v6` a
+  `~/_archivo_bots_anteriores/`. Usado por `/consejero`; no se cae (tiene fallback) pero muestra
+  valores por defecto. Decidir: corregir las 3 rutas o dejarlo.
+- [ ] **M7 · 5 archivos en "zona gris"** del home sin clasificar (`backup_sd.sh`,
+  `package-lock.json`, `intel_noticias/`, `respuesta22.txt`, `setup-dell.sh`/`backup_dell/`) —
+  esperan que Ariel confirme qué son.
+- [ ] **M8 · Corrección de texto en `INVESTIGACION.md`** — el hallazgo "horario×calidad" quedó
+  invalidado al corregir el bug de timestamps (23-ago) y el texto publicado no se actualizó.
+- [ ] **M9 · Trailing/BE: 0 cierres reales en 9 años** — documentado y **decidido no tocar** (dos
+  mediciones independientes dicen que arreglarlo empeora). Queda como deuda conocida, no como TODO.
+- [ ] **M10 · Fase B de correlación — rediseño** — con la ventana pedida, 0/40 combinaciones llegan
+  a n≥30 (máx. 7). Un diseño distinto podría generar muestra, pero es otra pregunta.
+
+## ✅ BLOQUE DE LABORATORIO — COMPLETO (L1–L10, cerrado el 07-sep)
+
+Fue **antes** que todo lo demás. Motivo: 5 artefactos de ventana corta en una jornada; el
+laboratorio no era lo bastante sólido para sostener conclusiones nuevas.
+
+- [x] **L1 · Integridad de datos históricos** — ✅ 07-sep (ver "Ya cerrado")
+- [x] **L2 · Reproducibilidad** — ✅ 07-sep: 4/4 tests + huella de datos
+- [x] **L3 · Validación fuera de muestra** — ✅ 07-sep (3 niveles)
+- [x] **L4 · Monte Carlo** — ✅ 07-sep (el barajado ingenuo miente)
+- [x] **L5 · Benchmark tonto** — ✅ 07-sep (la entrada SÍ le gana al azar). **Reconstruido como
+  script re-ejecutable el 09-sep**: `~/lab_eval/benchmark_tonto.py`
+- [x] **L6 · pytest** — ✅ 07-sep: 31 tests (43 con los de L10), todos pasan
+- [x] **L7 · GitHub Actions** — ✅ 07-sep: CI de 2 niveles, verde
+- [x] **L8 · ruff** — ✅ 07-sep: encontró 3 bugs reales, los 3 corregidos
+- [x] **L9 · mypy** — ✅ 07-sep: acotado a los 16 módulos de producción
+- [x] **L10 · hypothesis** — ✅ 07-sep: 12 property-based sobre el camino del dinero.
+  ⚠️ Se había marcado cerrado con la librería sólo **instalada** y sin un test escrito; se corrigió.
+- [ ] **L11 · ¿es fuerte el laboratorio?** — 🟡 **1 de 3 pruebas.** Es el **ítem 1** de la cola.
+
+## Ya cerrado
+
+- [x] **`cerrar_huerfanas()` · etapa 2 y decisión final (09-sep) — 🟢 APLICADO, commit `ade1ae0`.**
+  Sobre **2020-09-22 → 2026-09-08** (783.358 pasos de 4 min, las dos ramas completas):
+  **CON** 2.675 trades, WR 35,3 %, PF 1,015, PnL **+$3,77**, maxDD $14,91 (40,5 %) ·
+  **SIN** 1.106 trades, WR 44,1 %, PF 1,164, PnL **+$34,79**, maxDD $6,52 (17,7 %).
+  - **Quitarla gana +$31,02** y es el **primer candidato de la serie que no se cae al sacudirlo**:
+    **7 de 7 años** calendario y **4 de 4 monedas** (BTC cambia de signo, −$7,03 → +$9,32).
+    Bootstrap por bloque mensual (65 meses): **IC 95 % [+17,06 · +45,13], no cruza cero**;
+    test de signo **42/61, p = 0,0044**; sin los 5 mejores meses sigue **+$19,94**.
+  - **Descomposición exacta:** +$17,07 de **1.801 reaperturas que sólo existen en CON**, +$14,31 de
+    307 trades con la misma entrada y salida distinta, −$0,36 de 232 que sólo existen en SIN.
+  - **Las posiciones no quedaron sin guardián:** `_proteger_otras_fases()` (commit `f9d6c2c`, 30-ago)
+    ya cubría eso en los 4 directores, y por fase **LOCAL**, 5,2× más frecuente que la global.
+  - ⚠️ Asteriscos registrados: el bot opera **menos de la mitad** (1.108 aperturas contra 2.677) ·
+    a escala actual son **~$0,43/mes** · **ambas ramas superan el 10 % del guardián** · las huellas
+    de datos difieren en 4 velas al final de 6 años.
+  - `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `CLAUDE.md`, `data/resultados.db` (pruebas **293** y
+    **294**). Reporte: `reports/2026-09-09_huerfanas-etapa2-6anos.md` · celular:
+    https://claude.ai/code/artifact/1b6ac240-8b94-4e0d-966e-7d57b76c28f1
+
+- [x] **Impacto REALIZADO de `cerrar_huerfanas()` — las primeras 31 filas `FASE_CAMBIO` (09-sep).**
+  `CLAUDE.md` decía "0 filas, nunca llegó a dispararse": **quedó desactualizado**. Se disparó **31
+  veces entre el 3 y el 7-sep** (16 AVAX, 8 BTC, 7 SOL), justo lo que ese archivo anticipaba al
+  pasar `MONTO_FIJO` a $7/$10.
+  - **El costo real no era el que parecía:** efecto sobre la caja −$5,0973, pero **+$4,9754 es polvo
+    inmovilizado** y sólo **−$0,1219 pérdida efectiva por precio**. Un primer cálculo las mezclaba y
+    daba −$0,81 por trade de BTC en 12 minutos, **imposible por precio**.
+  - **BTC concentra el polvo:** ~$0,79 por vuelta = **8,2 % del ticket** (compra 0,00011988 y el
+    `stepSize` de 0,00001 deja 0,00000988 sin vender). Su polvo pasó de 0 a ~$5,5 en cuatro días:
+    **~13 % del capital**. El mecanismo no crea el polvo —todo cierre trunca— pero **multiplicaba
+    los cierres**: 31 en 5 días, mediana de 20 minutos.
+  - 7 filas no tienen `COMPRA` con ese timestamp y **no se estimaron**. Prueba **295**.
+    Reporte: `reports/2026-09-09_impacto-realizado-cerrar-huerfanas.md`
+
+- [x] **L11 · Prueba 1 — engaño controlado (09-sep) — 🔴 dos puntos ciegos medidos.**
+  600 estrategias sintéticas con ventaja conocida por diseño (6 valores de `p` × 100 semillas, ~240
+  trades cada una, BTC 2020-2026), con criterios **pre-registrados el 08-sep**.
+  - 🔴 **INDULGENCIA:** el criterio *"IC 95 % del total no cruza cero"* —el bootstrap citado en todo
+    `INDICE_RESULTADOS.md`— **aprobó 100 de 100 estrategias de ruido puro**. Causa: entrar al azar
+    rinde **+1,5517 % por trade** por deriva del mercado, así que toda vara contra **cero** aprueba
+    al ruido. **No invalida** su uso comparativo (A vs B); **sí** invalida leer "IC 95 % > 0" como
+    "la estrategia sirve".
+  - 🔴 **FALTA DE POTENCIA:** con la vara correcta los falsos positivos son **0/100 = 0,0 %** ✅,
+    pero la detección es 1 % (p=0,505), 2 % (0,51), 5 % (0,52), **17 % (0,55)** y **40 % (0,60)**.
+    **Ninguna** se detecta en ≥50 % de las semillas. **Umbral: con ~240 trades no distingue del azar
+    una ventaja de +0,485 pp por trade** (~$0,034 en un ticket de $7).
+  - 📌 **Cómo cambia la lectura de todo el índice:** la mayoría de los `NO_CONCLUYENTE` no dicen "no
+    hay ventaja", dicen **"el instrumento no la ve a esta escala"**. De ahí sale el **ítem 2**.
+  - Contraste del mismo día: la etapa 2 de `cerrar_huerfanas()` está **muy por encima** del umbral,
+    y por eso resiste.
+  - **Control:** `monte_carlo.py` marcó "el drawdown depende del orden" en estrategias de ruido puro
+    (falsos positivos también ahí); `validar_fuera_muestra.py` dio ρ 0,063 y P(>0) 81,4 %, correcto.
+  - Arnés nuevo y re-ejecutable en `~/lab_eval/`. Prueba **296**.
+    Reporte: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`
+
+- [x] **L7–L10 · CI, ruff, mypy, hypothesis (07-sep) — ✅ y encontraron 3 bugs reales.**
+  - **CI de dos niveles.** *Bloquea:* `pytest` (31/31) y `ruff --select E9,F821,F811`. *Avisa sin
+    frenar:* ruff completo (342 hallazgos, **277 son f-strings cosméticos**) y mypy (36 errores).
+    La filosofía está escrita en el propio workflow: **un CI que nace en rojo se aprende a ignorar.**
+  - 🐛 **`ejecutor.py:35`, en el camino del dinero** — el fallback de avisos referenciaba `_e`, la
+    variable del `except`, que **Python 3 borra al salir del bloque**. Crasheaba con `NameError` la
+    primera vez que se usaba, justo cuando fallaba Telegram. **Reproducido antes de corregir.**
+  - 🐛 `periodista_independiente.py` importaba `os` dos veces.
+  - 🐛 `sistema_c/tests_sistema_c.py:329` usaba `ets_ms` sin inicializar — falso positivo en la
+    práctica (se asigna antes de leerse), hecho explícito igual.
+  - **Tras los 3 fixes el CI queda verde.** `mypy` acotado a los **16 módulos de producción**: los
+    298 archivos chocan con nombres de módulo duplicados y tipar scripts de un solo uso no aporta.
+  - `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `data/resultados.db` (prueba id 290).
+
+- [x] **L6 · pytest (07-sep) — ✅ 31 tests, 31 pasan.**
+  - **21 sobre `ejecutor.py`**, y cada uno tiene detrás un incidente real: `_truncar_cantidad` (si
+    redondea hacia arriba → rechazo −2010 y posición ABIERTA sin stop; incluye el caso
+    `0.29*100 = 28.999999999999996` que motivó usar `Decimal`), `_formatear_qty` (notación científica
+    → error −1100, **pasa siempre con BTC**: $5 a ~$80.000 da qty 6,25e-05), `_extraer_fill` (restar
+    la comisión en el activo correcto según compra o venta).
+  - **10 invariantes de `auditoria.csv` sobre el archivo REAL de producción**: cabecera exacta, ≥7
+    columnas, estados y acciones de conjunto cerrado, timestamps ordenados, ABIERTA con qty, ANULADA
+    sin qty, sin duplicados de symbol+timestamp. **Todos pasan hoy** — los datos de producción
+    cumplen los invariantes.
+  - Entorno: venv `.venv-lab` (el pip del sistema está bloqueado por PEP 668). Config en
+    `pyproject.toml`, con `ruff` y `mypy` ya configurados en modo permisivo para L8/L9.
+
+- [x] **L5 · Benchmark tonto (07-sep) — 🟢 la entrada SÍ aporta. Primera buena noticia del bloque.**
+  - **Entradas al azar**, mismo TP/SL y misma cantidad de trades que el bot: **supera al azar en 4 de
+    4 monedas** — BTC +199,1 % vs +36,6 % (**P 95,0 %**), ETH +269,3 % vs −43,2 % (**100 %**), SOL
+    +80,9 % vs −108,9 % (**97,5 %**), AVAX +146,5 % vs −117,2 % (**100 %**). Los 12 gates, el RSI y
+    las EMAs **seleccionan algo real**.
+  - **La referencia 3 (moneda al aire) es la misma prueba que la 2** — tirar una moneda con la
+    frecuencia observada *es* elegir al azar. Se reportan juntas.
+  - **Buy & hold:** retornos enormes (BTC +1.426 %, BNB +36.535 %) pero con **caídas del 84 al 97 %**
+    y entre 5 y 8 años acumulados bajo el −20 %.
+  - **Comprado sólo en ALCISTA, sin ningún filtro: le gana a buy & hold en 4 de 5 monedas con la
+    mitad del drawdown.** BTC +2.837 % vs +1.426 % (DD −46,5 % vs −83,9 %); **AVAX +10.826 % vs
+    +89 %**.
+  - ⚠️ La primera versión daba **+22.900.366 %** por un **look-ahead** (decidía la fase con el cierre
+    de la vela *i* y cobraba el retorno de esa misma vela). Corregido a decidir con velas cerradas
+    hasta *i−1*. **Segundo error propio atrapado hoy antes de registrarlo** (el otro fue el Monte
+    Carlo ingenuo de L4).
+  - 📌 **El cuadro que arman L3+L4+L5:** la entrada aporta (L5) · su magnitud está bien medida (L4) ·
+    **cuál variante es la mejor, no se puede saber** (L3) · sólo opera el 15–41 % del año (2b/2c) ·
+    y **la fase sola ya le gana a buy & hold** (L5). Lectura sugerida, no veredicto: el valor parece
+    estar más en **estar dentro en el régimen correcto** que en afinar los gates.
+  - `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `data/resultados.db` (prueba id 288).
+    Reporte: `reports/2026-09-07_L5-benchmark-tonto.md`
+
+- [x] **L4 · Monte Carlo (07-sep) — 🟡 el hallazgo es metodológico: el barajado ingenuo miente.**
+  - **Casi queda registrada una falsa alarma.** Barajando **trade a trade**, 41 de 108 estudios daban
+    el drawdown observado bajo el percentil 5 — "el riesgo real es 1,70× mayor de lo medido", y 2,56×
+    en el peor 5 %.
+  - **Barajando por bloques de 20 trades quedan 14.** El barajado libre destruye la estructura
+    temporal y genera secuencias de pérdidas que la estrategia real nunca produjo. **Dos tercios de
+    la alarma eran artefacto del método.** El script quedó con bloques de 20 por defecto.
+  - **También se descartó una explicación propia:** se propuso que ganadoras y perdedoras alternan
+    más que el azar (autocorrelación −0,084 en un BTC), pero medida en los 108 la mediana es
+    **+0,009** y es negativa en sólo el 46 %. Cierta en el caso mirado primero, **falsa en general**.
+  - **Lo que queda:** 14 de 108 (13 %) con DD bajo el percentil 5 usando bloques — más que el ~5 %
+    esperable, pero acotado y con estimación gruesa.
+  - **Bootstrap:** en los estudios grandes el **signo del resultado es robusto** (P(>0) ≈ 100 %,
+    IC 95 % enteramente positivos, cero cruzando el cero entre los 10 mayores).
+  - 📌 **Contraste con L3, y es el punto: cuánto rinde una configuración está bien medido; cuál es la
+    mejor, no.** L4 confirma la primera mitad; L3 había demolido la segunda.
+  - ⚠️ **Unidades:** los DD están en puntos porcentuales sumados por trade, **no** en % de la cuenta.
+    30 puntos con $7 por trade son **$2,10 ≈ 5,7 %** de $36,86.
+  - Entregable: `laboratorio/monte_carlo.py` (shuffle por bloques + bootstrap, exit code).
+    `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `data/resultados.db` (prueba id 287).
+    Reporte: `reports/2026-09-07_L4-monte-carlo.md`
+
+- [x] **L3 (parte 2) · El walk-forward confirma: elegir el mejor NO le gana al azar (07-sep) — 🔴.**
+  Diseño: elegir la mejor combinación **con los datos hasta el mes N**, medir el mes **N+1**, correr
+  la ventana y repetir. Contra elegir **al azar** y contra el **techo** (elegir con el futuro).
+  - Con 24 meses de historia: ventaja **+64,64 %**, pero **IC 95 % [−101,07, +247,09]** y
+    **P(>0) = 77,4 %** — bajo la vara con que este proyecto rechazó un cambio el 02-sep (P = 83 %).
+  - **La sensibilidad lo da vuelta:** cuanta **más** historia se exige, **menos** ventaja hay
+    (+67,41 % con 12 m → +26,72 % con 48 m). Y **excluyendo los meses en que la elegida no operó**
+    —la comparación justa— cae de **+30,37 %** a **−24,78 %**, con **P(>0) = 36,4 %**.
+  - **Techo:** elegir con el futuro daría **+1.334,77 %**. El método captura **10,7 %**.
+  - 🔴 **TERCERA VÍA INDEPENDIENTE con la misma conclusión:** bootstrap del Ítem 2 (7 IC 95 %
+    cruzando el cero) · estabilidad del ranking entre años (ρ +0,010) · este walk-forward.
+    **Ya es un patrón sobre el método de selección, no una coincidencia.**
+  - **Regla que queda:** toda configuración que se proponga aplicar debe demostrar que **gana fuera
+    de la ventana donde se la eligió** y que **le gana al azar**. Se verifica con
+    `laboratorio/validar_fuera_muestra.py` (3 niveles, exit code para CI).
+  - `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `data/resultados.db` (prueba id 286).
+- [x] **L3 (parte 1) · El ranking del torneo NO se sostiene entre años (07-sep) — 🔴.**
+  Partiendo los **2.790 trades** del torneo ya guardados en `resultados.db` por año, **sin correr
+  nada nuevo**:
+  - **ρ medio del orden entre años = +0,010** (21 pares) — indistinguible del azar.
+  - El mejor global (`avax_alcista`) **gana 1 de 7 años**; queda 8º, 8º y 9º en tres de ellos.
+  - **Controlado por moneda** (comparando sólo fases dentro de la misma, para descartar que sea "qué
+    moneda se movió ese año"): **ρ −0,058** (103 pares). **La objeción no salva el resultado.** Sólo
+    AVAX muestra algo de señal (ρ +0,233, gana 4/6).
+  - **Consecuencia:** correr todas las combinaciones sobre toda la historia y quedarse con la mejor
+    **selecciona ruido**. Las mediciones siguen valiendo; **la conclusión de que una sea "la mejor",
+    no**.
+  - Coincide con el bootstrap del Ítem 2 (7 IC 95 % cruzando el cero): **dos métodos independientes,
+    la misma conclusión**.
+  - ⚠️ **El torneo dejó de estar etiquetado como "REFERENCIA PRINCIPAL"** en `INDICE_RESULTADOS.md`.
+  - El mismo test sobre los 8 escenarios del Ítem 2 da ρ +0,008, pero **no se usa como evidencia**:
+    la mediana es de 12 trades por mes y escenario, muestra demasiado chica.
+  - `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `data/resultados.db` (prueba id 285).
+    Reporte: `reports/2026-09-07_L3-validacion-fuera-de-muestra.md`
+
+- [x] **L1 · Integridad de datos históricos (07-sep) — 🔧 APLICADO.** Los datos estaban bien; las
+  etiquetas del backup 4h, no: **toda su columna de tiempo estaba corrida −4 h**. Detectado cruzando
+  dos fuentes independientes (los `data_1m` agregados contra el backup): diferían en el 98,5–99,2 %
+  de las velas, y `backup[t] == 1m[t+4h]` con **mediana 0,000000 % y 100 % de velas iguales**.
+  - **Corregido en la fuente**: 13 CSV +4 h por fila, respaldo y marca anti-doble-aplicación.
+    Verificado después: las dos fuentes coinciden al **100 %**.
+  - **Por qué en la fuente y no con una bandera:** de los **58 `.py`** que leen ese backup, **35 no
+    corregían nada** y **9 sólo ajustaban el índice de inicio** (ventana bien, horas mal por dentro).
+    **Ninguno tenía los timestamps correctos.**
+  - Los `data_1m` son **exactos** (48/48 velas de muestra idénticas a Binance; 15,8 M de velas con
+    OHLC coherente). Huecos: **20.153 min = 0,097 %**, con 0,41–0,43 % de las ventanas del torneo,
+    los 12 gates y TP/SL, y **cero** en los 8 escenarios del Ítem 2. **No se rellenan**, por decisión.
+  - Decisiones ejecutadas: BNB 1m crudo descargado · desfase corregido en la fuente · huecos intactos.
+  - `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md`, `data/resultados.db` (prueba id 283), commit `e97233a`.
+    Reporte: `reports/2026-09-07_L1-integridad-datos-historicos.md`
+- [x] **L2 · Reproducibilidad — CERRADO 07-sep: 4/4 tests + huella de datos.**
+  `verificar_reproducibilidad.py` (reutilizable) corre el mismo tramo cambiando una cosa por vez:
+  **A** misma corrida dos veces · **B** distinto `PYTHONHASHSEED` · **C** distinto `--tmpdir` ·
+  **D** la bandera obsoleta sigue siendo no-op. **Los cuatro pasan.**
+  - El test B era el que valía: el orden de `SYMS` **sí** cambia con la semilla de hash
+    (`set(MONEDAS) | set(MONEDAS_VOTO)`), pero **el resultado no depende de eso**. Medido, no razonado.
+  - ⚠️ **El asterisco, ya resuelto:** los tests prueban reproducibilidad *el mismo día con los
+    mismos datos*, no a lo largo del tiempo. Se cerró agregando una **huella de datos** a cada
+    resultado (velas y rango por moneda + **md5 de los 5 `.npy`**, ~2,7 s una vez al arranque). Ahora
+    dos corridas que difieren se distinguen entre "cambió el simulador" y "cambiaron los datos".
+  - Entregables en el repo: `laboratorio/verificar_datos.py` y
+    `laboratorio/verificar_reproducibilidad.py`, ambos con exit code para CI.
+
+- [x] **Ítem 2b — por qué la fase cambia cada 8h + cobertura real (07-sep) — 🟡 PROMETEDOR.**
+  - **Disparadores de fase:** `cambio_7d` **55,1%** de los cruces que cambian la fase, `cambio_30d`
+    **31,6%**, `precio vs EMA200` **13,3%**. Una histéresis sobre 7 días cubre la mitad; para el 87%
+    hay que aplicarla también al de 30 días.
+  - **Las 5 monedas oscilan cada 6–10 h** (AVAX 6,0h · BNB 7,2h · BTC 8,6h · ETH 9,5h · SOL 10,6h).
+    El voto global no crea el ruido: agrega cinco señales que ya son ruido. **672 cambios de fase
+    global en 2026**, uno cada 8,9 h.
+  - **Cobertura real:** el bot no puede operar entre el **73% y el 85% del año**. AVAX opera con
+    dinero real y tiene sólo **37 días alcistas de 249**.
+  - **El bot opera en la fase más quieta de las tres.** BAJISTA tiene 40% más rango y 46% más
+    volumen; LATERAL 2,6× más velas con 7% menos de rango.
+  - ⚠️ **ALCANCE de lo anterior:** el torneo de francotiradores, los 12 gates y el ensanchado de
+    TP/SL **midieron una estrategia que sólo actúa ~1/5 del año**. No se invalidan —las
+    comparaciones entre configuraciones ALCISTA valen entre sí— pero su alcance queda acotado.
+  - **Dos artefactos de ventana corta corregidos sobre la marcha:** con 12 días `c7` parecía el
+    98,5% (real 55,1%) y ALCISTA local parecía 37–67% (real 14,9–27,0%). Tercer y cuarto caso de la
+    serie en que una ventana corta engaña.
+  - Registrado en `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md` y `data/resultados.db` (prueba id 282).
+    Reportes: `reports/2026-09-07_item2bc-condiciones-y-cobertura.md`,
+    `reports/2026-09-07_item2b-por-que-oscila-la-fase.md`
+
+- [x] **Ítem 2 — churn de fase GLOBAL vs LOCAL (07-sep) — 🟡 NO CONCLUYENTE, decisión ABIERTA.**
+  **No se archiva como "no sirve": es un defecto de diseño real** — hoy el bot cierra posiciones que
+  su propia lógica de entrada considera válidas. Lo que falta es evidencia, no voluntad.
+  - **Hallazgo principal, no buscado:** en 2026 **210 de 237 cierres (89%) son por cambio de fase**,
+    no por TP ni SL. El bot no está operando su estrategia: lo barre el voto de fase.
+  - **Los 8 escenarios dan EXACTAMENTE 12 TP.** Apagar el churn de 210 a 24 (−89%) **no hace que ni
+    una sola operación más llegue al take profit**. Los trades que el mecanismo cierra no iban a ganar.
+  - **Ninguna de las 3 soluciones es significativa**: los 7 IC95% cruzan el cero. La mejor (A · zona
+    muerta 0,25) da +$2,83 con P(mejor)=80,1%. Sumar B y C a A aporta **+$0,021** con P(mejor)=**49,8%**
+    — una moneda al aire.
+  - **Contradice el instinto de partida:** la fase local corta *más* churn (−74% vs −57%) pero su
+    **PF empeora** (0,603 vs 0,619 del baseline). Cortar más no es cortar mejor.
+  - Los 8 pierden plata (PF 0,603–0,774): la mejor reduce la pérdida de −$12,22 a −$9,38.
+  - ⚠️ **QUÉ FALTA PARA DECIDIR:** medir el impacto del **cambio de duración por trade** (14,9 h
+    baseline → 32,3 h con A → 83,0 h con A+B+C) sobre el **perfil de riesgo: drawdown máximo y
+    exposición simultánea**. Este estudio no lo midió. Sin eso se estaría cambiando el perfil de
+    riesgo del bot a ciegas.
+  - Registrado en `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md` y `data/resultados.db` (prueba id 281).
+    Reporte: `reports/2026-09-07_item2-paso2-ocho-escenarios.md`
+- [x] **Simulador: capa del director + 3 fallos de fidelidad corregidos (06/07-sep)** —
+  `sandbox_director.py` reproduce el voto de las 5 monedas y `cerrar_huerfanas()`, que el simulador
+  anterior se salteaba por completo. Fidelidad validada contra `eventos.log`: **87,3% de coincidencia
+  de fase ciclo a ciclo** y **31 transiciones simuladas contra 33 reales**. Los 3 fallos (fase de
+  despacho con velas cerradas, `_f_urlopen` ignorando `interval`, `data_1m` desactualizado y sin BNB)
+  afectan a **todo el historial de backtests** — registrado en los dos .md y en la DB (prueba id 280).
+
+- [x] **Tarea 1A — 4 minutos vs 4 horas (06-sep) — 🟡 LA RESOLUCIÓN IMPORTA, Y EN CONTRA.** El bot
+  real evalúa cada 240 s, o sea cada 4 min; todos los backtests anteriores se corrieron a 4 h.
+  Simular a la resolución real da **PF 1.202 vs 1.384** y **WR 45,7% vs 49,7%**, con **81,5% más
+  trades** (1.419 vs 782). Consistente en **4/4 monedas, sin una sola excepción**. Mecanismo medido:
+  los 1.204 trades que sólo existen a 4m rinden PF 1.142, contra PF 1.606 de los 215 que ambas
+  resoluciones ven — mirar más seguido no encuentra mejores oportunidades, encuentra más
+  oportunidades mediocres. **Consecuencia: todo backtest a 4h sobreestima el nivel absoluto**; las
+  comparaciones relativas entre estrategias siguen valiendo. Antes de aplicar cualquier cambio que
+  dependa de cruzar PF ≥ 1,6, revalidarlo a 4 minutos.
+  *Queda abierto sin verificar:* los rechazos por `SL inejecutable` pasan de 3 a 312 (18% de los
+  intentos). Hipótesis, no conclusión.
+  Registrado en `INDICE_RESULTADOS.md`, `ESTADO_ACTUAL.md` y `data/resultados.db` (prueba id 279).
+  Reporte: `reports/2026-09-06_tarea1a-4m-vs-4h-comparacion.md`
+- [x] **Reanudación desde checkpoint del simulador (05/06-sep)** — corrida completa vs. cortada-y-reanudada
+  da resultado **idéntico** (13/13 campos, `usdt_final` hasta el último decimal, `auditoria.csv` bit
+  a bit), incluido el caso difícil con 2 posiciones abiertas cruzando el corte. La 1A se terminó
+  reanudando desde el 65,8% tras el apagón, en vez de repetir 11,5 h de cómputo.
+- [x] Auditoría económica completa (31-ago) — trailing/breakeven, termómetro, centinela documentados
+- [x] Bugs históricos de ejecución (-1100, reapertura inmediata, TP fantasma, NOTIONAL, billetera.json) — resueltos y verificados en vivo
+- [x] Infraestructura de datos: `data/resultados.db` construida y poblada (235 pruebas / 32.339 trades)
+- [x] Simulador mejorado a granularidad de 4 minutos, control de consistencia confirmado (784 trades idénticos a la versión anterior)
+- [x] Conexión Google Drive (`zbotv2.ariel@gmail.com` → carpeta `zbot-reportes`) verificada y funcionando
+- [x] Subida automática de reportes y auditoria.csv a Drive (disparada por evento, sin temporizador) — instalada y probada
+- [x] Verificación diaria de sincronización Dell↔Drive (07:00 AM, por contenido) — instalada y probada, encontró y ayudó a cerrar un hueco real de concurrencia
+
+## Protocolo pre-vuelo (aplica a toda prueba pesada nueva)
+
+Antes de lanzar cualquier prueba/simulación larga: memoria RAM+swap disponible vs. pico esperado, protección de sesión en screen/tmux, checkpoints probados, espacio en disco, estimación de tiempo honesta, revisión de fugas de memoria conocidas. Code da veredicto GO/NO-GO explícito antes de arrancar.
+
+---
+**Instrucciones para Code:** marcá `[x]` el ítem que cierres, con fecha y veredicto (🟢/🟡/🔴) al lado. No reordenes ni saltes ítems. Este archivo es la fuente de verdad compartida entre Ariel, Claude y vos — actualizalo cada vez que cambie el estado de algo.

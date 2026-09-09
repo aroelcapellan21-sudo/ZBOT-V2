@@ -596,80 +596,18 @@ de aplicar cualquier cambio que dependa de cruzar el umbral PF ≥ 1.6, revalida
 
 Detalle: `reports/2026-09-06_tarea1a-4m-vs-4h-comparacion.md`.
 
-## COLA DE INVESTIGACIÓN
+## COLA DE INVESTIGACIÓN → se mudó a `COLA.md` (09-sep-2026)
 
-Ordenada por prioridad/impacto potencial, no por fecha.
-
-### 🔴 ALTA PRIORIDAD — reabrir los `NO_CONCLUYENTE` que el instrumento no podía ver (09-sep-2026)
-
-**Pedido explícito de Ariel el 09-sep, a raíz del L11.** No se hizo todavía: queda anotado acá para
-que no se pierda.
-
-**Qué hay que hacer.** Revisar los `NO_CONCLUYENTE` archivados en `INDICE_RESULTADOS.md` y separar
-dos cosas que hasta hoy se leían igual: los que **midieron que no hay ventaja** y los que
-**tenían una ventaja real que el laboratorio no tenía potencia para detectar**. El L11 midió el
-umbral: con ~240 trades no distingue del azar una ventaja de **+0,485 pp por trade**, y detecta
-apenas el 17 % de las de +0,250 pp.
-
-**Por dónde empezar: por los de MENOS trades.** Son los más vulnerables — cuanto más chica la
-muestra, más alto el umbral de detección, así que un `NO_CONCLUYENTE` con n bajo es casi
-indistinguible de "no se midió". Los de n grande son los más creíbles como negativos de verdad.
-
-**Cómo hacerlo sin repetir el error:**
-- La consulta sale de `data/resultados.db`, que tiene `n` por prueba
-  (`python3 consultar.py`), no de leer el `.md` a ojo.
-- **Reevaluar contra el azar, no contra cero** — `~/lab_eval/benchmark_tonto.py` ya hace eso y es
-  re-ejecutable. La vara vieja ("IC 95 % > 0") aprobó 100 de 100 estrategias de ruido puro.
-- Para cada candidato, la pregunta no es "¿dio positivo?" sino **"¿cuántos trades harían falta para
-  que una ventaja de este tamaño fuera detectable?"**. Eso convierte cada caso archivado en una
-  decisión concreta: juntar más muestra, o cerrarlo de verdad.
-- ⚠️ **Esto NO es permiso para resucitar hallazgos.** Un `NO_CONCLUYENTE` que vuelve a la mesa sigue
-  necesitando evidencia propia, diff y OK explícito antes de tocar nada. Lo que cambia es que ya no
-  se puede archivar uno diciendo "no hay ventaja" cuando lo que hubo fue falta de potencia.
-
-Base: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`, prueba **296** en la DB.
-
-### El resto de la cola
-
-1. ~~Decisión pendiente — ¿reemplazar/ampliar la config de producción?~~ **Resuelto 24-ago: Combo O
-   activado en producción** (ver "En producción ahora"). Nota viva: el peor caso teórico de $20
-   simultáneos (4×$5) en la práctica queda capado en $10 por `MAX_TRADES_MISMA_DIR=2`, que sigue sin
-   tocarse — así que la exposición real hoy es menor a la backtesteada como "worst case".
-   Pendiente de observación: **N** (BTC+ETH+AVAX-BAJISTA, Sharpe 3.96) seguía siendo mejor que O,
-   pero requiere Futuros — no descartado, solo fuera de alcance sin esa cuenta.
-2. **SOL LATERAL — filtro de volatilidad k=2.0, "prometedor no confirmado".** Mejor resultado de
-   toda la línea de investigación de volatilidad (PF 1.768, Sharpe 1.704, +$3.53 vs. baseline) pero
-   depende de una sola ventana de 6 meses (PF 5.88). Si se junta más historia de SOL con el tiempo,
-   vale la pena re-testear. Ver `2026-08-24_sol-filtro-volatilidad-k-alto.md`.
-3. **`resumen_capital.py` con rutas rotas** tras la reorganización de archivos del home
-   (`~/bot-padre-v4/v5/v6` movidos a `~/_archivo_bots_anteriores/`) — usado por `/consejero` en
-   Telegram, no se cae (tiene fallback) pero muestra capital/trades por defecto para esas filas en
-   vez de los reales. Pendiente decisión: corregir las 3 rutas o dejarlo así. Ver
-   `~/RESUMEN_ORGANIZACION_2026-08-24.md`.
-4. **5 archivos en "zona gris"** de la reorganización del home, sin clasificar (`backup_sd.sh`,
-   `package-lock.json`, `intel_noticias/`, `respuesta22.txt`, `setup-dell.sh`/`backup_dell/`) —
-   pendientes de que Ariel confirme qué son. Ver `~/PROPUESTA_ORGANIZACION_2026-08-24.md`, sección 5.
-5. **Corrección de texto pendiente en `INVESTIGACION.md`**: el hallazgo "horario×calidad" quedó
-   invalidado tras corregir el bug de timestamps (2026-08-23) — el texto publicado no se actualizó
-   todavía, solo existe un reporte nuevo con la corrección. Ver
-   `2026-08-23_reverificacion-filtro-eventos-calidad-horario-corregido.md`.
-6. **Bug estructural sin corregir**: 0 cierres `BE`/`TRAILING_SL` reales en 9 años — la fórmula de
-   trailing de producción es auto-referencial y nunca dispara (`sl_trail` siempre < `precio_actual`
-   en la misma evaluación). Documentado, no tocado — fuera de alcance de las investigaciones de
-   backtest. Ver `2026-08-19_trailing-stop-desconectado-investigacion.md`.
-7. **Polvo inmovilizado** — punto abierto de siempre, sin resolver (ver `CLAUDE.md`, sección
-   "Camino de dinero").
-8. **`memoria_propia.json` no se actualiza** — causa raíz ligada a `FASE_CAMBIO`, sin corregir (ver
-   `INVESTIGACION.md`).
-9. **Bajistas en Futuros** — el torneo confirma señal real (grupo BAJISTA PF 1.074, AVAX BAJISTA
-   2° mejor de los 15), pero activarlos requiere cuenta de Futuros y reescribir
-   `ejecutor.py:cerrar_posicion` — no iniciado, no es tarea de backtest.
-10. **Fase B de correlación entre monedas — rediseño pendiente.** Con la ventana de 3 velas
-    antes/después pedida, 0/40 combinaciones llegan a n≥30 casos de alerta (máx. observado 7) — las
-    posiciones duran muy pocas velas frente a la escala diaria del criterio de tendencia. Un diseño
-    distinto (sin el requisito de margen, o con ventana fija post-entrada en vez de vela a vela
-    hasta el cierre) podría generar más muestra, pero es una pregunta distinta a la ya cerrada. Ver
-    `2026-08-25_correlacion-5-monedas-fase-ab.md`.
+> **La cola ya no vive acá.** Hasta el 09-sep había **dos** colas con numeraciones distintas y sin
+> un solo ítem en común —esta sección (ítems 1-10) y `~/zbot-drive/cola/zbot-cola.md` (ítems 2-14)—,
+> que juntas sumaban 20 pendientes que nadie veía a la vez, con el trabajo de "revisar los hallazgos
+> anteriores" escrito **dos veces**.
+>
+> **Fuente de verdad única: `COLA.md`**, en la raíz del repo. Se versiona en git y se sincroniza
+> sola a Drive junto con `reports/`. Los 10 ítems que estaban acá se migraron completos al bloque
+> **"Mantenimiento y deuda técnica" (M1-M10)** de ese archivo; ninguno se perdió.
+>
+> El orden de trabajo confirmado por Ariel el 09-sep está al tope de `COLA.md`.
 
 ## CERRADO RECIENTEMENTE
 

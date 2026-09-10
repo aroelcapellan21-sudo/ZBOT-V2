@@ -47,6 +47,31 @@ Lo siguiente que se toma es el **ítem 1**.
   09-sep. 7 de 8 conexiones sanas; el problema no era el estado sino la detección.**
   Detalle en "Ya cerrado".
 
+- [ ] **0 · 🔴 ALTA PRIORIDAD — auditar los estudios pre-07-sep que usan `filtro_horario` con
+  reloj inyectado** *(nuevo, 09-sep, sale de la reapertura del ítem 4)*
+
+  **El canal de contaminación está confirmado, el alcance NO está medido.** Cualquier estudio
+  anterior al fix de L1 (07-sep) que inyecte un reloj falso a `filtro_horario` evaluó la ventana
+  **0-17 h en vez de 4-21 h**, porque los timestamps del backup 4h estaban corridos −4 h. Con velas
+  de 4 h eso es **una vela exacta** de corrimiento, y el gate bloquea 1 de cada 6: **no bloqueaba de
+  más ni de menos, bloqueaba la vela equivocada**.
+
+  **Qué hay que hacer:**
+  1. Listar **todos** los `.py` que hagan `filtro_horario.datetime = <reloj falso>` o equivalente.
+     Se sabe de `torneo_generico.py` y los `resim_evaluar_literal_*`; **cuántos más hay, no está
+     medido**.
+  2. Cruzar con `data/resultados.db` por fecha: **toda prueba anterior al 2026-09-07** generada por
+     esos scripts queda bajo sospecha.
+  3. Decidir por bloque, no de a una: cuáles se rehacen y cuáles no dependen del gate horario.
+
+  **Lo que ya se sabe y acota el problema:** un desfase uniforme **no altera el OHLC ni su orden**,
+  así que RSI, EMAs y la mecánica de TP/SL son idénticos. `filtro_eventos` estaba anulado en el
+  torneo. **El único canal verificado es el gate horario** — pero alcanza para mover el 16,7 % de
+  las oportunidades.
+
+  ⚠️ **Esto toca la credibilidad de una parte del índice, así que va antes que cualquier
+  investigación nueva.** `reports/2026-09-09_item4-reabierto-desfase-4h.md`
+
 - [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* 🔜 **← EL QUE SIGUE** — 🟡 **REABIERTO
   el 09-sep: pendiente de confirmar con datos limpios.**
   Se habia cerrado con los 7 estudios ya registrados (PF 0,963-1,208 contra el umbral de 1,6), pero
@@ -162,14 +187,26 @@ huecos.)*
 - [ ] **M10 · Fase B de correlación — rediseño** — con la ventana pedida, 0/40 combinaciones llegan
   a n≥30 (máx. 7). Un diseño distinto podría generar muestra, pero es otra pregunta.
 
-- [ ] **M12 · Regla de proceso "buscar antes de investigar" — redactada, sin aplicar** *(09-sep)*
-  Va en `CLAUDE.md`, junto a la regla del 01-sep. Dice que antes de arrancar cualquier
-  investigación nueva hay que consultar **dos** lugares: `INDICE_RESULTADOS.md` + `resultados.db`
-  (*"¿esto ya se midió?"*) **y** las secciones "NO TOCAR" / "DECISIÓN TOMADA" de `CLAUDE.md`
-  (*"¿esto ya se decidió, y con qué argumento?"*). El motivo es concreto: hay decisiones sostenidas
-  por evidencia que **no es una fila de la DB** —el trailing, el termómetro, el centinela viven en
-  prosa—, y un backtest nuevo puede contradecirlas sin que nadie lo note.
-  **Diff completo y listo:** `reports/2026-09-09_diffs-cierre-del-dia.txt`, bloque B.
+- [ ] **M12 · Regla de proceso "buscar antes de investigar" — redactada, sin aplicar** *(09-sep,
+  corregida el mismo día)*
+  Va en `CLAUDE.md`, junto a la regla del 01-sep. Antes de arrancar cualquier investigación nueva
+  hay que consultar **dos** lugares: `INDICE_RESULTADOS.md` + `resultados.db` (*"¿esto ya se
+  midió?"*) **y** las secciones "NO TOCAR" / "DECISIÓN TOMADA" de `CLAUDE.md` (*"¿esto ya se
+  decidió, y con qué argumento?"*). El motivo: hay decisiones sostenidas por evidencia que **no es
+  una fila de la DB** —el trailing, el termómetro, el centinela viven en prosa—, y un backtest nuevo
+  puede contradecirlas sin que nadie lo note.
+
+  🔴 **CORRECCIÓN del 09-sep, aprendida en el mismo día por las malas:** **no alcanza con encontrar
+  que algo ya se midió.** Hay que verificar **la fecha de esa medición contra la fecha de cada fix
+  del laboratorio** (L1 en adelante) antes de darla por válida. El ítem 4 se cerró apoyándose en 7
+  estudios sin mirar con qué datos habían corrido: eran todos anteriores al fix de L1 y el gate
+  horario había evaluado la hora corrida 4 h. **Buscar los resultados no es buscar las condiciones
+  en que se produjeron.**
+
+  Fechas de fix contra las que hay que contrastar, por ahora: **2026-09-07 (L1**, desfase de −4 h
+  del backup 4h**)**. Cada fix nuevo del laboratorio suma una fecha a esta lista.
+  **Diff completo y listo:** `reports/2026-09-09_diffs-cierre-del-dia.txt`, bloque B
+  ⚠️ **ese diff quedó desactualizado con esta corrección — hay que regenerarlo al aplicarlo.**
 
 - [ ] **M13 · Marcar 4 archivos viejos como históricos — redactado, sin aplicar** *(09-sep)*
   `CONTEXTO_SESION.md` (volcado de código de junio), `CIERRE_FINAL.md` (los 3 puntos de julio),

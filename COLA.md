@@ -47,15 +47,10 @@ Lo siguiente que se toma es el **ítem 1**.
   09-sep. 7 de 8 conexiones sanas; el problema no era el estado sino la detección.**
   Detalle en "Ya cerrado".
 
-- [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* 🔜 **← EL QUE SIGUE**
+- [x] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* — ✅ **CERRADO el 09-sep sin
+  correr un backtest: 🔴 no hay nada que reactivar.** Detalle en "Ya cerrado".
 
-  **Pospuesto el 07-sep**, no descartado: su premisa —LATERAL es la mayor parte del año, con
-  movimiento comparable— quedó **confirmada en 5 de 6 años** (hasta 2,93× más velas que ALCISTA en
-  2022, con rango 0,62-0,93× y mediana 0,89×). Se medía "cuando el laboratorio esté blindado";
-  **con L1-L11 cerrados esa condición ya se cumplió** — con la salvedad que dejó el L11: el
-  laboratorio mide bien pero no sirve para elegir la mejor de muchas variantes.
-
-- [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*
+- [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)* 🔜 **← EL QUE SIGUE**
   Las 5 monedas del bot se eligieron entre las que **hoy** están arriba, y nunca se testeó
   sobre monedas que se hundieron o salieron del top. La "segunda lista" (XRP, LINK, UNI,
   NEAR, ADA) arrastra el mismo sesgo. Es una de las **dos sins graves** que quedaron abiertas.
@@ -204,6 +199,30 @@ laboratorio no era lo bastante sólido para sostener conclusiones nuevas.
 - [x] **L11 · ¿es fuerte el laboratorio?** — ✅ **CERRADO 09-sep, 3 de 3 pruebas.** 🔴 mide bien y elige mal.
 
 ## Ya cerrado
+
+- [x] **4 · Francotiradores LATERAL (09-sep) — 🔴 no hay nada que reactivar.** (prueba **302**)
+  **Primer ítem cerrado con la regla "buscar antes de investigar", y la justifica: lo que iba a
+  medir ya estaba medido siete veces.** No se corrió un solo backtest nuevo.
+  - **La premisa sigue en pie:** LATERAL es la mayor parte del año (5 de 6, hasta 2,93× más velas
+    que ALCISTA) y el bot está ciego el **73-85 %** del año. El hueco existe.
+  - **Ninguna implementación lo aprovecha.** Los 7 estudios registrados dan **PF 0,963-1,208**
+    contra el umbral de **1,6**; la mediana es **1,020** — empatar descontando comisiones. El
+    "PF 1,183 de SOL" son 38 trades de 2026 aislado, ya registrado como artefacto: el mismo estudio
+    sobre 5,9 años da **1,001**.
+  - **Y hoy se sabe más:** el mejor (`bnb_lateral`, PF 1,208) tiene SR +0,0918 contra un SR₀ de
+    **+0,2178**, y su **DSR es 0,016**. `avax_lateral` quedó "sin señal" en el ítem 2. `btc_lateral`
+    y `avax_lateral` están entre los 20 que el jackknife da vuelta al excluir un año.
+  - **Los cinco están pausados con un número delante:** ETH PF 0,90 · SOL 0,928 · AVAX 0,985 · BTC
+    sin backtest de gates · BNB huérfano. Reactivar sería reabrir una decisión sin evidencia nueva.
+  - ⚠️ **Anotado con cautela, no como hallazgo:** el mejor LATERAL es BNB, la moneda que no opera, y
+    3 de los 5 "recuperables" del ítem 2 también eran de BNB. **No se presenta como hallazgo**
+    porque es la forma exacta del *storytelling bias* que el L11 marcó con 4 reincidencias, y los
+    números no lo sostienen. Para mirar en el **ítem 9**.
+  - 🎯 **La premisa cambia de forma:** explotar el año ciego **no se logra reactivando lo que hay**.
+    Hay que **diseñar** algo distinto, con las dos condiciones que puso el L11 (no probar N
+    variantes y quedarse con la mejor; apuntar a un efecto grande o traer mucha más muestra). Eso
+    es un **proyecto de diseño de estrategia**, no un ítem de cola de verificación.
+    Reporte: `reports/2026-09-09_item4-francotiradores-lateral.md`
 
 - [x] **3 · Auditoría de conexiones y sincronizaciones (09-sep) — ✅ 7 de 8 sanas; lo que faltaba
   era la detección.** (prueba **300**)

@@ -183,6 +183,21 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
+## 🔴 Ítem 4 — los francotiradores LATERAL no se reactivan (09-sep-2026, CERRADO)
+
+**La premisa es cierta y ninguna implementación la aprovecha.** LATERAL es la mayor parte del
+año y el bot está ciego el 73-85 %, pero los **7 estudios ya registrados** dan **PF
+0,963-1,208** contra el umbral de **1,6** (mediana 1,020). El mejor, `bnb_lateral`, tiene un
+**DSR de 0,016**: no sobrevive la corrección por prueba múltiple. Los cinco francotiradores
+están pausados **con un número delante** (ETH 0,90 · SOL 0,928 · AVAX 0,985).
+
+**Cerrado sin correr un solo backtest**, aplicando la regla "buscar antes de investigar" —
+que este ítem justifica: lo que iba a medir ya estaba medido siete veces.
+
+🎯 **Lo que queda:** explotar el año ciego **no se logra reactivando lo que hay**; hay que
+diseñar algo distinto, y eso es un proyecto de estrategia, no un ítem de verificación.
+Prueba **302** · `reports/2026-09-09_item4-francotiradores-lateral.md`
+
 ## 🟢 Ítem 3 — las conexiones están sanas; lo que faltaba era enterarse (09-sep-2026, CERRADO)
 
 **7 de 8 sanas.** Lo que no existía era la detección: Drive tenía **tres** mecanismos

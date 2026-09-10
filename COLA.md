@@ -47,10 +47,21 @@ Lo siguiente que se toma es el **ítem 1**.
   09-sep. 7 de 8 conexiones sanas; el problema no era el estado sino la detección.**
   Detalle en "Ya cerrado".
 
-- [x] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* — ✅ **CERRADO el 09-sep sin
-  correr un backtest: 🔴 no hay nada que reactivar.** Detalle en "Ya cerrado".
+- [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* 🔜 **← EL QUE SIGUE** — 🟡 **REABIERTO
+  el 09-sep: pendiente de confirmar con datos limpios.**
+  Se habia cerrado con los 7 estudios ya registrados (PF 0,963-1,208 contra el umbral de 1,6), pero
+  **los siete son del 17-23 de agosto, anteriores al fix de L1**, y **sí les aplica** el desfase:
+  `torneo_generico.py` inyecta un reloj falso a `filtro_horario` con el timestamp de la vela, que
+  estaba corrido −4 h, así que el gate evaluaba la ventana **0-17 h en vez de 4-21 h**. Con velas de
+  4 h eso es **exactamente una vela de corrimiento**, y el filtro bloquea 1 de cada 6: no bloqueaba
+  de más ni de menos, **bloqueaba la vela equivocada**.
+  **Acotado:** `filtro_eventos` no aplica (está anulado en el torneo) y la secuencia de precios es
+  la misma, así que RSI, EMAs y TP/SL son idénticos — el único canal verificado es el gate horario.
+  **Para cerrarlo:** rehacer los 3 `torneo_*_lateral` y el `sol_lateral` de 5,9 años con el CSV ya
+  corregido (`torneo_generico.py` **ya está arreglado**: es volver a correrlo) y comparar los PF.
+  `reports/2026-09-09_item4-reabierto-desfase-4h.md`
 
-- [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)* 🔜 **← EL QUE SIGUE**
+- [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*
   Las 5 monedas del bot se eligieron entre las que **hoy** están arriba, y nunca se testeó
   sobre monedas que se hundieron o salieron del top. La "segunda lista" (XRP, LINK, UNI,
   NEAR, ADA) arrastra el mismo sesgo. Es una de las **dos sins graves** que quedaron abiertas.
@@ -200,7 +211,10 @@ laboratorio no era lo bastante sólido para sostener conclusiones nuevas.
 
 ## Ya cerrado
 
-- [x] **4 · Francotiradores LATERAL (09-sep) — 🔴 no hay nada que reactivar.** (prueba **302**)
+- [~] **4 · Francotiradores LATERAL (09-sep) — ⚠️ ESTE CIERRE QUEDO REVERTIDO EL MISMO DIA.**
+  Ver el ítem 4 arriba: los 7 estudios que lo sostenían son anteriores al fix de L1 y el gate
+  horario corría con la hora corrida 4 h. Lo de abajo se conserva como el análisis que se hizo,
+  **no como veredicto vigente.** (prueba **302**, hoy `NO_CONCLUYENTE`)
   **Primer ítem cerrado con la regla "buscar antes de investigar", y la justifica: lo que iba a
   medir ya estaba medido siete veces.** No se corrió un solo backtest nuevo.
   - **La premisa sigue en pie:** LATERAL es la mayor parte del año (5 de 6, hasta 2,93× más velas

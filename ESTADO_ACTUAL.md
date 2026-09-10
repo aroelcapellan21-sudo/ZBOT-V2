@@ -183,7 +183,18 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
-## 🔴 Ítem 4 — los francotiradores LATERAL no se reactivan (09-sep-2026, CERRADO)
+## 🟡 Ítem 4 — LATERAL: el cierre se revirtió el mismo día (09-sep-2026, REABIERTO)
+
+> ⚠️ **Se había dado por cerrado con los 7 estudios ya registrados. Ariel preguntó si eran
+> anteriores al fix de L1 — y lo son: los siete son del 17-23 de agosto.** Verificado que **sí
+> les aplica** el desfase: `torneo_generico.py` inyecta un reloj falso a `filtro_horario` con
+> el timestamp de la vela, corrido −4 h, así que el gate evaluaba la ventana **0-17 h en vez de
+> 4-21 h**. Con velas de 4 h es **una vela exacta** de corrimiento, y el filtro bloquea 1 de 6:
+> **bloqueaba la vela equivocada**. Acotado: `filtro_eventos` está anulado en el torneo y la
+> secuencia de precios es la misma (RSI, EMAs y TP/SL idénticos).
+> **Pendiente de confirmar con datos limpios.** `reports/2026-09-09_item4-reabierto-desfase-4h.md`
+
+## 🔴 Ítem 4 — los francotiradores LATERAL no se reactivan (análisis del 09-sep, veredicto no vigente)
 
 **La premisa es cierta y ninguna implementación la aprovecha.** LATERAL es la mayor parte del
 año y el bot está ciego el 73-85 %, pero los **7 estudios ya registrados** dan **PF

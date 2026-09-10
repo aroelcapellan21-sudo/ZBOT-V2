@@ -183,9 +183,11 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
-## 🔴 Ítem 0 — el desfase contaminó 107 pruebas, pero sólo 36 cambian de veredicto (10-sep-2026, CERRADO)
+## 🟢 Ítem 0 — se rehicieron las 36 y ninguna cambió de veredicto (10-sep-2026, CERRADO)
 
-**El índice no se cae: se cae el 12 % de él, y está identificado fila por fila.**
+**El índice queda confirmado, no invalidado.** Se rehicieron las **36** pruebas que podían haber
+cambiado de veredicto y **ninguna cambió**. Los dos "cruces del umbral" que aparecieron durante el
+trabajo (ids 140 y 131) resultaron **artefactos del PF bruto**, no cruces reales.
 
 Auditoría del canal que abrió el ítem 4 al reabrirse. **16 scripts** inyectan un reloj falso a
 `filtro_horario` (la cola conocía 2). El mecanismo quedó verificado con aritmética: el gate bloquea
@@ -199,15 +201,31 @@ de las **08:00 UTC** en vez de la de las **04:00 UTC**.
 | ⚫ Irreproducibles — script inexistente (→ ítem **0c**) | 49 |
 | ⬜ Sin `origen_archivo`, **sin trazar** | 116 |
 
-**Criterio de corte, no opinión:** el ítem 4 midió el efecto rehaciendo dos estudios completos —
-**≤ 0,034 de PF, con el signo cambiando** según el estudio (ruido direccional, no sesgo). Se rehace
-lo que esté a menos de 3× eso del umbral 1,6, más aquello cuyo **sujeto** era el gate horario.
+**La cota de 0,034 que se usó para elegir las 36 era falsa.** Medido sobre los **69 estudios
+rehechos**, el efecto depende del **tamaño de muestra**:
 
-> **REHACER 36 · NO REHACER 71.**
+| n | \|ΔPF\| máximo |
+|---|---:|
+| n < 150 | **0,579** |
+| 150 ≤ n < 250 | 0,168 |
+| n ≥ 250 | 0,084 |
 
-**La fila más frágil es la id 140** (`btc_fase2b_gates · horario_6_19`, PF **1,641**, n=214,
-`DESCARTADO`): la única contaminada **por encima** del umbral, a **1,2×** el efecto medido, y encima
-del bloque donde la hora era la variable independiente. Se rehace primero.
+Con la cota recalibrada, **14 pruebas más** pasaron a `REHACER_DESFASE_4H`: **50** en total, **57**
+quedan `OK_POR_MARGEN`. La columna `estado_datos` de `data/resultados.db` lo registra fila por fila.
+
+**Lo que el ejercicio destapó vale más que el desfase**, y nada de eso era lo que se fue a buscar:
+
+| # | Hallazgo | Ítem |
+|---|---|---|
+| 1 | El PF de la DB es **bruto** (+0,096 sistemático, toda la tabla) | **M16** |
+| 2 | Deriva de firmas producción↔sandbox: **36 de 36** no corrían | **0b** |
+| 3 | Francotiradores pausados ensucian el índice en silencio (prueba 276) | **0b** |
+| 4 | El efecto depende del tamaño de muestra (la cota falló 4 veces) | — |
+| 5 | `data/historico_4h/` **sigue corrida −4 h hoy** | **M17** |
+
+**Y un ítem de la cola se cayó:** **M3** (SOL LATERAL k=2,0) pasa de PF **1,768 a 1,508** neto con
+datos limpios — debajo del umbral. Con DD 25,5 % contra el límite de 10 % del guardián, tampoco
+sería ejecutable en vivo. Queda `DESCARTADO`.
 
 ⚠️ **Riesgo abierto hacia adelante:** el fix del 07-sep corrigió `~/bot-padre-v3-backup/` pero
 **dejó `~/bot-padre-v2/data/historico_4h/` sin tocar — sigue corrida hoy**. Cualquier estudio nuevo

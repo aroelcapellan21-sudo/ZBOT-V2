@@ -49,7 +49,7 @@ Lo siguiente que se toma es el **ítem 1**.
 
 - [x] **0 · 🔴 ALTA PRIORIDAD — auditar los estudios pre-07-sep que usan `filtro_horario` con
   reloj inyectado** *(nuevo, 09-sep, sale de la reapertura del ítem 4)* — ✅ **CERRADO el 10-sep.
-  🔴 contaminó 107 pruebas, pero sólo 36 pudieron cambiar de veredicto.**
+  Se rehicieron las 36 candidatas y NINGUNA cambió de veredicto: el índice queda confirmado.**
 
   **El canal de contaminación está confirmado, el alcance NO está medido.** Cualquier estudio
   anterior al fix de L1 (07-sep) que inyecte un reloj falso a `filtro_horario` evaluó la ventana
@@ -64,12 +64,15 @@ Lo siguiente que se toma es el **ítem 1**.
      (script inexistente → ítem **0c**), 116 sin `origen_archivo` **sin trazar** (queda abierto).
   3. Criterio de corte: el efecto medido es **≤ 0,034 de PF** (ítem 4), así que se rehace lo que
      esté a menos de 3× eso del umbral 1,6, más aquello cuyo **sujeto** era el gate horario.
-     → **REHACER 36 · NO REHACER 71.**
+     → se rehicieron **36**. **Ninguna cambió de veredicto.**
+  4. ⚠️ **La cota de 0,034 era falsa.** Medido sobre los 69 estudios rehechos, el efecto depende del
+     **tamaño de muestra**: **n<150 → hasta 0,579** · 150-250 → 0,168 · n≥250 → 0,084. Con la cota
+     recalibrada, **14 pruebas más** pasaron a `REHACER` (50 en total, 57 quedan `OK_POR_MARGEN`).
+  5. Los dos "cruces del umbral" (ids 140 y 131) resultaron **artefactos del PF bruto** — ver M16.
 
-  **Orden de trabajo:** id **140** primero (`btc_fase2b_gates · horario_6_19`, PF 1,641, la única
-  contaminada por encima del umbral y a sólo 1,2× el efecto) → ids 139, 182, 183 (la hora era el
-  sujeto) → los 32 restantes por lotes → corregir `~/bot-padre-v2/data/historico_4h/` **antes** de
-  rehacer la del grupo D.
+  **Lo que el ejercicio destapó, y vale más que el desfase:** el PF bruto de la DB (**M16**), la
+  deriva de firmas producción↔sandbox (**0b**), los francotiradores pausados que ensucian el índice
+  en silencio (**0c**/**0b**), y que `data/historico_4h/` sigue corrida (**M17**).
 
   ⚠️ **Pendiente que NO se cierra con esto:** las **116 filas sin `origen_archivo`**. El barrido por
   texto (47 con rastro del gate, 69 sin él) es triage, no evidencia.
@@ -89,15 +92,30 @@ Lo siguiente que se toma es el **ítem 1**.
   +0,599 y +0,557 para el umbral, o sea **16-18× el mayor efecto medido**.
   `reports/2026-09-09_item4-rehecho-con-datos-limpios.md`
 
-- [ ] **0b · 🆕 Estudios irreproducibles por cambios de código posteriores** *(09-sep, sale del ítem 4)*
-  `torneo_avax_lateral` y `sol_lateral_evaluar_literal_2020_2026` **ya no se pueden rehacer**: sus
-  francotiradores se pausaron por código el 29-ago (commit `5713c0a`) y los estudios son del 22-23,
-  así que hoy el torneo importa la función desactivada y devuelve **n = 0**.
-  **No es un problema de datos** —eso es el ítem 0— **sino de que el código que medían cambió
-  después.** Es el asterisco que L2 había dejado anotado (*"prueba reproducibilidad el mismo día, no
-  a lo largo del tiempo"*) apareciendo en la práctica. **Cuántos estudios más están en esta
-  situación, no está medido.** Salida posible: correrlos contra una copia parcheada del
-  francotirador, sin tocar producción.
+- [ ] **0b · 🆕 Deriva entre producción y los sandboxes — MEDIDO el 10-sep: es 36 de 36, no 2**
+  *(09-sep, reescrito el 10-sep con el alcance real)*
+
+  **Se creía que eran dos estudios con el francotirador pausado. Al ir a rehacer las 36 del ítem 0,
+  NINGUNA corría tal cual.** Son dos mecanismos distintos:
+
+  1. **Deriva de firmas (35 de 36).** El commit `f61c066` del **31-ago** agregó `sl_pct` a
+     `ejecutor.ejecutar_operacion()`. Los 9 sandboxes de `sistema_c/` mockean la firma **vieja**, así
+     que revientan con `TypeError` contra los 4 francotiradores ALCISTA que hoy lo pasan
+     (BTC/ETH/SOL/AVAX; BNB no, ni los LATERAL/BAJISTA).
+     ⚠️ **Lo grave no es el `TypeError`, que al menos es ruidoso: es que si el argumento nuevo
+     hubiera tenido un default compatible, el estudio habría corrido en silencio midiendo otra cosa.**
+  2. **Francotirador pausado (1 de 36, y una fila del índice ya arruinada).** `lateral_sol` está
+     pausado por código desde el 29-ago (`5713c0a`). **La prueba 276 es la víctima confirmada:**
+     corrió el **30-ago**, un día después de la pausa, su raw trae `baseline: 0 trades` y
+     `k_2.0: 0 trades`, y **se registró igual en el índice como `NO_CONCLUYENTE`**. El raw del
+     23-ago, antes de la pausa, traía 397 y 107.
+
+  **Salida verificada el 10-sep, no teórica:** copia parcheada en el scratchpad + `sys.path` por
+  delante del repo. Se usó para los 36 (`**kwargs` en los mocks) y para SOL LATERAL (quitando la
+  pausa). **Producción nunca se tocó.**
+
+  **Lo que queda por hacer:** decidir si los sandboxes se mantienen al día con producción (y cómo se
+  detecta cuando divergen), o si se acepta parchear copias cada vez. Hoy nada avisa de la deriva.
 
 - [ ] **0c · 🆕 Estudios irreproducibles porque el SCRIPT DE MEDICIÓN ya no existe** *(10-sep, sale
   del ítem 0)*
@@ -208,11 +226,18 @@ huecos.)*
   Reporte: `reports/2026-09-09_m11-billetera-resincronizada-y-verificacion.md`
 
 - [ ] **M2 · `memoria_propia.json` no se actualiza** — causa ligada a `FASE_CAMBIO`, sin corregir.
-- [ ] **M3 · SOL LATERAL, filtro de volatilidad k=2,0** — "prometedor no confirmado": el mejor
-  resultado de la línea de volatilidad (PF 1,768, Sharpe 1,704, +$3,53) pero depende de **una sola
-  ventana de 6 meses**. ⚠️ **Corregido el 09-sep (ítem 2): "re-testear cuando haya más historia
-  de SOL" no alcanza.** Su baseline tiene SR +0,0096 por trade y necesitaría **29.281 trades**
-  contra los 397 que tiene — 74× la muestra. Más historia no lo va a salvar.
+- [x] **M3 · SOL LATERAL, filtro de volatilidad k=2,0 — 🔴 DESCARTADO el 10-sep.** Se cae por tres
+  motivos independientes, y el tercero es nuevo.
+  1. **El número era contaminado.** Rehecho con datos limpios y el francotirador despausado:
+     **PF 1,768 → 1,508 neto** (bruto 1,886 → 1,603, Δ **−0,283**). Queda **por debajo** del umbral
+     de 1,6, no por encima. Todo el lote SOL LATERAL dio deltas negativos, hasta **−0,579** en
+     `k_2.5`: el desfase no era ruido acá, **inflaba**.
+  2. **Muestra insuficiente** (ítem 2, 09-sep): su baseline tiene SR +0,0096 por trade y necesitaría
+     **29.281 trades** contra los 397 que tiene — 74× la muestra. Más historia no lo salva.
+  3. 🆕 **No sería ejecutable aunque el número diera.** Su DD es **25,5 %**, y el del baseline
+     **96,7 %**, contra el límite de **10 %** de `guardian_riesgo.py`. El guardián lo frenaría antes
+     de llegar al resultado.
+  `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
 - [ ] **M4 · Combo N** (BTC+ETH+AVAX-BAJISTA, Sharpe 3,96) — mejor que el combo O en backtest, pero
   **requiere Futuros**. No descartado: fuera de alcance sin esa cuenta.
 - [ ] **M5 · Bajistas en Futuros** — el torneo confirma señal real (grupo BAJISTA PF 1,074), pero
@@ -270,6 +295,55 @@ huecos.)*
   corrida del 09-sep 02:03) pero **no tiene verificación que alguien lea**.
   La propuesta era quitar el filtro `*.md` de los dos scripts (bloque D del mismo archivo de diffs).
   **Decisión: no se aplica.** Reabrir sólo con evidencia nueva y decisión explícita de Ariel.
+
+> **M15 está reservado** para el vencimiento del `client_id` de Google Drive
+> (`reports/2026-09-10_drive-historial-consultable.md`), pendiente de aprobación de Ariel.
+
+- [ ] **M16 · 🔴 El PF de `data/resultados.db` es BRUTO — sobreestima +0,096 en TODA la tabla**
+  *(10-sep, sale del ítem 0)*
+
+  **No es un problema del desfase ni de las 36: afecta a todas las filas cargadas por recálculo.**
+
+  Verificado en **18 de 18** estudios comparados contra su reporte fuente, mismo `n`, siempre en la
+  misma dirección: **media +0,096** (rango +0,085 a +0,108). La causa está probada — descontando la
+  comisión de **0,2 %** (0,1 % por lado) a los trades frescos, la brecha se reproduce: **+0,104
+  predicho contra +0,096 observado**.
+
+  El mecanismo está en `resultados_db.py:319`: el recálculo usa `pnl_pct`, que viene de `cambio_pct`,
+  que es **variación bruta de precio**. Los reportes descontaban comisión; el importador no.
+
+  **Por qué pesa más que el desfase:** el desfase es ruido (cambia de signo, se corrige rehaciendo).
+  Esto es **sesgo** — misma dirección siempre, y **rehacer no lo corrige** porque el recálculo lo
+  vuelve a meter.
+
+  ⚠️ **Contradice una regla vigente.** `CLAUDE.md` dice *"si un número discrepa, manda la DB"* — y es
+  la DB la que trae el número **optimista**.
+
+  **Qué hay que decidir:** (a) recargar el PF en neto, o agregar una métrica `pf_neto` al lado de la
+  bruta; (b) corregir esa línea de `CLAUDE.md`; (c) mientras tanto, **restar ~0,10 al PF de la DB al
+  compararlo contra el umbral de 1,6**.
+  `reports/2026-09-10_pf-db-bruto-vs-reportes-neto.md`
+
+- [ ] **M17 · 🔴 `~/bot-padre-v2/data/historico_4h/` sigue corrida −4 h HOY** *(10-sep, sale del ítem 0)*
+
+  El fix de L1 del **07-sep** corrigió `~/bot-padre-v3-backup/data/historico_4h/` (14 scripts) pero
+  **dejó intacta la copia de `~/bot-padre-v2/`** (`mtime` 11-jun). Verificado contra Binance, no
+  deducido: misma vela de SOL, mismo OHLC exacto, timestamp distinto —
+
+  ```
+  BINANCE (verdad)  2020-09-01 04:00  O=4.7466 H=4.9475 L=4.5740 C=4.6900
+  v3-backup         2020-09-01 04:00  ✅ correcto
+  v2/data           2020-09-01 00:00  🔴 corrido -4 h
+  ```
+
+  **Es riesgo abierto hacia adelante, no daño pasado.** Hoy la usan 2 scripts
+  (`audit_eventos_sol_lateral_extendido.py`, `audit_mtf_sol_lateral_extendido.py`), y **cualquier
+  estudio nuevo que apunte ahí se contamina igual que los del ítem 0**.
+
+  **Qué hay que hacer:** corregir la copia (+4 h en cada fila, igual que el 07-sep) **o** borrarla y
+  dejar `v3-backup` como fuente única. Lo segundo evita que vuelvan a divergir, pero hay que revisar
+  antes qué más apunta a esa ruta.
+  `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
 
 ## ✅ BLOQUE DE LABORATORIO — COMPLETO (L1–L10, cerrado el 07-sep)
 

@@ -23,27 +23,38 @@ se cierra sin su fila acá, sin actualizar `ESTADO_ACTUAL.md`, y sin cargar sus 
 gate `filtro_horario` bloqueaba **la vela equivocada** (la real de las 08:00 UTC en vez de la de las
 04:00 UTC) — misma cantidad de bloqueos, distinta vela.
 
-**Esto NO invalida el índice.** El efecto se midió rehaciendo dos estudios completos con datos
-limpios: **≤ 0,034 de PF, y el signo cambia** según el estudio. De las 107 contaminadas, **sólo 36
-pudieron cambiar de veredicto** (las que están a menos de 3× ese efecto del umbral 1,6, más aquellas
-cuyo **sujeto** era el propio gate horario). **Las otras 71 se sostienen por margen.**
+**✅ CERRADO el 10-sep: se rehicieron las 36 candidatas y NINGUNA cambió de veredicto.** El índice
+queda **confirmado, no invalidado**.
 
-| Estado | n | Qué hacer al citarlas |
+El efecto depende del **tamaño de muestra** (medido sobre 69 estudios rehechos): **n<150 → hasta
+0,579** de PF · 150-250 → 0,168 · n≥250 → 0,084. La columna **`estado_datos`** de
+`data/resultados.db` clasifica cada fila:
+
+| `estado_datos` | n | Qué hacer al citarla |
 |---|---:|---|
-| 🔴 A rehacer | **36** | **No citar como firmes.** Ver ids exactos en la DB (ítem 0) |
-| 🟡 Contaminadas pero sostenidas por margen | 71 | Citables; el desfase no alcanza a moverlas |
-| ⚫ Irreproducibles (script inexistente) | 49 | **Indeterminadas** — ver ítem **0c** de `COLA.md` |
-| ⬜ Sin `origen_archivo`, sin trazar | 116 | Sin clasificar todavía |
-| ✅ Exoneradas / post-fix | 31 | Sin reparo |
+| 🔴 `REHACER_DESFASE_4H` | **50** | 36 ya rehechas (sin cambios); 14 marcadas por la cota recalibrada |
+| 🟡 `OK_POR_MARGEN` | 57 | Citables: el desfase no alcanza a moverlas |
+| ⚫ `IRREPRODUCIBLE_SIN_SCRIPT` | 49 | **Indeterminadas** — ver ítem **0c** de `COLA.md` |
+| ⬜ `SIN_TRAZAR` | 116 | Sin clasificar — **queda abierto** |
+| ✅ `EXONERADA_DATOS_FRESCOS` / post-fix | 31 | Sin reparo |
+
+> 🔴 **ADVERTENCIA MÁS IMPORTANTE QUE EL DESFASE — el PF de esta tabla y el de la DB son BRUTOS.**
+> Los reportes descontaban la comisión de 0,2 %; el importador de `data/resultados.db` no.
+> Verificado en 18 de 18 estudios: la DB está **+0,096 más alta**, siempre. **Al comparar contra el
+> umbral de 1,6, restá ~0,10.** Ver ítem **M16** y
+> `reports/2026-09-10_pf-db-bruto-vs-reportes-neto.md`.
 
 **Las familias más afectadas** (todas del 22-25 de agosto): `fase2b_gates`, `fase2_variantes`,
 `fase2c_parte2`, `fase3_remover_gates`, `volatilidad_filtro_entrada`, `combinacion_rsi_maxop`,
 `torneo_*` y `*_evaluar_literal`.
 
-🔴 **La fila más frágil de todo el índice** es `btc_fase2b_gates · horario_6_19` (id 140, PF
-**1,641**, n=214): la única contaminada **por encima** del umbral de 1,6 y aun así `DESCARTADO`, a
-sólo **1,2×** el efecto medido. Es la única del índice donde el desfase pudo, por sí solo, cruzar la
-línea. **No citarla hasta rehacerla.**
+✅ **La id 140, que figuraba como la fila más frágil, quedó resuelta.** Parecía descartada *pese a*
+tener PF 1,641 sobre el umbral. Rehecha da 1,473, y **en neto nunca estuvo sobre 1,6** (1,54 → 1,37):
+la anomalía la fabricaba el PF bruto. El descarte queda respaldado por su propio número.
+
+🔴 **Lo que sí se cayó: el ítem M3** (SOL LATERAL, filtro de volatilidad k=2,0). Su PF pasa de
+**1,768 a 1,508** neto con datos limpios — debajo del umbral. Además su DD es 25,5 % (el del baseline
+96,7 %) contra el límite de 10 % del guardián, así que no sería ejecutable en vivo. **DESCARTADO.**
 
 ⚠️ **La fuente `~/bot-padre-v2/data/historico_4h/` sigue corrida hoy** — el fix del 07-sep sólo tocó
 `~/bot-padre-v3-backup/`. Un estudio nuevo que apunte ahí se contamina igual.

@@ -108,26 +108,28 @@ huecos.)*
   Dato útil: **cuando la comisión se paga en BNB el polvo deja de generarse** (se compra y se
   vende la cantidad redonda) y además abarata la comisión un 28 %. Hoy el BNB de la cuenta es 0.
   Ver `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`.
-- [ ] **M11 · `billetera.json` desincronizado de Binance — 3 decisiones pendientes de Ariel**
-  🔴 **09-sep.** USDT **$23,33** en el archivo contra **$29,01** real; BTC y AVAX declaran saldos
-  que la cuenta no tiene (BTC: 6,916e-05 en el archivo, **0,0** en Binance). Las dos diferencias se
-  compensan: ese BTC se vendió de verdad y la contabilidad no lo registró.
-  **El guardián de riesgo decide con ese archivo.** Hoy el error es conservador y casi se cancela
-  ($36,59 calculado contra ~$36,28 real), pero es casualidad, no diseño.
+- [x] **M11 · `billetera.json` — ✅ 2 de 3 resueltas el 09-sep; falta una compra de $5** (prueba **301**)
+  1. ✅ **Resincronizado.** USDT 23,3342 → **29,00757172** · BTC 6,916e-05 → **0,0** (el fantasma) ·
+     AVAX 0,94176 → **0,86913**. `capital_inicial`, `capital_real` y `moneda_activa` preservados.
+     Hecho bajo el **mismo `flock`** que usan `ejecutor.py` y `gestor_billetera.py`, con respaldo
+     previo y escritura atómica; aborta si hay saldo bloqueado. ⚠️ Se corrigió un fallo de diseño
+     propio antes de aplicar: la consulta a Binance iba **antes** del lock, dejando una ventana para
+     que el bot operara en el medio. Verificado: el guardián calcula **$36,18** (antes $36,59
+     inflado), DD 3,62 %, sin bloqueo. El saldo real de AVAX coincide **exacto** con la `qty` de la
+     posición abierta.
+  2. 🟡 **BNB: decisión tomada (mantenerlo), compra pendiente.** El descuento **ya está activado**
+     en la cuenta (`spotBNBBurn: True`) — sólo falta saldo, hoy 0. **No se compró**: es una orden
+     con dinero real y el monto no estaba decidido. Medido: toda la comisión de los 162 trades
+     reales habría costado **$1,23** en BNB; con **$5** (el mínimo de Binance) se cubren ~6 años,
+     el USDT libre queda en $24,01 y siguen cabiendo las 2 posiciones simultáneas con $7 de margen.
+     **Falta que Ariel diga "comprá $5 de BNB".**
+  3. ✅ **Verificación automática.** `~/comparar_billetera.py` integrado al chequeo diario de las
+     08:00; deja `ALERTA_billetera_*.md` en `reports/` si no coincide. Umbrales: USDT > $0,50,
+     cripto > 2 % con mínimo absoluto. Probado en los dos sentidos (OK con la billetera actual,
+     detecta las 3 diferencias con el respaldo previo). Un fallo de red no cuenta como
+     desincronización.
 
-  **Las tres decisiones, que son de Ariel y no se toman solas:**
-  1. **¿Cómo se resincroniza `billetera.json` con la cuenta?** Tocarlo a mano es exactamente lo que
-     las reglas de oro del camino del dinero piden no hacer a la ligera. `/reconciliar` **no** sirve
-     acá: está hecho para vender polvo real, no para cuadrar un archivo que declara de más.
-  2. **¿Conviene mantener saldo de BNB para pagar comisión?** Medido: abarata la comisión de 0,1 %
-     a **0,0718 %** (−28 %) **y elimina la causa del polvo** — con la comisión cobrada en BNB la
-     cantidad queda redonda y se vende entera. En contra: inmoviliza capital en un activo que no se
-     opera. Hoy el BNB de la cuenta es **0**.
-  3. **¿Se agrega una verificación automática archivo-contra-cuenta?** Hoy **no existe ninguna**.
-     Es el mismo hueco que tenía el backup: falla y nadie se entera. Encaja con el ítem 3, que ya
-     dejó el molde (`verificar_conexiones.sh`).
-
-  Base: `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`, prueba 295.
+  Reporte: `reports/2026-09-09_m11-billetera-resincronizada-y-verificacion.md`
 
 - [ ] **M2 · `memoria_propia.json` no se actualiza** — causa ligada a `FASE_CAMBIO`, sin corregir.
 - [ ] **M3 · SOL LATERAL, filtro de volatilidad k=2,0** — "prometedor no confirmado": el mejor

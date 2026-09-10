@@ -108,7 +108,7 @@ huecos.)*
   Dato útil: **cuando la comisión se paga en BNB el polvo deja de generarse** (se compra y se
   vende la cantidad redonda) y además abarata la comisión un 28 %. Hoy el BNB de la cuenta es 0.
   Ver `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`.
-- [x] **M11 · `billetera.json` — ✅ 2 de 3 resueltas el 09-sep; falta una compra de $5** (prueba **301**)
+- [x] **M11 · `billetera.json` — ✅ CERRADO el 09-sep, las 3 decisiones resueltas** (prueba **301**)
   1. ✅ **Resincronizado.** USDT 23,3342 → **29,00757172** · BTC 6,916e-05 → **0,0** (el fantasma) ·
      AVAX 0,94176 → **0,86913**. `capital_inicial`, `capital_real` y `moneda_activa` preservados.
      Hecho bajo el **mismo `flock`** que usan `ejecutor.py` y `gestor_billetera.py`, con respaldo
@@ -117,12 +117,13 @@ huecos.)*
      que el bot operara en el medio. Verificado: el guardián calcula **$36,18** (antes $36,59
      inflado), DD 3,62 %, sin bloqueo. El saldo real de AVAX coincide **exacto** con la `qty` de la
      posición abierta.
-  2. 🟡 **BNB: decisión tomada (mantenerlo), compra pendiente.** El descuento **ya está activado**
-     en la cuenta (`spotBNBBurn: True`) — sólo falta saldo, hoy 0. **No se compró**: es una orden
-     con dinero real y el monto no estaba decidido. Medido: toda la comisión de los 162 trades
-     reales habría costado **$1,23** en BNB; con **$5** (el mínimo de Binance) se cubren ~6 años,
-     el USDT libre queda en $24,01 y siguen cabiendo las 2 posiciones simultáneas con $7 de margen.
-     **Falta que Ariel diga "comprá $5 de BNB".**
+  2. ✅ **BNB comprado** (autorizado por Ariel). `MARKET BUY 0.007 BNBUSDT` → **FILLED, $5,0501**,
+     dos fills a $721,44, comisión 0,00000525 BNB **ya con el descuento aplicado**. ⚠️ No fueron $5
+     exactos: el `stepSize` es 0,001 y el `NOTIONAL` exige $5,00 con `applyMinToMarket`, así que $5
+     truncados dan 0,006 BNB = **$4,33** y la orden habría sido rechazada con `-1013`; 0,007 es el
+     múltiplo inmediato superior que pasa. Hecho **bajo el `flock` de billetera** y **sin escribir
+     en `auditoria.csv`** (no es una posición). USDT 29,0076 → **23,9575** · BNB 0 → **0,00699475**.
+     El descuento ya estaba activado en la cuenta (`spotBNBBurn: True`): sólo faltaba el saldo.
   3. ✅ **Verificación automática.** `~/comparar_billetera.py` integrado al chequeo diario de las
      08:00; deja `ALERTA_billetera_*.md` en `reports/` si no coincide. Umbrales: USDT > $0,50,
      cripto > 2 % con mínimo absoluto. Probado en los dos sentidos (OK con la billetera actual,

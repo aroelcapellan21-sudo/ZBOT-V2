@@ -43,34 +43,11 @@ Lo siguiente que se toma es el **ítem 1**.
 - [x] **2 · Revisión de los hallazgos anteriores con las herramientas nuevas** — ✅ **CERRADO
   el 09-sep. 🟢 ninguno es candidato a reabrir.** Detalle en "Ya cerrado".
 
-- [ ] **3 · Auditoría de conexiones y sincronizaciones** *(ex Ítem 14)* 🔜 **← EL QUE SIGUE** — 🟡 parcial
+- [x] **3 · Auditoría de conexiones y sincronizaciones** *(ex Ítem 14)* — ✅ **CERRADO el
+  09-sep. 7 de 8 conexiones sanas; el problema no era el estado sino la detección.**
+  Detalle en "Ya cerrado".
 
-  Pedido por Ariel el 08-sep. Verificar que esté sana toda conexión del proyecto que dependa del
-  sistema: GitHub, backup rsync al disco externo, sincronización a Drive, túnel de Cloudflare,
-  Telegram y API de Binance.
-
-  **Estado verificado el 09-sep 16:50** (chequeo, no la auditoría):
-
-  | Conexión | Estado |
-  |---|---|
-  | **GitHub** | 🟢 Sano. `origin/main` al día en `bd96d90` |
-  | **Backup rsync** | 🟢 **Corrió bien**: `[2026-09-09 02:03:04] === Backup OK ===`, 2,13 GB. El disco dejó de desconectarse tras la reconexión física del 08-sep |
-  | **Drive (reportes)** | 🟢 296/296 `.md`, verificación diaria 07:05 sin diferencias |
-  | **Drive (esta cola)** | 🟡 → resuelto el 09-sep al mover la cola al repo y sumarla al vigía |
-  | Túnel, Telegram, Binance | ⬜ **sin auditar** |
-
-  🎯 **Lo que Ariel pidió el 09-sep: resolver la causa raíz, no el síntoma.** El disco se arregló
-  físicamente, pero **el backup sigue sin forma de avisar si falla**: el script escribe su error en
-  `~/rsync-backup.log` y **nadie lee ese log**. Comparar con Drive, que sí tiene verificación diaria
-  automática, archivo de estado y log de verificaciones: **el backup no tiene ninguna de las tres.**
-  Esa asimetría es la razón de que una caída pueda durar 32 días, no el punto de montaje.
-
-  **Entregable:** estado de cada conexión y, para cada una, **cómo se enteraría alguien si se cae**.
-
-  **Queda abierto sin explicación** (anotado el 08-sep): la corrida del **06-sep** arrancó, resolvió
-  el montaje, empezó a copiar y **nunca escribió `Backup OK`**.
-
-- [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)*
+- [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* 🔜 **← EL QUE SIGUE**
 
   **Pospuesto el 07-sep**, no descartado: su premisa —LATERAL es la mayor parte del año, con
   movimiento comparable— quedó **confirmada en 5 de 6 años** (hasta 2,93× más velas que ALCISTA en
@@ -131,13 +108,26 @@ huecos.)*
   Dato útil: **cuando la comisión se paga en BNB el polvo deja de generarse** (se compra y se
   vende la cantidad redonda) y además abarata la comisión un 28 %. Hoy el BNB de la cuenta es 0.
   Ver `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`.
-- [ ] **M11 · `billetera.json` desincronizado de Binance** — 🔴 **nuevo, 09-sep.** USDT $23,33 en
-  el archivo contra **$29,01** real; BTC y AVAX declaran saldos que la cuenta no tiene. **El
-  guardián de riesgo decide con ese archivo.** Hoy el error es conservador y casi se cancela
-  ($36,59 calculado contra ~$36,28 real), pero es casualidad. `/reconciliar` **no** lo arregla:
-  está hecho para vender polvo real, no para cuadrar un archivo que declara de más. Tres
-  decisiones pendientes de Ariel en el reporte. Encaja con el ítem 3 (auditoría de conexiones):
-  no existe ninguna verificación archivo-contra-cuenta.
+- [ ] **M11 · `billetera.json` desincronizado de Binance — 3 decisiones pendientes de Ariel**
+  🔴 **09-sep.** USDT **$23,33** en el archivo contra **$29,01** real; BTC y AVAX declaran saldos
+  que la cuenta no tiene (BTC: 6,916e-05 en el archivo, **0,0** en Binance). Las dos diferencias se
+  compensan: ese BTC se vendió de verdad y la contabilidad no lo registró.
+  **El guardián de riesgo decide con ese archivo.** Hoy el error es conservador y casi se cancela
+  ($36,59 calculado contra ~$36,28 real), pero es casualidad, no diseño.
+
+  **Las tres decisiones, que son de Ariel y no se toman solas:**
+  1. **¿Cómo se resincroniza `billetera.json` con la cuenta?** Tocarlo a mano es exactamente lo que
+     las reglas de oro del camino del dinero piden no hacer a la ligera. `/reconciliar` **no** sirve
+     acá: está hecho para vender polvo real, no para cuadrar un archivo que declara de más.
+  2. **¿Conviene mantener saldo de BNB para pagar comisión?** Medido: abarata la comisión de 0,1 %
+     a **0,0718 %** (−28 %) **y elimina la causa del polvo** — con la comisión cobrada en BNB la
+     cantidad queda redonda y se vende entera. En contra: inmoviliza capital en un activo que no se
+     opera. Hoy el BNB de la cuenta es **0**.
+  3. **¿Se agrega una verificación automática archivo-contra-cuenta?** Hoy **no existe ninguna**.
+     Es el mismo hueco que tenía el backup: falla y nadie se entera. Encaja con el ítem 3, que ya
+     dejó el molde (`verificar_conexiones.sh`).
+
+  Base: `reports/2026-09-09_billetera-vs-binance-y-correccion-del-polvo.md`, prueba 295.
 
 - [ ] **M2 · `memoria_propia.json` no se actualiza** — causa ligada a `FASE_CAMBIO`, sin corregir.
 - [ ] **M3 · SOL LATERAL, filtro de volatilidad k=2,0** — "prometedor no confirmado": el mejor
@@ -211,6 +201,34 @@ laboratorio no era lo bastante sólido para sostener conclusiones nuevas.
 - [x] **L11 · ¿es fuerte el laboratorio?** — ✅ **CERRADO 09-sep, 3 de 3 pruebas.** 🔴 mide bien y elige mal.
 
 ## Ya cerrado
+
+- [x] **3 · Auditoría de conexiones y sincronizaciones (09-sep) — ✅ 7 de 8 sanas; lo que faltaba
+  era la detección.** (prueba **300**)
+  - **Estado:** GitHub `4f7d040` sin pendientes · Drive reportes 292/292 por checksum · Drive cola
+    automática · túnel `:5050` HTTP 200 · Telegram `getMe` OK · Binance 273-348 ms · 30 screens.
+  - 🎯 **Causa raíz medida:** Drive tenía **tres** mecanismos de detección —verificación
+    programada, archivo de estado y alerta— y el backup **ninguno**. `backup_externo.sh` no tiene
+    una sola línea que notifique: escribe en un log de 78 MB que nadie abre. Por eso el 08-sep pasó
+    inadvertido y por eso en julio una caída duró 32 días.
+  - **Los dos fallos, explicados:** 06-sep `código rsync 24` (archivos que desaparecieron durante
+    la copia — benigno) y **08-sep abortó por disco sin montar** tras el reinicio de las 00:29: esa
+    noche no hubo backup. ⚠️ **Corrige el reporte del 08-sep**, que decía que la del 06 "nunca
+    escribió `Backup OK`, sin explicación": sí escribió — escribió `FALLO`.
+  - **El disco con sufijo `2`:** hay 3 directorios del mismo UUID en `/media/ariel`, los otros dos
+    **vacíos y no son puntos de montaje**. No afecta nada: el script resuelve por `findmnt UUID`.
+    298 G libres de 457 G. El backup incluye `reports/` completo con `raw/` y `snapshots_combo_o/`
+    — los 13 MB que Drive no cubre **sí** están ahí (refuerza M14).
+  - 🔴 **Problema de fondo:** Telegram es el **único** canal de alerta del sistema y el más frágil
+    — 11 fallos en 7 días, siempre por red, o sea **correlacionados con lo que tienen que avisar**.
+  - **APLICADO:** `~/verificar_conexiones.sh` + timer diario 08:00, que le da al backup los tres
+    mecanismos y consolida backup + Drive + screens + git en un archivo. Si el último `Backup OK`
+    pasa de **48 h**, deja un `ALERTA_backup_*.md` dentro de `reports/`, que ya se sincroniza solo
+    a Drive. **No avisa por Telegram a propósito**, para no construir sobre el punto único de falla
+    que este mismo ítem midió. Probado en real (exit 0, estado en Drive) y la rama de alerta
+    probada en aislamiento: detecta 139 h sin backup y escribe el detalle correcto.
+    Además se quitó el `except Exception: pass` de `tunnel_asistente.py`.
+  - **No se probó** el failover real (cortar la red) ni la URL pública del túnel desde afuera.
+    Reporte: `reports/2026-09-09_item3-auditoria-de-conexiones.md`
 
 - [x] **2 · Revisión de los `NO_CONCLUYENTE` con las herramientas del L11 (09-sep) — 🟢 ninguno es
   candidato a reabrir, y el reparto es el hallazgo.** (prueba **299**)

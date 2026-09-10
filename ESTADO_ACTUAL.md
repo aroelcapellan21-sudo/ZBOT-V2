@@ -183,6 +183,20 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
+## 🟢 Ítem 3 — las conexiones están sanas; lo que faltaba era enterarse (09-sep-2026, CERRADO)
+
+**7 de 8 sanas.** Lo que no existía era la detección: Drive tenía **tres** mecanismos
+(verificación programada, archivo de estado, alerta) y el **backup ninguno** — su script no
+tiene una sola línea que notifique. Por eso la caída del 08-sep (disco sin montar tras el
+reinicio) pasó inadvertida, y por eso en julio una duró 32 días.
+
+**Aplicado:** `~/verificar_conexiones.sh` + timer diario 08:00 → archivo de estado + alerta
+en `reports/` cuando el último backup bueno pasa de 48 h. **No usa Telegram a propósito:**
+es el único canal de alerta del sistema y falló **11 veces en 7 días**, siempre por red, o
+sea correlacionado con lo que tiene que avisar. También se quitó un `except: pass` de
+`tunnel_asistente.py`. Prueba **300** ·
+`reports/2026-09-09_item3-auditoria-de-conexiones.md`
+
 ## 🟢 Ítem 2 — ningún `NO_CONCLUYENTE` escondía una ventaja (09-sep-2026, CERRADO)
 
 De los **123** `NO_CONCLUYENTE`, **ninguno es candidato a reabrir** — pero **25 de los 46 que

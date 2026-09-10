@@ -16,10 +16,14 @@ import urllib.request
 import urllib.parse
 import sys
 import time
+from datetime import datetime
 
 PUERTO       = 5050
 KEYS_FILE    = os.path.expanduser("~/bot-padre-v2/keys.env")
 URL_FILE     = os.path.expanduser("~/bot-padre-v2/signals/tunnel_url.txt")
+# Mismo archivo que usa engine.enviar_aviso: un solo lugar donde mirar cuando
+# un aviso de Telegram no llega (CLAUDE.md, "Log de fallos").
+LOG_TELEGRAM = os.path.expanduser("~/bot-padre-v2/memoria/telegram.log")
 PATRON_URL   = re.compile(r"https://[a-zA-Z0-9._-]+\.trycloudflare\.com")
 PATRON_FIJA  = re.compile(r"https://[a-zA-Z0-9._-]+\.[a-z]{2,}")
 
@@ -60,8 +64,17 @@ def enviar_telegram(mensaje):
                 headers={"Content-Type": "application/json"}
             )
             urllib.request.urlopen(req, timeout=5)
-        except Exception:
-            pass
+        except Exception as e:
+            # No se traga el error: si este aviso falla, la URL nueva del tunel
+            # no le llega a nadie y no queda rastro. Igual que engine.enviar_aviso,
+            # el fallo va a memoria/telegram.log (CLAUDE.md: nunca `except: pass`).
+            print(f"[TUNNEL] Fallo el aviso a {chat_id}: {e}")
+            try:
+                with open(LOG_TELEGRAM, "a") as f:
+                    f.write(f"{datetime.now():%Y-%m-%d %H:%M:%S} - "
+                            f"Error envio tunnel {chat_id}: {e}\n")
+            except Exception as e2:
+                print(f"[TUNNEL] Tampoco se pudo loguear: {e2}")
 
 def guardar_url(url):
     try:

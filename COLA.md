@@ -72,19 +72,22 @@ Lo siguiente que se toma es el **ítem 1**.
   ⚠️ **Esto toca la credibilidad de una parte del índice, así que va antes que cualquier
   investigación nueva.** `reports/2026-09-09_item4-reabierto-desfase-4h.md`
 
-- [ ] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* 🔜 **← EL QUE SIGUE** — 🟡 **REABIERTO
-  el 09-sep: pendiente de confirmar con datos limpios.**
-  Se habia cerrado con los 7 estudios ya registrados (PF 0,963-1,208 contra el umbral de 1,6), pero
-  **los siete son del 17-23 de agosto, anteriores al fix de L1**, y **sí les aplica** el desfase:
-  `torneo_generico.py` inyecta un reloj falso a `filtro_horario` con el timestamp de la vela, que
-  estaba corrido −4 h, así que el gate evaluaba la ventana **0-17 h en vez de 4-21 h**. Con velas de
-  4 h eso es **exactamente una vela de corrimiento**, y el filtro bloquea 1 de cada 6: no bloqueaba
-  de más ni de menos, **bloqueaba la vela equivocada**.
-  **Acotado:** `filtro_eventos` no aplica (está anulado en el torneo) y la secuencia de precios es
-  la misma, así que RSI, EMAs y TP/SL son idénticos — el único canal verificado es el gate horario.
-  **Para cerrarlo:** rehacer los 3 `torneo_*_lateral` y el `sol_lateral` de 5,9 años con el CSV ya
-  corregido (`torneo_generico.py` **ya está arreglado**: es volver a correrlo) y comparar los PF.
-  `reports/2026-09-09_item4-reabierto-desfase-4h.md`
+- [x] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* — ✅ **CERRADO el 09-sep, ahora
+  con datos limpios.** Rehechos 2 de los 4 estudios con el CSV corregido: el desfase mueve el
+  PF **0,01-0,03** y **no cambia ningún veredicto**. Los otros 2 **no son reproducibles** (sus
+  francotiradores se pausaron después, commit `5713c0a`) y se sostienen por margen: les faltan
+  +0,599 y +0,557 para el umbral, o sea **16-18× el mayor efecto medido**.
+  `reports/2026-09-09_item4-rehecho-con-datos-limpios.md`
+
+- [ ] **0b · 🆕 Estudios irreproducibles por cambios de código posteriores** *(09-sep, sale del ítem 4)*
+  `torneo_avax_lateral` y `sol_lateral_evaluar_literal_2020_2026` **ya no se pueden rehacer**: sus
+  francotiradores se pausaron por código el 29-ago (commit `5713c0a`) y los estudios son del 22-23,
+  así que hoy el torneo importa la función desactivada y devuelve **n = 0**.
+  **No es un problema de datos** —eso es el ítem 0— **sino de que el código que medían cambió
+  después.** Es el asterisco que L2 había dejado anotado (*"prueba reproducibilidad el mismo día, no
+  a lo largo del tiempo"*) apareciendo en la práctica. **Cuántos estudios más están en esta
+  situación, no está medido.** Salida posible: correrlos contra una copia parcheada del
+  francotirador, sin tocar producción.
 
 - [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*
   Las 5 monedas del bot se eligieron entre las que **hoy** están arriba, y nunca se testeó

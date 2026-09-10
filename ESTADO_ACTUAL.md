@@ -183,6 +183,44 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
+## 🔴 Ítem 0 — el desfase contaminó 107 pruebas, pero sólo 36 cambian de veredicto (10-sep-2026, CERRADO)
+
+**El índice no se cae: se cae el 12 % de él, y está identificado fila por fila.**
+
+Auditoría del canal que abrió el ítem 4 al reabrirse. **16 scripts** inyectan un reloj falso a
+`filtro_horario` (la cola conocía 2). El mecanismo quedó verificado con aritmética: el gate bloquea
+**1 de 6 velas en ambos casos (16,7 % exacto)**; lo que cambia es **cuál** — bloqueaba la vela real
+de las **08:00 UTC** en vez de la de las **04:00 UTC**.
+
+| De las 280 pruebas pre-07-sep | n |
+|---|---:|
+| 🔴 Contaminadas | **107** |
+| ✅ Exoneradas (bajan serie fresca de Binance) | 8 |
+| ⚫ Irreproducibles — script inexistente (→ ítem **0c**) | 49 |
+| ⬜ Sin `origen_archivo`, **sin trazar** | 116 |
+
+**Criterio de corte, no opinión:** el ítem 4 midió el efecto rehaciendo dos estudios completos —
+**≤ 0,034 de PF, con el signo cambiando** según el estudio (ruido direccional, no sesgo). Se rehace
+lo que esté a menos de 3× eso del umbral 1,6, más aquello cuyo **sujeto** era el gate horario.
+
+> **REHACER 36 · NO REHACER 71.**
+
+**La fila más frágil es la id 140** (`btc_fase2b_gates · horario_6_19`, PF **1,641**, n=214,
+`DESCARTADO`): la única contaminada **por encima** del umbral, a **1,2×** el efecto medido, y encima
+del bloque donde la hora era la variable independiente. Se rehace primero.
+
+⚠️ **Riesgo abierto hacia adelante:** el fix del 07-sep corrigió `~/bot-padre-v3-backup/` pero
+**dejó `~/bot-padre-v2/data/historico_4h/` sin tocar — sigue corrida hoy**. Cualquier estudio nuevo
+que apunte ahí se contamina de nuevo. Verificado contra Binance, no deducido.
+
+⚠️ **Y el bug estaba escrito desde el 23-ago** (`reports/2026-08-23_diagnostico-bug-timestamps-backup4h.md`).
+Los scripts de `~/experimento_director_adaptativo/` lo esquivaron al día siguiente; los de
+`sistema_c/` corrieron con él **dos semanas más**, hasta el 07-sep. El problema no fue detectarlo:
+fue propagar el fix.
+
+**Queda abierto y no se cierra en falso:** las 116 filas sin `origen_archivo`.
+`reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
+
 ## 🟡 Ítem 4 — LATERAL: el cierre se revirtió el mismo día (09-sep-2026, REABIERTO)
 
 > ⚠️ **Se había dado por cerrado con los 7 estudios ya registrados. Ariel preguntó si eran

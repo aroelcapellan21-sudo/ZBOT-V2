@@ -47,8 +47,9 @@ Lo siguiente que se toma es el **ítem 1**.
   09-sep. 7 de 8 conexiones sanas; el problema no era el estado sino la detección.**
   Detalle en "Ya cerrado".
 
-- [ ] **0 · 🔴 ALTA PRIORIDAD — auditar los estudios pre-07-sep que usan `filtro_horario` con
-  reloj inyectado** *(nuevo, 09-sep, sale de la reapertura del ítem 4)*
+- [x] **0 · 🔴 ALTA PRIORIDAD — auditar los estudios pre-07-sep que usan `filtro_horario` con
+  reloj inyectado** *(nuevo, 09-sep, sale de la reapertura del ítem 4)* — ✅ **CERRADO el 10-sep.
+  🔴 contaminó 107 pruebas, pero sólo 36 pudieron cambiar de veredicto.**
 
   **El canal de contaminación está confirmado, el alcance NO está medido.** Cualquier estudio
   anterior al fix de L1 (07-sep) que inyecte un reloj falso a `filtro_horario` evaluó la ventana
@@ -56,21 +57,30 @@ Lo siguiente que se toma es el **ítem 1**.
   de 4 h eso es **una vela exacta** de corrimiento, y el gate bloquea 1 de cada 6: **no bloqueaba de
   más ni de menos, bloqueaba la vela equivocada**.
 
-  **Qué hay que hacer:**
-  1. Listar **todos** los `.py` que hagan `filtro_horario.datetime = <reloj falso>` o equivalente.
-     Se sabe de `torneo_generico.py` y los `resim_evaluar_literal_*`; **cuántos más hay, no está
-     medido**.
-  2. Cruzar con `data/resultados.db` por fecha: **toda prueba anterior al 2026-09-07** generada por
-     esos scripts queda bajo sospecha.
-  3. Decidir por bloque, no de a una: cuáles se rehacen y cuáles no dependen del gate horario.
+  **Resultado (10-sep):**
+  1. **16 scripts** inyectan el reloj, no 2. Clasificados: **3 exonerados** (bajan la serie fresca de
+     Binance), 9 parchados el 07-sep, 2 sin parchar, 2 leyendo una fuente **aún corrida**.
+  2. De las **280 pruebas pre-07-sep**: **107 contaminadas**, 8 exoneradas, 49 irreproducibles
+     (script inexistente → ítem **0c**), 116 sin `origen_archivo` **sin trazar** (queda abierto).
+  3. Criterio de corte: el efecto medido es **≤ 0,034 de PF** (ítem 4), así que se rehace lo que
+     esté a menos de 3× eso del umbral 1,6, más aquello cuyo **sujeto** era el gate horario.
+     → **REHACER 36 · NO REHACER 71.**
+
+  **Orden de trabajo:** id **140** primero (`btc_fase2b_gates · horario_6_19`, PF 1,641, la única
+  contaminada por encima del umbral y a sólo 1,2× el efecto) → ids 139, 182, 183 (la hora era el
+  sujeto) → los 32 restantes por lotes → corregir `~/bot-padre-v2/data/historico_4h/` **antes** de
+  rehacer la del grupo D.
+
+  ⚠️ **Pendiente que NO se cierra con esto:** las **116 filas sin `origen_archivo`**. El barrido por
+  texto (47 con rastro del gate, 69 sin él) es triage, no evidencia.
 
   **Lo que ya se sabe y acota el problema:** un desfase uniforme **no altera el OHLC ni su orden**,
   así que RSI, EMAs y la mecánica de TP/SL son idénticos. `filtro_eventos` estaba anulado en el
   torneo. **El único canal verificado es el gate horario** — pero alcanza para mover el 16,7 % de
   las oportunidades.
 
-  ⚠️ **Esto toca la credibilidad de una parte del índice, así que va antes que cualquier
-  investigación nueva.** `reports/2026-09-09_item4-reabierto-desfase-4h.md`
+  **El índice no se cae: se cae el 12 % de él (36 de 303), identificado fila por fila.**
+  `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
 
 - [x] **4 · Francotiradores para fase LATERAL** *(ex Ítem 2c)* — ✅ **CERRADO el 09-sep, ahora
   con datos limpios.** Rehechos 2 de los 4 estudios con el CSV corregido: el desfase mueve el
@@ -88,6 +98,37 @@ Lo siguiente que se toma es el **ítem 1**.
   a lo largo del tiempo"*) apareciendo en la práctica. **Cuántos estudios más están en esta
   situación, no está medido.** Salida posible: correrlos contra una copia parcheada del
   francotirador, sin tocar producción.
+
+- [ ] **0c · 🆕 Estudios irreproducibles porque el SCRIPT DE MEDICIÓN ya no existe** *(10-sep, sale
+  del ítem 0)*
+
+  **49 pruebas del índice salen de scripts que no están en ningún lado del disco.** Son casi todas
+  la serie de auditorías de gates y solapamientos del **18-ago**. Buscados por nombre en todo `~`:
+  `audit_horario_limitador`, `audit_termometro`, `audit_calidad_estadistico`, `audit_correlacion`,
+  `audit_limitador_extendido`, `audit_pares_memoria`, `investigar_horario_*`, `backtest_memoria_fix`,
+  `calidad_extendido`, `pares_restantes`, `produccion_vs_sistemac` → **ninguno existe**.
+  `sistema_c/` conserva 29 `.py` y ninguno es de esa familia.
+
+  **Es una causa distinta de las otras dos, y es la única sin salida:**
+
+  | Causa | Ítem | Salida |
+  |---|---|---|
+  | Los datos estaban corridos | **0** | Rehacer con el CSV corregido |
+  | El código medido cambió después | **0b** | Correr contra una copia parcheada |
+  | **El script de medición desapareció** | **0c** | **Ninguna conocida** |
+
+  Sin el script no se puede reproducir el estudio **ni verificar si el gate horario estaba activo**,
+  así que estas 49 tampoco se pueden clasificar como contaminadas o sanas: quedan indeterminadas.
+  Son las filas más débiles del índice y **hoy no están marcadas como tales**.
+
+  **Qué hay que decidir (no es obvio, es decisión de Ariel):** si se marcan en
+  `INDICE_RESULTADOS.md` como no verificables, si se rehacen desde cero con scripts nuevos (es
+  reescribir 9 estudios), o si se aceptan como están dejando constancia. **No hay opción técnica
+  que las recupere.**
+
+  ⚠️ **Y la pregunta que abre para adelante:** nada obliga hoy a conservar el script que generó una
+  fila del índice. Mientras eso siga así, el problema **se repite**.
+  `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
 
 - [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*
   Las 5 monedas del bot se eligieron entre las que **hoy** están arriba, y nunca se testeó

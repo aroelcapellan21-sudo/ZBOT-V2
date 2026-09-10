@@ -17,6 +17,41 @@ se cierra sin su fila acá, sin actualizar `ESTADO_ACTUAL.md`, y sin cargar sus 
 
 ---
 
+## ⚠️ LEER ANTES DE CITAR UNA FILA ANTERIOR AL 07-SEP (auditoría del 10-sep, ítem 0)
+
+**El desfase de −4 h del backup 4h contaminó 107 de las 280 pruebas anteriores al 2026-09-07.** El
+gate `filtro_horario` bloqueaba **la vela equivocada** (la real de las 08:00 UTC en vez de la de las
+04:00 UTC) — misma cantidad de bloqueos, distinta vela.
+
+**Esto NO invalida el índice.** El efecto se midió rehaciendo dos estudios completos con datos
+limpios: **≤ 0,034 de PF, y el signo cambia** según el estudio. De las 107 contaminadas, **sólo 36
+pudieron cambiar de veredicto** (las que están a menos de 3× ese efecto del umbral 1,6, más aquellas
+cuyo **sujeto** era el propio gate horario). **Las otras 71 se sostienen por margen.**
+
+| Estado | n | Qué hacer al citarlas |
+|---|---:|---|
+| 🔴 A rehacer | **36** | **No citar como firmes.** Ver ids exactos en la DB (ítem 0) |
+| 🟡 Contaminadas pero sostenidas por margen | 71 | Citables; el desfase no alcanza a moverlas |
+| ⚫ Irreproducibles (script inexistente) | 49 | **Indeterminadas** — ver ítem **0c** de `COLA.md` |
+| ⬜ Sin `origen_archivo`, sin trazar | 116 | Sin clasificar todavía |
+| ✅ Exoneradas / post-fix | 31 | Sin reparo |
+
+**Las familias más afectadas** (todas del 22-25 de agosto): `fase2b_gates`, `fase2_variantes`,
+`fase2c_parte2`, `fase3_remover_gates`, `volatilidad_filtro_entrada`, `combinacion_rsi_maxop`,
+`torneo_*` y `*_evaluar_literal`.
+
+🔴 **La fila más frágil de todo el índice** es `btc_fase2b_gates · horario_6_19` (id 140, PF
+**1,641**, n=214): la única contaminada **por encima** del umbral de 1,6 y aun así `DESCARTADO`, a
+sólo **1,2×** el efecto medido. Es la única del índice donde el desfase pudo, por sí solo, cruzar la
+línea. **No citarla hasta rehacerla.**
+
+⚠️ **La fuente `~/bot-padre-v2/data/historico_4h/` sigue corrida hoy** — el fix del 07-sep sólo tocó
+`~/bot-padre-v3-backup/`. Un estudio nuevo que apunte ahí se contamina igual.
+
+`reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
+
+---
+
 ## BTC
 
 | Fase | Qué se probó | n | WR | PF | Sharpe | Resultado | Reporte fuente |

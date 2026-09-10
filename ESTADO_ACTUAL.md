@@ -183,6 +183,17 @@ manual por diseño.
 **Registrado en `data/resultados.db`:** pruebas **293** (rama CON), **294** (rama SIN) y **295**
 (impacto realizado).
 
+## 🟢 Ítem 2 — ningún `NO_CONCLUYENTE` escondía una ventaja (09-sep-2026, CERRADO)
+
+De los **123** `NO_CONCLUYENTE`, **ninguno es candidato a reabrir** — pero **25 de los 46 que
+tienen serie (54 %) nunca tuvieron capacidad de detectar nada** y estaban archivados igual que
+los medidos. Los 14 "no visibles" se parten en **5 recuperables** (falta muestra alcanzable;
+**3 de los 5 son de BNB**, la moneda huérfana) y **9 sin señal** (MinTRL astronómico: hasta
+**6,18 millones** de trades). **Con los 298 ensayos de la casa el Sharpe máximo esperado por
+azar es +0,2178 por trade y ninguno de los 46 lo supera.** Corrige la lectura de M3:
+`sol_volatilidad` necesitaría 74× su muestra, así que "esperar más historia de SOL" no sirve.
+Prueba **299** · `reports/2026-09-09_item2-revision-de-los-no-concluyentes.md`
+
 ## 🔴 L11 — el laboratorio mide bien y elige mal (09-sep-2026, CERRADO)
 
 > **Cerrado con las 3 pruebas el 09-sep.** Además de los dos puntos ciegos de abajo, la

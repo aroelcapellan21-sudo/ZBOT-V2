@@ -40,33 +40,10 @@ Lo siguiente que se toma es el **ítem 1**.
 - [x] **1 · L11 — evaluación del laboratorio** *(ex Ítem 13)* — ✅ **CERRADO el 09-sep. 🔴 el
   laboratorio mide bien y elige mal.** Las tres pruebas están en "Ya cerrado".
 
-- [ ] **2 · Revisión de los hallazgos anteriores con las herramientas nuevas** 🔜 **← EL QUE SIGUE** *(ex "revisión con
-  herramientas nuevas" de la cola de Drive + ex "ítem de alta prioridad" de `ESTADO_ACTUAL.md` —
-  **eran el mismo trabajo escrito dos veces**, unificados acá el 09-sep)*
+- [x] **2 · Revisión de los hallazgos anteriores con las herramientas nuevas** — ✅ **CERRADO
+  el 09-sep. 🟢 ninguno es candidato a reabrir.** Detalle en "Ya cerrado".
 
-  Revisar los **`NO_CONCLUYENTE`** archivados en `INDICE_RESULTADOS.md` y separar dos cosas que
-  hasta hoy se leían igual: los que **midieron que no hay ventaja** y los que **tenían una ventaja
-  real que el laboratorio no tenía potencia para detectar**.
-
-  El L11 midió el umbral: con ~240 trades no distingue del azar una ventaja de **+0,485 pp por
-  trade**, y detecta apenas el 17 % de las de +0,250 pp.
-
-  - **Empezar por los de MENOS trades** — son los más vulnerables: cuanto más chica la muestra, más
-    alto el umbral, así que un `NO_CONCLUYENTE` con n bajo es casi indistinguible de "no se midió".
-  - La consulta sale de `data/resultados.db`, que tiene `n` por prueba (`python3 consultar.py`), no
-    de leer el `.md` a ojo.
-  - **Reevaluar contra el azar, no contra cero** (`~/lab_eval/benchmark_tonto.py`). La vara vieja
-    ("IC 95 % > 0") aprobó 100 de 100 estrategias de ruido puro.
-  - La pregunta no es "¿dio positivo?" sino **"¿cuántos trades harían falta para que una ventaja de
-    este tamaño fuera detectable?"** — eso convierte cada caso archivado en una decisión: juntar más
-    muestra, o cerrarlo de verdad.
-  - ⚠️ **NO es permiso para resucitar hallazgos.** Un `NO_CONCLUYENTE` que vuelve a la mesa sigue
-    necesitando evidencia propia, diff y OK explícito antes de tocar nada. Lo que cambia es que ya
-    no se puede archivar uno diciendo "no hay ventaja" cuando lo que hubo fue falta de potencia.
-
-  Base: `reports/2026-09-09_L11-evaluacion-del-laboratorio.md`, prueba **296**.
-
-- [ ] **3 · Auditoría de conexiones y sincronizaciones** *(ex Ítem 14)* — 🟡 parcial
+- [ ] **3 · Auditoría de conexiones y sincronizaciones** *(ex Ítem 14)* 🔜 **← EL QUE SIGUE** — 🟡 parcial
 
   Pedido por Ariel el 08-sep. Verificar que esté sana toda conexión del proyecto que dependa del
   sistema: GitHub, backup rsync al disco externo, sincronización a Drive, túnel de Cloudflare,
@@ -165,7 +142,9 @@ huecos.)*
 - [ ] **M2 · `memoria_propia.json` no se actualiza** — causa ligada a `FASE_CAMBIO`, sin corregir.
 - [ ] **M3 · SOL LATERAL, filtro de volatilidad k=2,0** — "prometedor no confirmado": el mejor
   resultado de la línea de volatilidad (PF 1,768, Sharpe 1,704, +$3,53) pero depende de **una sola
-  ventana de 6 meses**. Re-testear cuando haya más historia de SOL.
+  ventana de 6 meses**. ⚠️ **Corregido el 09-sep (ítem 2): "re-testear cuando haya más historia
+  de SOL" no alcanza.** Su baseline tiene SR +0,0096 por trade y necesitaría **29.281 trades**
+  contra los 397 que tiene — 74× la muestra. Más historia no lo va a salvar.
 - [ ] **M4 · Combo N** (BTC+ETH+AVAX-BAJISTA, Sharpe 3,96) — mejor que el combo O en backtest, pero
   **requiere Futuros**. No descartado: fuera de alcance sin esa cuenta.
 - [ ] **M5 · Bajistas en Futuros** — el torneo confirma señal real (grupo BAJISTA PF 1,074), pero
@@ -183,6 +162,34 @@ huecos.)*
   mediciones independientes dicen que arreglarlo empeora). Queda como deuda conocida, no como TODO.
 - [ ] **M10 · Fase B de correlación — rediseño** — con la ventana pedida, 0/40 combinaciones llegan
   a n≥30 (máx. 7). Un diseño distinto podría generar muestra, pero es otra pregunta.
+
+- [ ] **M12 · Regla de proceso "buscar antes de investigar" — redactada, sin aplicar** *(09-sep)*
+  Va en `CLAUDE.md`, junto a la regla del 01-sep. Dice que antes de arrancar cualquier
+  investigación nueva hay que consultar **dos** lugares: `INDICE_RESULTADOS.md` + `resultados.db`
+  (*"¿esto ya se midió?"*) **y** las secciones "NO TOCAR" / "DECISIÓN TOMADA" de `CLAUDE.md`
+  (*"¿esto ya se decidió, y con qué argumento?"*). El motivo es concreto: hay decisiones sostenidas
+  por evidencia que **no es una fila de la DB** —el trailing, el termómetro, el centinela viven en
+  prosa—, y un backtest nuevo puede contradecirlas sin que nadie lo note.
+  **Diff completo y listo:** `reports/2026-09-09_diffs-cierre-del-dia.txt`, bloque B.
+
+- [ ] **M13 · Marcar 4 archivos viejos como históricos — redactado, sin aplicar** *(09-sep)*
+  `CONTEXTO_SESION.md` (volcado de código de junio), `CIERRE_FINAL.md` (los 3 puntos de julio),
+  `reporte_evaluacion_real.md` (evaluación de mayo, con números del simulador a 4 h que
+  **sobreestima**) y `CLAUDE_BACKUP_2026-08-22.md` (copia vieja de `CLAUDE.md`). Cada encabezado
+  dice qué es, por qué quedó superado y dónde vive hoy esa información.
+  **Diff completo y listo:** `reports/2026-09-09_diffs-cierre-del-dia.txt`, bloque C.
+
+- [x] **M14 · ~~Respaldo de `reports/` fuera de la Dell~~ — ⛔ DESCARTADO por decisión de Ariel
+  (09-sep).** No se toca nada.
+  **Lo que se midió antes de descartarlo, para no volver a abrirlo sin datos nuevos:** `reports/`
+  está en `.gitignore` y nunca va a GitHub. Drive **sí** lo respalda, con verificación diaria por
+  checksum (292/292 el 09-sep, 0 diferencias), **pero sólo los `.md`**: el vigía y el verificador
+  filtran con `--include "*.md"`. De los 16 MB, **13 MB en 157 archivos quedan fuera** — los JSON de
+  backtests, los diffs, `raw/`, `snapshots_combo_o/` —, y ésos dependen de un solo respaldo: el
+  rsync al disco USB, que copia todo `/home/ariel/` (verificado: 446 entradas de `reports/` en la
+  corrida del 09-sep 02:03) pero **no tiene verificación que alguien lea**.
+  La propuesta era quitar el filtro `*.md` de los dos scripts (bloque D del mismo archivo de diffs).
+  **Decisión: no se aplica.** Reabrir sólo con evidencia nueva y decisión explícita de Ariel.
 
 ## ✅ BLOQUE DE LABORATORIO — COMPLETO (L1–L10, cerrado el 07-sep)
 
@@ -204,6 +211,28 @@ laboratorio no era lo bastante sólido para sostener conclusiones nuevas.
 - [x] **L11 · ¿es fuerte el laboratorio?** — ✅ **CERRADO 09-sep, 3 de 3 pruebas.** 🔴 mide bien y elige mal.
 
 ## Ya cerrado
+
+- [x] **2 · Revisión de los `NO_CONCLUYENTE` con las herramientas del L11 (09-sep) — 🟢 ninguno es
+  candidato a reabrir, y el reparto es el hallazgo.** (prueba **299**)
+  - De los **123** `NO_CONCLUYENTE`: **77 no tienen serie** (auditorías, diagnósticos,
+    proyecciones). De los **46 con trades**: **21 MEDIDO** (muestra suficiente y aun así no
+    alcanza — el nulo *es* un resultado), **11 INEVALUABLE** (n < 30) y **14 NO VISIBLE**.
+  - 🔴 **25 de 46 (54 %) nunca tuvieron capacidad de detectar nada** y estaban archivados igual que
+    los medidos.
+  - **Los 14 "no visibles" son dos cosas distintas.** 🟡 **5 recuperables** (falta muestra
+    alcanzable): `torneo_bnb_lateral` +29 trades, `btc_volatilidad k_1.31` +45,
+    `sol_volatilidad_khigh k_1.75` +53, y los dos de BNB con +508 y +638. **Tres de los cinco son
+    de BNB**, la moneda huérfana — coherente, porque no opera y por eso tiene menos trades.
+    ⚪ **9 sin señal:** `torneo_eth_bajista` necesitaría **6.181.199 trades** (SR +0,0007).
+  - 🎯 **El dato que ordena todo:** con los 298 ensayos de la casa, el Sharpe máximo esperado **por
+    azar** es **SR₀ = +0,2178 por trade**, y **ninguno de los 46 lo supera** (el mejor recuperable
+    llega a +0,1526). Los 5 son recuperables **contra cero**, la vara que la Prueba 1 mostró que
+    aprueba 100 de 100 estrategias de ruido puro.
+  - **Norma que deja:** `NO_CONCLUYENTE` debería distinguir "medido y nulo" de "no evaluable";
+    antes de archivar un nulo hay que calcular el **MinTRL**; y un MinTRL astronómico es un
+    resultado **positivo** que cierra el tema, no un pendiente esperando datos.
+  - Sin backtests nuevos: todo salió de los trades ya guardados.
+    Reporte: `reports/2026-09-09_item2-revision-de-los-no-concluyentes.md`
 
 - [x] **12 · Carrera entre `watchdog.py` e `iniciar_bots.sh` + watchdog ciego** *(ex Ítem 12)*
   — ✅ **RESUELTO el 08-sep 01:11, commit `3592e89`, pusheado y verificado en vivo.**

@@ -59,6 +59,123 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🟢 Las 473 aperturas fallidas: diagnosticadas y con contramedida aplicada (10-sep-2026)
+
+**Pregunta de Ariel:** *"¿existen pruebas o mecanismos que no hayamos hecho que sí recomiendes?"*
+Se revisaron las 306 pruebas de la DB buscando huecos reales. Salió **una** recomendación, se
+investigó, y terminó en el único cambio de código del día. Pruebas **307** y **308**.
+
+### 1. El hueco que encontré: el 92 % invisible
+`auditoria.csv` tenía **473 filas `ANULADA` contra 41 operaciones reales**. El bot intentaba abrir
+y fallaba, **y el motivo no se registraba en ningún lado**.
+
+### 2. El diagnóstico: no era un problema, eran tres — y los tres ya estaban apagados
+
+| Causa | Filas | Cuándo | Estado |
+|---|---:|---|---|
+| Monto bajo el mínimo de $5 | **118** | agosto | ✅ corregido el 24-ago (`MONTO_FIJO`) |
+| SL inejecutable (SOL a $5) | **18** | 29 y 31-ago | ✅ corregido el 31-ago — **el guardián funcionando bien** |
+| Pasan todo → falla en Binance | **337** | 4 al 8-sep | ✅ se extinguió solo |
+
+Las 337 pasan **todas** las validaciones locales (monto, fondos de $30,54, SL ejecutable), así que
+la orden salió y Binance la rechazó. **No hay ni un marcador `ORDEN_INCIERTA`**: fueron rechazos
+definitivos.
+
+**Verificado que hoy no pasa:** `POST /api/v3/order/test` (no llega al motor de matching) da
+**HTTP 200 en las 4 monedas**, `billetera.json` coincide con Binance **al centavo**, y hay **0
+filas `ANULADA` desde el 8-sep 18:38**.
+
+> ⚠️ **Esto cierra la hipótesis optimista de la prueba 307.** Yo había planteado que parte de ese
+> 92 % podían ser señales recuperables, y sería la mayor palanca de frecuencia disponible.
+> **No lo es:** 136 eran bugs ya corregidos y las 337 eran **una señal reintentada cada 4 minutos**,
+> no 337 oportunidades — el bot igual terminó entrando. **No hay frecuencia escondida ahí.**
+
+### 3. La causa de fondo, que sí seguía viva: el punto ciego
+En los 4 francotiradores, la rama de éxito llamaba `registrar_evento()` y la del fallo **sólo**
+marcaba `ANULADA`. `ejecutor.py` tiene **21 retornos de fallo distintos**, cada uno con su motivo,
+pero iban sólo a un `print` que muere con el screen y a un Telegram que fallaba por red.
+**0 coincidencias de `RECHAZADO` en 118 MB de logs.**
+
+### 4. ✅ Contramedida aplicada (con OK explícito de Ariel)
+`registrar_evento()` en la rama `else` de los 4 francotiradores activos —
+`btc:441`, `eth:814`, `sol:428`, `avax:428`. **6 líneas insertadas, 0 modificadas, 0 borradas.**
+No cambia ninguna decisión de trading, no toca el camino del dinero, no pide locks.
+
+**`v2_main` reiniciado** el 10-sep 22:30:43 (PID 9364; el viejo 3477 se mató con el PID verificado
+por `cwd`, no con `pgrep -f`, así que `motor-confluencia` quedó intacto).
+
+**Verificación post-reinicio:** `BOT_REAL_CONFIRMADO=true` · modo REAL · `billetera.json` **sin
+cambios** · `auditoria.csv` con **md5 idéntico** · 30 screens y `monitor_screens` con **0 caídos**
+· **0 tracebacks** · ORQUESTA despachando a los 4 directores. Se reinició con **0 posiciones
+abiertas**, la ventana de menor riesgo posible.
+
+### 5. Las seis ideas que se descartaron en el camino
+Salidas parciales/piramidar (**imposible**: mínimo $5, media posición de $7 son $3,50) · conectar
+BNB (ya dio **negativo en forward real 2026**) · segunda lista de monedas (**XRP y LINK ya
+descartadas** el 15-ago con el mismo screening) · sacar la moneda más floja (las 4 aportan
+positivo) · compounding (centavos a $0,49/mes) · órdenes LIMIT (**maker 10 bps = taker 10 bps**).
+
+**Candidata de segundo orden, no ejecutada:** barrer el intervalo de velas (`4h` fijo, nunca
+comparado con 1h/2h) — pero la prueba 279 sugiere que más señales rinden peor (PF 1,142 vs 1,606).
+
+### Qué NO se hizo
+No se tocó `MONTO_FIJO`, ni TP/SL, ni el cupo, ni el guardián, ni ningún gate. No se ejecutó
+ninguna orden real. El cambio aplicado es **puramente de registro**.
+
+## 🔴 Tres preguntas sobre "ganar más" — las tres cerradas sin cambios (10-sep-2026)
+
+**Decisión de Ariel el mismo día: las tres quedan SOLO como reporte de investigación.** No se
+implementa ninguna. Se registran para no volver a preguntarlo. Pruebas **304**, **305** y **306**.
+
+### 1. ¿Se puede arriesgar más? — el cupo no es la palanca (prueba 304)
+- **Cupo 2, 3 y 4 dan resultado idéntico**: 0 señales descartadas en 6 años, pico simultáneo
+  observado = **2, nunca 3**. La "Fase 2" del plan de esa mañana (subir el cupo a 4) **no cambiaría
+  un solo trade**.
+- **La exposición media real es $5,68 de $36,86 (15,4 %)**, no $17 — el **51,1 % del tiempo no hay
+  ninguna posición abierta**. El capital ocioso no viene del cupo, viene de la falta de señales.
+- La única palanca es `MONTO_FIJO`, y es **escalado proporcional puro**: ×2 monto = ×2 ganancia y
+  ×2 pérdida. Techo ejecutable por caja: ×1,75. **Ningún escenario alcanza $1,67/mes**, ni ×3,0.
+- Tiempo bajo el agua **invariante al monto**: 634 días en los 9 escenarios.
+
+### 2. ¿Qué cambiar con evidencia? — no queda nada sin aplicar (prueba 305)
+- De **41 PROMETEDOR** en la DB, **uno solo** sobrevivió toda la robustez: quitar
+  `cerrar_huerfanas()` — **ya aplicado el 09-sep**. La comisión en BNB (`spotBNBBurn: true`) **ya
+  está activa**. Son las dos únicas palancas que pasaron la vara, y las dos están hechas.
+- **El candidato que más prometía se cae:** ensanchar TP/SL ×1,5 mejora el PF en 4/4 monedas y en
+  cartera daba PF 1,384 vs 1,276 con **menos** drawdown — pero gana en **5 de 10 años** y **2 de 4
+  monedas**, con IC 95 % **[−$43,26 · +$66,87]** y P(mejor) = **66,9 %**. Y cuesta frecuencia
+  segura: **11,13 → 6,98 trades/mes**.
+- **Tres cuellos de botella resultaron inertes:** el cupo, los **12 gates** (quitarlos da 243 → 249
+  trades en 9 años) y **el guardián al 10 %**.
+
+> ⚠️ **Corrección registrada.** La prueba 304 planteó que el umbral del guardián estaba mal
+> calibrado (el DD real es 14,31 % contra un límite de 10 %). **La 305 lo midió: cuesta $0,00** —
+> 1 bloqueo en 6 años, **0 señales perdidas**, PnL idéntico con umbrales 10/12/15/20 %.
+> **Es protección gratis. No se toca.**
+
+### 3. ¿Y si el capital sube a $50? — sí, pero es lineal (prueba 306)
+- ⚠️ **`MONTO_FIJO` es fijo, no un porcentaje del capital.** Poner los **$12,79** sin tocar nada
+  más da **$0,00 de mejora**: el PnL es idéntico año por año (+$34,79), sólo baja el DD a 11,11 %
+  por el colchón.
+- Bien hecho ($50 con monto **×1,356** = $13,56 / $9,49): **mismo DD del 14,31 %** que hoy y
+  **+35,6 %** de resultado (+$34,79 → +$47,17), o sea **+$0,17/mes**. Los +$5 pasan de ~10,2 a
+  ~7,5 meses.
+- **El capital es un multiplicador, no un arreglo:** los últimos 12 meses de la base son
+  **negativos** y empeoran de −$2,92 a −$3,96. Y **2021 aporta el 56 %** de toda la ganancia de 6
+  años; sin ese año quedan ~$0,31/mes.
+
+### Lo que queda anotado de las tres
+El bot no tiene un problema de configuración sino de **escala**. El motor funciona — L5 confirmó
+que **le gana a entradas al azar en 4 de 4 monedas** (95-100 %) — pero produce **~$0,49/mes sobre
+$36**, y ninguna reconfiguración medida lo cambia.
+
+### Qué NO se hizo
+No se tocó `MONTO_FIJO`, ni el cupo, ni TP/SL, ni el guardián, ni un gate, ni un francotirador, ni
+el capital. Limitación común: DD **realizado** (sólo cierres), el real sería peor.
+
+Detalle: `reports/2026-09-10_arriesgar-mas-frontera-monto-vs-guardian.md` ·
+`reports/2026-09-10_que-cambiar-con-evidencia.md` · `reports/2026-09-10_subir-capital-a-50.md`
+
 ## 🟢 `cerrar_huerfanas()` — la etapa 2 decidió: quitarla gana $31 en 6 años (09-sep-2026)
 
 **Estado: PROMETEDOR con diff preparado, esperando OK de Ariel.** La etapa 2 terminó el 09-sep a

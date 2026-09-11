@@ -438,6 +438,7 @@ def evaluar():
             )
         else:
             _actualizar_fila(fila_id, "ANULADA")
+            registrar_evento(f"ALCISTA BTC: APERTURA FALLIDA {SYMBOL} | {resultado}")
     else:
         print(f"  Sin señal. RSI:{rsi} EMA_C:{ema_c} EMA_L:{ema_l}")
         registrar_evento(f"FRANCOTIRADOR ALCISTA BTC: Sin señal. RSI:{rsi}")

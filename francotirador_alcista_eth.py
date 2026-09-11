@@ -810,6 +810,9 @@ def evaluar():
                 fila_id,
                 "ANULADA"
             )
+            registrar_evento(
+                f"ALCISTA ETH: APERTURA FALLIDA {SYMBOL} | {resultado}"
+            )
 
     else:
         print(

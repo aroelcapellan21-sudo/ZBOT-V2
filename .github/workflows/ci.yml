@@ -9,8 +9,9 @@
 #
 #   Por eso se separa en dos niveles:
 #
-#     BLOQUEA  lo que rompe en ejecucion: los tests, y los errores de ruff que
-#              son bugs de verdad (nombre indefinido, sintaxis, redefinicion).
+#     BLOQUEA  lo que rompe en ejecucion: los tests, los errores de ruff que
+#              son bugs de verdad (nombre indefinido, sintaxis, redefinicion), y
+#              desde el 12-sep la deriva entre los sandboxes y produccion (L12).
 #     AVISA    lo cosmetico y los tipos: se ven en el log, no frenan el push.
 #              Son el backlog, y la idea es bajarlos hasta poder promoverlos.
 #
@@ -47,15 +48,18 @@ jobs:
       - name: ruff — solo lo que rompe en ejecucion
         run: ruff check . --select E9,F821,F811 --ignore F401,F841,F541
 
-      # ── AVISA (no frena) ──────────────────────────────────────────────────
-      - name: L12 — deriva entre los sandboxes y produccion (informativo)
-        run: python3 laboratorio/verificar_mocks.py || true
-        # Informativo por ahora y con fecha de vencimiento: hoy hay 13 mocks de
-        # sistema_c/ que no aceptan `sl_pct` (commit f61c066, 31-ago), y un paso
-        # que nace en rojo se aprende a ignorar. Cuando esas 13 esten saldadas,
-        # PROMOVER a BLOQUEA (quitar el `|| true` y mover el paso arriba): a
-        # partir de ahi cualquier deriva nueva frena el push, que es el punto.
+      - name: L12 — deriva entre los sandboxes y produccion
+        run: python3 laboratorio/verificar_mocks.py
+        # PROMOVIDO a BLOQUEA el 12-sep-2026, que era la condicion escrita aca
+        # al crearlo. Nacio informativo porque 13 mocks de sistema_c/ no
+        # aceptaban `sl_pct` (f61c066, 31-ago) y un paso que nace en rojo se
+        # aprende a ignorar. Saldadas esas 13 (commit 6a3de0f), el chequeo
+        # termina verde: 65 divergencias, todas SILENCIOSO y todas en el
+        # baseline. Desde aca cualquier deriva NUEVA frena el push, que es el
+        # punto del chequeo. Si aparece una y es legitima, se revisa y se
+        # actualiza el baseline con `--actualizar`; no se vuelve a `|| true`.
 
+      # ── AVISA (no frena) ──────────────────────────────────────────────────
       - name: ruff completo (informativo)
         run: ruff check . --statistics || true
 

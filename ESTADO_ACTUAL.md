@@ -106,7 +106,7 @@ bajistas. Es un análisis sobre datos ya registrados.
 
 Detalle: `reports/2026-09-12_ranking-quinto-francotirador-lateral-bajista.md`
 
-## 🟢 Ítem 0b — la deriva ahora se detecta sola; faltan 13 por saldar (12-sep-2026)
+## 🟢 Ítem 0b — CERRADO: la deriva se detecta sola y las 13 quedaron saldadas (12-sep-2026)
 
 **Instrucción de Ariel:** detección automática, **no** el patrón de parchear cada vez que se rompe
 — ese patrón produjo 3-4 fallos silenciosos distintos en una sola semana.
@@ -141,9 +141,78 @@ mocks, y eso **cambia los resultados de backtests ya registrados** (`torneo_gene
 `resim_*`) — medición propia y OK aparte. Tampoco compara comportamiento, sólo interfaz. Ningún
 archivo de producción tocado, sin dependencias nuevas.
 
-**El ítem 0b sigue ABIERTO** en `COLA.md` por esas 13, con la parte de detección hecha.
+### Cómo se cerró, el mismo día
 
-Detalle: `reports/2026-09-12_item0b-deteccion-deriva-sandboxes.md`
+**Se midió antes de tocar nada.** El gate de `sl_pct` rechaza la entrada si la posición valdría
+menos que el mínimo de Binance al tocar su stop. Sobre **3.700 trades de 14 series** lo que rechaza
+depende del monto: **$5 → 100 % · $7 → 0,6 % · $10 → 0 %**. El 100 % con $5 es aritmética —$5 con un
+SL de 3,5 % valen $4,83 al stop, por debajo del mínimo de $5— y el monto mínimo viable es **$5,18**.
+O sea que **el torneo, que simuló $5, midió un bot que no podía existir**: no invalida la comparación
+*entre* francotiradores (mismo sesgo para todos), pero sí leer sus retornos como plata alcanzable.
+
+**Cómo quedó:** un módulo único `sistema_c/mock_ejecutor.py` con la lógica del gate, que los 13
+sandboxes importan (3 líneas de patch cada uno). Lee `LOT_SIZE`, `MONTO_MINIMO_BINANCE` y
+`COMISION_SPOT` del propio `ejecutor.py` **con `ast`, sin importarlo**, así que si cambian allá
+cambian acá solos — que era el punto del ítem. L12 pasó de **78 divergencias (13 `ROMPE`) a 65
+(0 `ROMPE`), exit 0**; las 65 que quedan son las `SILENCIOSO` del baseline, deliberadas.
+
+**⚠️ Los 13 estudios ya registrados NO se rehacen, y queda anotado por qué.** Se midieron sin el
+gate. Modelarlo con los montos de hoy mueve el PF **entre +0,000 y +0,033, y siempre a favor**: es
+menos que la tercera cifra de casi cualquier fila del índice y no puede cambiarle el signo a ningún
+veredicto. Decisión de Ariel (12-sep): **se anota, no se recorre.** Lo que sí queda dicho es que
+cualquier lectura de esos estudios como *plata alcanzable* arrastra el sesgo del monto simulado.
+
+**Condición de uso, escrita en el módulo:** un sandbox que lo use **tiene que simular el monto
+real**. Corrido con $5 el gate devuelve 0 trades y parece que el francotirador no opera.
+
+**El paso del CI quedó promovido a BLOQUEA** (`.github/workflows/ci.yml`), que era la condición
+escrita al crearlo: desde hoy cualquier deriva **nueva** frena el push. Si alguna vez aparece una
+legítima, se revisa y se actualiza el baseline con `--actualizar`; no se vuelve a poner `|| true`.
+
+**Y se corrigió un bug del propio L12:** `_archivos_py()` usaba `os.walk` sin `followlinks`, así que
+**no entraba en directorios que fueran symlinks y podía devolver verde sin haber escaneado nada** —
+un falso verde, justo lo que el chequeo existe para evitar. Reproducido y verificado: en un árbol de
+prueba con el sandbox detrás de un symlink, la versión vieja decía *"sin divergencias"* (exit 0) y la
+nueva la detecta (exit 1); sobre el repo real la salida es **idéntica**, y un symlink en ciclo hacia
+un ancestro no la cuelga (`vistos` por `realpath`).
+
+Detalle: `reports/2026-09-12_item0b-deteccion-deriva-sandboxes.md` y
+`reports/2026-09-12_saldar-13-divergencias-y-agregador-torneo.md`
+
+## 🟡 Ítem 0c — 11 filas recuperadas, 49 con constancia de no verificables (12-sep-2026)
+
+**El problema:** 49 pruebas del índice salen de scripts de medición que ya no existen en el disco
+(buscados por nombre en todo `~` el 10-sep). No se pueden reproducir **ni clasificar** como
+contaminadas o sanas por el desfase 4h: son las filas más débiles del índice y hasta hoy nada lo
+decía.
+
+**Decisión de Ariel (12-sep): recuperar formalmente lo que se pueda con el agregador nuevo, y para
+el resto dejar constancia de la razón — no rehacerlas desde cero.**
+
+**Lo recuperado: las 11 filas del torneo del 24-ago.** `sistema_c/metricas_torneo.py` reemplaza al
+script perdido que armó sus tablas y las reproduce desde los raws de `reports/raw/`: **n y WR dan
+exacto en las 11, y el PF en 10 de 11**. La única que no es `GRUPO BAJISTA`, y esa diferencia ya
+tenía nombre — el retorno del short dividido por el precio de *salida* (prueba 311), que la lleva de
+**1,074 a 0,921**. Las 11 dejan de estar `SIN_TRAZAR` y pasan a `REPRODUCIDA_METRICAS_TORNEO`, con
+el raw anotado fila por fila. **Que 10 de 11 den exacto es lo que convierte a la 11ª en un error y
+no en una diferencia de método.**
+
+⚠️ **El Sharpe de los agregados no se recupera, y por eso cambia en la DB.** Los individuales se
+reproducen dentro del 5 %; los tres grupos no dan con ninguna de las tres fórmulas probadas (el
+3,865 publicado de `GRUPO ALCISTA` sale **1,726** por trade). Como el método original no se puede
+reconstruir, la DB pasa a guardar el Sharpe calculado con **el método estándar de
+`resultados_db.calcular_metricas()`** —media/std × √252, el mismo que el resto de la DB— y la fuente
+queda escrita en cada métrica. **No es que el bot rinda menos: es que del 3,865 no se sabe de dónde
+salía.**
+
+**Lo no recuperable: las 49.** Cada una lleva ahora, en su propio `resumen` de la DB, la constancia
+de por qué no se puede verificar. Se conservan los números publicados; lo que cambia es que la fila
+ahora dice que **nadie puede volver a obtenerlos**.
+
+**Lo que el ítem deja abierto:** nada obliga hoy a conservar el script que generó una fila del
+índice. Mientras eso siga así, el problema se repite.
+
+Detalle: `reports/2026-09-12_saldar-13-divergencias-y-agregador-torneo.md`
 
 ## 🟢 Las 473 aperturas fallidas: diagnosticadas y con contramedida aplicada (10-sep-2026)
 

@@ -24,11 +24,14 @@ tercio: se respetó el orden.
 
 ## En curso
 
-**Ítem 0b — deriva entre producción y los sandboxes.** Tomado el 12-sep con la instrucción
-explícita de Ariel: **detección automática, no parchear cada vez que se rompe**. Los ítems 0, 1, 2,
-3 y 4 están cerrados (ver "Ya cerrado").
+**Nada en curso: 0b y 0c se cerraron el 12-sep.** 0b — la deriva producción↔sandbox se detecta
+sola (L12), las 13 divergencias quedaron saldadas y el paso del CI está promovido a **BLOQUEA**.
+0c — 11 filas del torneo recuperadas con `sistema_c/metricas_torneo.py`, y las 49 sin script
+marcadas como **no verificables** con la razón escrita en cada fila de la DB. Los ítems 0, 1, 2, 3 y
+4 ya estaban cerrados (ver "Ya cerrado").
 
-Lo siguiente que se toma, al cerrar 0b, es el **ítem 0c**.
+**Lo siguiente lo elige Ariel.** Los candidatos inmediatos de la cola son **4b** (survivorship bias,
+identificado y sin medir) y **5** (¿el cupo `MAX_OP_TOTAL` 1→2 depende de un año bueno?).
 
 ## Orden confirmado por Ariel (09-sep)
 
@@ -93,7 +96,8 @@ Lo siguiente que se toma, al cerrar 0b, es el **ítem 0c**.
   +0,599 y +0,557 para el umbral, o sea **16-18× el mayor efecto medido**.
   `reports/2026-09-09_item4-rehecho-con-datos-limpios.md`
 
-- [ ] **0b · 🆕 Deriva entre producción y los sandboxes — MEDIDO el 10-sep: es 36 de 36, no 2**
+- [x] **0b · ✅ CERRADO el 12-sep — deriva entre producción y los sandboxes** — MEDIDO el
+  10-sep: es 36 de 36, no 2
   *(09-sep, reescrito el 10-sep con el alcance real)*
 
   **Se creía que eran dos estudios con el francotirador pausado. Al ir a rehacer las 36 del ítem 0,
@@ -154,14 +158,26 @@ Lo siguiente que se toma, al cerrar 0b, es el **ítem 0c**.
   ⚠️ **Queda una condición de uso, escrita en el módulo:** un sandbox que lo use **tiene que simular
   el monto real**. Corrido con $5 devuelve 0 trades y parece que el francotirador no opera.
 
-  **Pendiente menor:** promover el paso del CI de informativo a BLOQUEA (quitarle el `|| true`), que
-  era la condición puesta al crearlo. Y un bug propio de L12: `_archivos_py()` usa `os.walk` sin
-  `followlinks`, así que no entra en directorios que sean symlinks — no afecta al repo, apareció al
-  montar el árbol de prueba.
+  **✅ Los dos pendientes menores, cerrados el 12-sep con OK de Ariel:**
+  1. **El paso del CI está promovido a BLOQUEA** (se le quitó el `|| true` y se movió al bloque de
+     arriba en `.github/workflows/ci.yml`), que era la condición escrita al crearlo. Desde ahora
+     cualquier deriva **nueva** frena el push; si alguna es legítima se actualiza el baseline con
+     `--actualizar`, no se vuelve a `|| true`.
+  2. **El bug de `os.walk` está corregido:** `_archivos_py()` va con `followlinks=True` y un
+     `vistos` por `realpath` que corta los ciclos. Sin eso el chequeo **no entraba en directorios
+     que fueran symlinks y podía devolver verde sin escanear nada** — un falso verde, justo lo que
+     L12 existe para evitar. Verificado: en el árbol de prueba la versión vieja daba "sin
+     divergencias" (exit 0) y la nueva la detecta (exit 1); sobre el repo real la salida es
+     **idéntica** y un symlink en ciclo hacia un ancestro no la cuelga.
+
+  **⚠️ Los 13 estudios ya registrados no se recorren — decisión de Ariel, y queda anotado.** Se
+  midieron sin el gate; modelarlo con los montos de hoy mueve el PF **+0,000 a +0,033 y siempre a
+  favor**, menos que la tercera cifra de casi cualquier fila del índice, así que no puede cambiarle
+  el signo a ningún veredicto. La constancia queda en `ESTADO_ACTUAL.md`, en el índice y en la DB.
   `reports/2026-09-12_saldar-13-divergencias-y-agregador-torneo.md`
 
-- [ ] **0c · 🆕 Estudios irreproducibles porque el SCRIPT DE MEDICIÓN ya no existe** *(10-sep, sale
-  del ítem 0)*
+- [x] **0c · ✅ CERRADO el 12-sep — estudios irreproducibles porque el SCRIPT DE MEDICIÓN ya no
+  existe** *(10-sep, sale del ítem 0)*
 
   **49 pruebas del índice salen de scripts que no están en ningún lado del disco.** Son casi todas
   la serie de auditorías de gates y solapamientos del **18-ago**. Buscados por nombre en todo `~`:
@@ -182,13 +198,26 @@ Lo siguiente que se toma, al cerrar 0b, es el **ítem 0c**.
   así que estas 49 tampoco se pueden clasificar como contaminadas o sanas: quedan indeterminadas.
   Son las filas más débiles del índice y **hoy no están marcadas como tales**.
 
-  **Qué hay que decidir (no es obvio, es decisión de Ariel):** si se marcan en
-  `INDICE_RESULTADOS.md` como no verificables, si se rehacen desde cero con scripts nuevos (es
-  reescribir 9 estudios), o si se aceptan como están dejando constancia. **No hay opción técnica
-  que las recupere.**
+  **✅ Decisión de Ariel (12-sep): recuperar formalmente lo que se pueda, y para el resto dejar
+  constancia de la razón — NO rehacerlas desde cero.** Aplicado así:
 
-  ⚠️ **Y la pregunta que abre para adelante:** nada obliga hoy a conservar el script que generó una
-  fila del índice. Mientras eso siga así, el problema **se repite**.
+  - **11 filas recuperadas.** `sistema_c/metricas_torneo.py` reemplaza al script perdido que armó
+    las tablas del torneo del 24-ago y las reproduce desde los raws: **n y WR exactos en las 11, PF
+    exacto en 10 de 11**. La única que no es `GRUPO BAJISTA` (1,074 → **0,921**), y esa diferencia
+    ya tenía nombre: la fórmula del short de la prueba 311. Pasan de `SIN_TRAZAR` a
+    `REPRODUCIDA_METRICAS_TORNEO`, con el raw anotado fila por fila.
+  - ⚠️ **El Sharpe de los agregados sigue sin recuperarse**, con ninguna de las tres fórmulas
+    probadas (3,865 publicado → 1,726 por trade en `GRUPO ALCISTA`). Como el método original no se
+    puede reconstruir, la DB pasa a guardar el Sharpe del método estándar de
+    `resultados_db.calcular_metricas()` con la fuente escrita en cada métrica. **No es que rinda
+    menos: es que del 3,865 no se sabe de dónde salía.**
+  - **Las 49 quedan marcadas como no verificables**, cada una con la razón en su propio `resumen`
+    de la DB. Se conservan los números publicados; lo que cambia es que la fila ahora dice que
+    nadie puede volver a obtenerlos.
+
+  ⚠️ **Lo que NO se cierra con esto, y es lo que importa para adelante:** nada obliga hoy a
+  conservar el script que generó una fila del índice. Mientras eso siga así, el problema
+  **se repite**.
   `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
 
 - [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*

@@ -180,7 +180,20 @@ def _comparar_firmas(real, mock):
 
 
 def _archivos_py():
-    for base, dirs, archivos in os.walk(RAIZ):
+    # followlinks=True a proposito: sin el, os.walk NO entra en un directorio
+    # que sea un symlink, y este chequeo devuelve "sin divergencias" sobre un
+    # arbol que en realidad no miro. Aparecio el 12-sep montando el arbol de
+    # prueba, donde sistema_c/ era un link: dio verde sin escanear nada. El repo
+    # hoy no tiene ninguno, pero un falso verde es justo lo que este chequeo
+    # existe para evitar. `vistos` corta los ciclos que followlinks habilita
+    # (un link a un directorio ya recorrido, o a un ancestro).
+    vistos = set()
+    for base, dirs, archivos in os.walk(RAIZ, followlinks=True):
+        real = os.path.realpath(base)
+        if real in vistos:
+            dirs[:] = []
+            continue
+        vistos.add(real)
         dirs[:] = [d for d in sorted(dirs) if d not in EXCLUIDOS and not d.startswith(".")]
         for nombre in sorted(archivos):
             if nombre.endswith(".py"):

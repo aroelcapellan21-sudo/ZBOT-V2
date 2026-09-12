@@ -49,8 +49,14 @@ sus números en `data/resultados.db`.
   para detectar francotiradores inactivos demasiado tiempo. Diseño y diff:
   `2026-08-25_diseno-tiempo-sin-operar.md`, `2026-08-25_diff-tiempo-sin-operar.patch`.
 - **Bajistas:** los 5 desactivados por gate global (`gestor_bajistas.py`, falta de capital en
-  Futuros — no por mal resultado, ver Fase 3 del torneo: el grupo BAJISTA combinado da PF 1.074,
-  positivo, con AVAX BAJISTA como 2° mejor francotirador de los 15).
+  Futuros). ⚠️ **CORREGIDO EL 2026-09-12 — el "no por mal resultado" era falso.** Decía que la Fase 3
+  del torneo daba el grupo BAJISTA en PF 1.074 positivo, con AVAX BAJISTA como 2° mejor de los 15.
+  **Los dos números estaban inflados por un error de cálculo:** el torneo dividió el retorno del
+  short por el precio de **salida** en vez del de entrada. Con el cálculo correcto el **grupo da PF
+  0.921** (retorno de +291,2 pp a **−326,2 pp**, cambia de signo) y **AVAX BAJISTA da 1.068**, por
+  debajo de los cuatro ALCISTA activos. Los 5 bajistas siguen apagados; lo que cambia es que ahora
+  **tampoco hay resultado que los respalde**. Detalle y verificación:
+  `reports/2026-09-12_ranking-quinto-francotirador-lateral-bajista.md`.
 - **BNB:** sigue huérfano — código completo (3 fases sin pausa interna) pero
   `director_orquesta.py` no lo llama. Nota nueva: sus 11 filas históricas en `auditoria.csv` son
   todas `ANULADA` — nunca ejecutó un trade real ni siquiera cuando estuvo conectado (mismo
@@ -58,6 +64,47 @@ sus números en `data/resultados.db`.
 - **`config_cartera.py` no es fuente de verdad universal** — BTC ALCISTA lo ignora por completo
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
+
+## 🔴 No hay quinto francotirador: ninguno de los 9 LATERAL/BAJISTA califica (12-sep-2026)
+
+**Pregunta de Ariel:** de los francotiradores LATERAL/BAJISTA disponibles, ¿cuál sería el mejor
+candidato para sumar a los 4 ALCISTA activos? Comparados por ganancia (PF neto), muestra, y la vara
+correcta contra el azar (**SR₀**, no contra cero).
+
+**El mejor candidato es BNB LATERAL con PF neto 1,104 y le faltan +0,496 para el umbral de 1,6.** No
+está cerca. Queda **por debajo del más flojo de los cuatro que ya operan** (SOL ALCISTA, 1,182), y
+**los 4 activos le ganan a los 9 candidatos sin excepción**.
+
+| | Candidatos (los 9) | Activos hoy (los 4) |
+|---|---|---|
+| PF neto | 1,104 · 1,068 · 0,985 · 0,978 · 0,935 · 0,928 · 0,909 · 0,824 · 0,765 | **1,428** · 1,403 · 1,247 · 1,182 |
+| En positivo | **2 de 9** | 4 de 4 |
+| Mejor retorno (ticket $7, 9 años) | +$6,23 (BNB LAT) | **+$21,00** (ETH ALC) |
+| Años calendario positivos, el mejor | 5 de 10 | **9 de 10** |
+| DSR contra SR₀ = +0,3537 | **0 de 9** (todos 0,000) | 0 de 4 (máx 0,002) |
+
+**Muestra:** 201-379 trades, a la par de los activos — pero **ninguna alcanza su propio MinTRL**.
+BNB LATERAL necesitaría 1.178 trades para que su Sharpe sea distinto de **cero** al 95 % y tiene
+301; AVAX BAJISTA necesitaría 2.806 y tiene 254. Los activos sí la pasan (ETH necesita 95).
+
+**Contra el azar, honestidad completa:** con N=309 ensayos el mejor Sharpe esperable por puro azar es
+**+0,3537 por trade**. El mejor candidato llega a +0,0479 — le falta 7,4 veces su propio Sharpe.
+**Los cuatro activos tampoco pasan** (lo mismo que midió L11-Prueba 3: DSR 0 de 121), pero están
+1,8-2,6× más cerca. El orden relativo es lo que la comparación permite afirmar; "probado contra el
+azar" no lo está ninguno.
+
+**Dos cosas que no se ven en la tabla:** BNB LATERAL ya se probó en producción y dio **PnL −9,18 % en
+forward real 2026** (prueba 28) —único candidato con evidencia out-of-sample real, y es negativa— y
+su director está huérfano. AVAX BAJISTA es inejecutable en SPOT.
+**A favor:** el gate de correlación cuenta el cupo **por acción**, así que un LATERAL abriría cupo
+propio y no competiría con las 2 posiciones ALCISTA que hoy topan el sistema. El límite no es el
+cupo: es que el candidato no gana lo suficiente.
+
+### Qué NO se hizo
+No se conectó ningún francotirador, no se tocó `director_orquesta.py`, ni un parámetro, ni el gate de
+bajistas. Es un análisis sobre datos ya registrados.
+
+Detalle: `reports/2026-09-12_ranking-quinto-francotirador-lateral-bajista.md`
 
 ## 🟢 Ítem 0b — la deriva ahora se detecta sola; faltan 13 por saldar (12-sep-2026)
 

@@ -294,6 +294,18 @@ bot ajeno. Para `v2_main` **usar siempre PIDs explícitos**, verificados antes c
   futuros hay que reescribir el ejecutor, reactivar el gate no basta.
 - Ver `INVESTIGACION.md` para el backtest de 5.4 años que sustenta desactivar bajistas y el
   detalle del incidente que dejó el gate en `false` por accidente en su momento.
+- ⚠️ **No citar el torneo del 24-ago como evidencia de que los bajistas rinden (corregido
+  2026-09-12).** Ese torneo publicó el grupo BAJISTA en **PF 1,074 positivo** y AVAX BAJISTA como
+  **2° mejor de los 15**, y de ahí salió la idea de que estaban apagados *"no por mal resultado"*.
+  **Los dos números están inflados:** calculó el retorno del short como `(entrada − salida) /
+  salida`, dividiendo por el precio final en vez del de entrada, lo que agranda los ganadores y
+  achica los perdedores. Con el cálculo correcto el **grupo da PF 0,921** —retorno de +291,2 pp a
+  **−326,2 pp**, cambia de signo— y **AVAX BAJISTA da 1,068**, por debajo de los 4 ALCISTA activos.
+  Verificado reproduciendo la fórmula errónea sobre los 5 al decimal, mientras los 4 LATERAL y los 3
+  ALCISTA del mismo torneo dan su PF publicado exacto.
+  **Esto no cambia nada operativo** (los 5 siguen apagados y son inejecutables en SPOT): cambia que
+  ya no hay resultado que respalde fondear futuros.
+  `reports/2026-09-12_ranking-quinto-francotirador-lateral-bajista.md`
 
 ## Camino de dinero — reglas de oro y qué no tocar
 

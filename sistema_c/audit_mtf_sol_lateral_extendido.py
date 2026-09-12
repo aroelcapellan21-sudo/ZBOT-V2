@@ -28,6 +28,7 @@ Uso:
 import sys, os, json, csv, tempfile, types, statistics, random
 import urllib.parse, urllib.request
 from datetime import datetime, timezone
+import mock_ejecutor   # gate de sl_pct, ver item 0b
 
 BOT_DIR = os.path.expanduser("~/bot-padre-v2")
 sys.path.insert(0, BOT_DIR)
@@ -121,15 +122,18 @@ sys.modules["engine"] = fake_engine
 
 COMISION_SPOT = 0.001
 fake_ejecutor = types.ModuleType("ejecutor")
-fake_ejecutor.MONTO_MINIMO_BINANCE = 5.0
+fake_ejecutor.MONTO_MINIMO_BINANCE = mock_ejecutor.MONTO_MINIMO_BINANCE
 CIERRES_LOG = []
 APERTURAS_LOG = []
 
-def _fake_ejecutar_operacion(moneda, tipo, precio, monto=None):
+def _fake_ejecutar_operacion(moneda, tipo, precio, monto=None, sl_pct=None):
     if not monto or monto <= 0:
         return f"❌ RECHAZADO: Monto invalido (${monto})", None
     if monto < 5.0:
         return f"❌ RECHAZADO: Monto ${monto:.2f} bajo minimo Binance ($5.0)", None
+    rechazo = mock_ejecutor.rechazo_por_sl(moneda + "USDT", monto, precio, sl_pct)
+    if rechazo:
+        return rechazo, None
     precio_fill = closes_f[RELOJ["i"]]
     if tipo == "COMPRA":
         qty_neta = (monto / precio_fill) * (1 - COMISION_SPOT)

@@ -132,12 +132,33 @@ Lo siguiente que se toma, al cerrar 0b, es el **ítem 0c**.
   - **3 francotiradores pausados** detectados por el chequeo aparte (`lateral_avax`, `lateral_eth`,
     `lateral_sol`): el otro mecanismo del ítem, el que arruinó la prueba 276.
 
-  **Lo que queda por hacer (no se hizo hoy, y no es trámite):** saldar las 13 `ROMPE`. Agregarle
-  `sl_pct=None` al mock e ignorarlo lo saca del rojo pero lo convierte en `SILENCIOSO` — el
-  chequeo lo va a marcar igual, a propósito. Modelarlo de verdad es replicar
-  `ejecutor._monto_minimo_viable()` en los mocks, y **eso cambia los resultados de los backtests**
-  (rechazaría operaciones que hoy el sandbox acepta), así que necesita su propia medición y OK
-  explícito. Hasta entonces el paso de CI es informativo; al llegar a 0 se promueve a BLOQUEA.
+  **✅ Las 13 se saldaron el mismo día (12-sep).** Se midió primero, como correspondía: el gate de
+  `sl_pct` rechaza la entrada si la posición valdría menos que el mínimo de Binance al tocar su stop,
+  y sobre 3.700 trades de 14 series el efecto depende del monto —
+  **$5: 100 % rechazado · $7: 0,6 % · $10: 0 %**.
+
+  **El 100 % con $5 es aritmética, no truncamiento:** $5 con un SL de 3,5 % valen $4,83 al stop, bajo
+  el mínimo de $5; el monto mínimo viable es **$5,18**. O sea que **el torneo, que simuló $5, midió un
+  bot que no podía existir** — no invalida la comparación entre francotiradores (mismo sesgo para
+  todos) pero sí leer sus retornos como plata alcanzable. Con los montos de hoy ($7 y $10 desde el
+  31-ago) modelarlo mueve el PF **entre +0,000 y +0,033, siempre a favor**: por eso salió barato.
+
+  **Cómo quedó:** un módulo único `sistema_c/mock_ejecutor.py` con la lógica del gate, que los 13
+  sandboxes importan (3 líneas de patch cada uno). Lee `LOT_SIZE`, `MONTO_MINIMO_BINANCE` y
+  `COMISION_SPOT` del propio `ejecutor.py` **con `ast`, sin importarlo**, así que si cambian allá
+  cambian acá solos — que era el punto del ítem.
+
+  **Verificado:** los 13 compilan y L12 pasa de **78 divergencias (13 `ROMPE`) a 65 (0 `ROMPE`),
+  exit 0**. Las 65 restantes son las `SILENCIOSO` del baseline, deliberadas.
+
+  ⚠️ **Queda una condición de uso, escrita en el módulo:** un sandbox que lo use **tiene que simular
+  el monto real**. Corrido con $5 devuelve 0 trades y parece que el francotirador no opera.
+
+  **Pendiente menor:** promover el paso del CI de informativo a BLOQUEA (quitarle el `|| true`), que
+  era la condición puesta al crearlo. Y un bug propio de L12: `_archivos_py()` usa `os.walk` sin
+  `followlinks`, así que no entra en directorios que sean symlinks — no afecta al repo, apareció al
+  montar el árbol de prueba.
+  `reports/2026-09-12_saldar-13-divergencias-y-agregador-torneo.md`
 
 - [ ] **0c · 🆕 Estudios irreproducibles porque el SCRIPT DE MEDICIÓN ya no existe** *(10-sep, sale
   del ítem 0)*
@@ -268,25 +289,30 @@ huecos.)*
   (`media/std × √252`, validado: reproduce el 1,694 publicado en 1,688), el **Sharpe de AVAX BAJISTA
   cae de 1,694 a 0,491** — 3,5× menos.
 
-  **Reconstrucción del combo** (BTC+ETH ALCISTA de la serie 9 años con datos limpios + AVAX BAJISTA,
-  761 trades):
+  **El combo, con los trades del propio torneo** (785 trades, medido por trade × √252):
 
   | | n | WR | PF | Sharpe | ret. |
   |---|---:|---:|---:|---:|---:|
-  | Combo N con AVAX BAJ como lo publicó el torneo | 761 | 49,4 % | 1,356 | 2,263 | +750,0 pp |
-  | **Combo N con AVAX BAJ corregido** | 761 | 49,4 % | **1,275** | **1,826** | +592,9 pp |
-  | **Sólo BTC+ETH ALCISTA, sin AVAX BAJISTA** | 507 | 53,1 % | **1,417** | **2,660** | +532,7 pp |
+  | Combo N con AVAX BAJ como lo publicó el torneo | 785 | 49,7 % | 1,352 | 2,242 | +774,2 pp |
+  | **Combo N con AVAX BAJ corregido** | 785 | 49,7 % | **1,274** | **1,822** | +617,1 pp |
+  | **Sólo BTC+ETH ALCISTA, sin AVAX BAJISTA** | 531 | 53,3 % | **1,407** | **2,596** | +556,9 pp |
 
-  **El dato que decide: agregar AVAX BAJISTA corregido EMPEORA el combo.** Sharpe 2,660 → 1,826 y PF
-  1,417 → 1,275. El combo N existía porque ese francotirador supuestamente aportaba; con el número
+  **El dato que decide: agregar AVAX BAJISTA corregido EMPEORA el combo.** Sharpe 2,596 → 1,822 y PF
+  1,407 → 1,274. El combo N existía porque ese francotirador supuestamente aportaba; con el número
   correcto, resta.
 
-  ⚠️ **El 3,96 exacto no es reproducible y no se puede corregir a un número equivalente:** los trades
-  del torneo de BTC y ETH ALCISTA **no se guardaron** (no están en `reports/raw/` ni en la DB — las
-  pruebas 7 y 14 tienen 0 trades). Es un caso del ítem **0c**. Por eso la tabla de arriba es una
-  reconstrucción con las corridas disponibles —de ahí que la fila "como lo publicó el torneo" dé
-  2,263 y no 3,96— y **lo que vale de ella es la comparación entre sus tres filas**, medidas todas
-  igual, no el nivel absoluto.
+  🔴 **CORREGIDO EL MISMO DÍA (12-sep): los trades SÍ estaban.** Acá decía que los del torneo de BTC
+  y ETH ALCISTA no se habían guardado y que era un caso del ítem 0c. **Es falso**: están en
+  `reports/raw/` con otro nombre —`btc_alcista_evaluar_literal_9anios_baseline_2026-08-22.json`
+  (n=243) y el equivalente de ETH (n=288)— y **reproducen su fila publicada al decimal** (BTC WR
+  48,6 % PF 1,369; ETH WR 57,3 % PF 1,438 contra 1,437). Se buscaron por el patrón `torneo_*` y se
+  dio por perdido lo que estaba a la vista. La tabla de arriba está rehecha con ellos.
+
+  ⚠️ **Lo que sí sigue sin poder corregirse es el Sharpe del AGREGADO.** Los Sharpe individuales se
+  reproducen con `media/std × √252` dentro del 5 % (BTC 2,389 contra 2,346 publicado; ETH 2,763
+  contra 2,953), pero para el 3,96 se probaron tres fórmulas y ninguna se acerca: por trade **2,242**,
+  serie diaria **1,028**, serie mensual **1,399**. Sin el script original (ítem 0c) no hay un "3,96
+  corregido"; **lo que vale es la comparación entre las tres filas de la tabla**, medidas igual.
 
   **El ítem queda abierto** —sigue requiriendo Futuros— pero **sin la premisa que lo hacía atractivo**.
 - [x] **M5 · Bajistas en Futuros** — ⛔ **CERRADO EL 12-SEP: se queda sin sustento.** Decía *"el

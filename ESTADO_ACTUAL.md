@@ -59,6 +59,45 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🟢 Ítem 0b — la deriva ahora se detecta sola; faltan 13 por saldar (12-sep-2026)
+
+**Instrucción de Ariel:** detección automática, **no** el patrón de parchear cada vez que se rompe
+— ese patrón produjo 3-4 fallos silenciosos distintos en una sola semana.
+
+`laboratorio/verificar_mocks.py` (L12, commit `f5fb366`) compara estáticamente con `ast` —sin
+importar ni ejecutar nada, 0,36 s por corrida— cada módulo falso que un sandbox instala en
+`sys.modules` contra el módulo real del repo: firma por firma y constante por constante. No hay
+lista de sandboxes ni de módulos escrita a mano; los descubre por contenido, así que un sandbox
+nuevo entra solo.
+
+**Medición del 12-sep: 78 divergencias en 13 sandboxes**, todos de `sistema_c/`.
+
+| Categoría | n | Qué es |
+|---|---|---|
+| `ROMPE` | **13** | Las 13 son la misma: `ejecutar_operacion` mockeada sin `sl_pct` (agregado el 31-ago, `f61c066`) |
+| `SILENCIOSO` | **65** | 5 mocks permisivos × 13 sandboxes: `enviar_aviso`, `registrar_tp`/`_sl`, `actualizar_memoria`, `registrar_evento` |
+| `PAUSADO` | **3** | `lateral_avax`/`eth`/`sol` con `return` incondicional en `evaluar()` — el otro mecanismo del ítem, el que arruinó la prueba 276 |
+
+**Lo que aporta sobre el conteo a mano del 10-sep:** distingue lo que revienta con `TypeError` de lo
+que **acepta la llamada e ignora el parámetro**. Ese es el caso peligroso, y por eso el parche
+cómodo —tirarle `**kwargs` al mock para que deje de reventar— queda marcado `SILENCIOSO` y **sigue
+fallando**. Verificado con 6 escenarios sintéticos en un mini-repo: 6/6.
+
+**El baseline arranca con las 65 `SILENCIOSO` y deja las 13 `ROMPE` afuera a propósito**, así que el
+chequeo termina en rojo hoy: esa es la deuda, visible en cada corrida. Por eso el paso del CI entra
+como informativo, con la promoción a BLOQUEA escrita en el propio YAML.
+
+### Qué NO se hizo
+**No se saldaron las 13, y no es trámite.** Ponerle `sl_pct=None` al mock e ignorarlo las pasa de
+`ROMPE` a `SILENCIOSO`; modelarlo de verdad es replicar `ejecutor._monto_minimo_viable()` en los
+mocks, y eso **cambia los resultados de backtests ya registrados** (`torneo_generico`, los
+`resim_*`) — medición propia y OK aparte. Tampoco compara comportamiento, sólo interfaz. Ningún
+archivo de producción tocado, sin dependencias nuevas.
+
+**El ítem 0b sigue ABIERTO** en `COLA.md` por esas 13, con la parte de detección hecha.
+
+Detalle: `reports/2026-09-12_item0b-deteccion-deriva-sandboxes.md`
+
 ## 🟢 Las 473 aperturas fallidas: diagnosticadas y con contramedida aplicada (10-sep-2026)
 
 **Pregunta de Ariel:** *"¿existen pruebas o mecanismos que no hayamos hecho que sí recomiendes?"*

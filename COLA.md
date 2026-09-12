@@ -262,9 +262,49 @@ huecos.)*
   `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
 - [ ] **M4 · Combo N** (BTC+ETH+AVAX-BAJISTA, Sharpe 3,96) — mejor que el combo O en backtest, pero
   **requiere Futuros**. No descartado: fuera de alcance sin esa cuenta.
-- [ ] **M5 · Bajistas en Futuros** — el torneo confirma señal real (grupo BAJISTA PF 1,074), pero
-  activarlos exige cuenta de Futuros **y reescribir `ejecutor.py:cerrar_posicion`**. No es tarea de
-  backtest.
+  ⚠️ **12-sep — recalculado: el Sharpe 3,96 no se sostiene, y AVAX BAJISTA le RESTA al combo.**
+  El combo incluye AVAX BAJISTA, cuyo PF pasó de 1,262 a **1,068** al corregir el cálculo del retorno
+  del short (ver M5). Con los mismos trades y el mismo método del torneo
+  (`media/std × √252`, validado: reproduce el 1,694 publicado en 1,688), el **Sharpe de AVAX BAJISTA
+  cae de 1,694 a 0,491** — 3,5× menos.
+
+  **Reconstrucción del combo** (BTC+ETH ALCISTA de la serie 9 años con datos limpios + AVAX BAJISTA,
+  761 trades):
+
+  | | n | WR | PF | Sharpe | ret. |
+  |---|---:|---:|---:|---:|---:|
+  | Combo N con AVAX BAJ como lo publicó el torneo | 761 | 49,4 % | 1,356 | 2,263 | +750,0 pp |
+  | **Combo N con AVAX BAJ corregido** | 761 | 49,4 % | **1,275** | **1,826** | +592,9 pp |
+  | **Sólo BTC+ETH ALCISTA, sin AVAX BAJISTA** | 507 | 53,1 % | **1,417** | **2,660** | +532,7 pp |
+
+  **El dato que decide: agregar AVAX BAJISTA corregido EMPEORA el combo.** Sharpe 2,660 → 1,826 y PF
+  1,417 → 1,275. El combo N existía porque ese francotirador supuestamente aportaba; con el número
+  correcto, resta.
+
+  ⚠️ **El 3,96 exacto no es reproducible y no se puede corregir a un número equivalente:** los trades
+  del torneo de BTC y ETH ALCISTA **no se guardaron** (no están en `reports/raw/` ni en la DB — las
+  pruebas 7 y 14 tienen 0 trades). Es un caso del ítem **0c**. Por eso la tabla de arriba es una
+  reconstrucción con las corridas disponibles —de ahí que la fila "como lo publicó el torneo" dé
+  2,263 y no 3,96— y **lo que vale de ella es la comparación entre sus tres filas**, medidas todas
+  igual, no el nivel absoluto.
+
+  **El ítem queda abierto** —sigue requiriendo Futuros— pero **sin la premisa que lo hacía atractivo**.
+- [x] **M5 · Bajistas en Futuros** — ⛔ **CERRADO EL 12-SEP: se queda sin sustento.** Decía *"el
+  torneo confirma señal real (grupo BAJISTA PF 1,074)"* y **ese número estaba inflado**: el torneo
+  del 23-ago calculó el retorno del short como `(entrada − salida) / salida` —dividiendo por el
+  precio final en vez del de entrada— lo que agranda los ganadores y achica los perdedores.
+  **Con el cálculo correcto el grupo BAJISTA da PF 0,921 y su retorno pasa de +291,2 pp a −326,2 pp:
+  cambia de signo.** Los 5 individuales caen igual (AVAX 1,262 → 1,068 y deja de ser "2° mejor de los
+  15"; SOL 1,150 → 0,978; ETH 1,074 → 0,935; BNB 0,967 → 0,824; BTC 0,877 → 0,765).
+
+  **El ítem existía por esa señal, así que se cierra con la señal.** Lo que quedaba por hacer
+  —fondear Futuros y reescribir `ejecutor.py:cerrar_posicion`— es trabajo caro y de riesgo real cuya
+  única justificación medida acaba de desaparecer. **Reabrirlo exige evidencia nueva**, no la del
+  torneo.
+
+  Verificación: la fórmula errónea reproduce los 5 PF publicados al decimal, mientras los 4 LATERAL y
+  los 3 ALCISTA del mismo torneo dan su PF exacto sin corrección alguna.
+  `reports/2026-09-12_ranking-quinto-francotirador-lateral-bajista.md`
 - [ ] **M6 · `resumen_capital.py` con rutas rotas** — tras mover `~/bot-padre-v4/v5/v6` a
   `~/_archivo_bots_anteriores/`. Usado por `/consejero`; no se cae (tiene fallback) pero muestra
   valores por defecto. Decidir: corregir las 3 rutas o dejarlo.

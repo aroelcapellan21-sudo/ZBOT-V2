@@ -48,6 +48,14 @@ jobs:
         run: ruff check . --select E9,F821,F811 --ignore F401,F841,F541
 
       # ── AVISA (no frena) ──────────────────────────────────────────────────
+      - name: L12 — deriva entre los sandboxes y produccion (informativo)
+        run: python3 laboratorio/verificar_mocks.py || true
+        # Informativo por ahora y con fecha de vencimiento: hoy hay 13 mocks de
+        # sistema_c/ que no aceptan `sl_pct` (commit f61c066, 31-ago), y un paso
+        # que nace en rojo se aprende a ignorar. Cuando esas 13 esten saldadas,
+        # PROMOVER a BLOQUEA (quitar el `|| true` y mover el paso arriba): a
+        # partir de ahi cualquier deriva nueva frena el push, que es el punto.
+
       - name: ruff completo (informativo)
         run: ruff check . --statistics || true
 

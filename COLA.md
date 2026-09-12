@@ -1,6 +1,6 @@
 # Cola de trabajo — Z-Bot Padre v2
 
-**Última actualización: 2026-09-09 (Claude Code)**
+**Última actualización: 2026-09-12 (Claude Code)**
 
 > ⚠️ **FUENTE DE VERDAD ÚNICA.** Este archivo vive en el repo (`~/bot-padre-v2/COLA.md`), se
 > versiona en git y se sincroniza solo a Drive junto con `reports/`.
@@ -24,10 +24,11 @@ tercio: se respetó el orden.
 
 ## En curso
 
-**Nada.** La investigación de `cerrar_huerfanas()` —lo único que figuraba acá— se cerró y se
-**aplicó** el 09-sep (commit `ade1ae0`). Ver "Ya cerrado".
+**Ítem 0b — deriva entre producción y los sandboxes.** Tomado el 12-sep con la instrucción
+explícita de Ariel: **detección automática, no parchear cada vez que se rompe**. Los ítems 0, 1, 2,
+3 y 4 están cerrados (ver "Ya cerrado").
 
-Lo siguiente que se toma es el **ítem 1**.
+Lo siguiente que se toma, al cerrar 0b, es el **ítem 0c**.
 
 ## Orden confirmado por Ariel (09-sep)
 
@@ -114,8 +115,29 @@ Lo siguiente que se toma es el **ítem 1**.
   delante del repo. Se usó para los 36 (`**kwargs` en los mocks) y para SOL LATERAL (quitando la
   pausa). **Producción nunca se tocó.**
 
-  **Lo que queda por hacer:** decidir si los sandboxes se mantienen al día con producción (y cómo se
-  detecta cuando divergen), o si se acepta parchear copias cada vez. Hoy nada avisa de la deriva.
+  **Decisión de Ariel (12-sep): se detecta automáticamente. El patrón de "parchear cada vez que
+  se rompe" queda descartado** — es el que produjo 3-4 fallos silenciosos distintos en una sola
+  semana.
+
+  **Hecho:** `laboratorio/verificar_mocks.py` (L12) compara estáticamente, sin ejecutar nada, cada
+  módulo falso que un sandbox instala en `sys.modules` contra el módulo real: firma por firma y
+  constante por constante. Verificado con 6 escenarios sintéticos, incluido **el peligroso** — que
+  producción agregue un parámetro con default y el mock lo absorba con `**kwargs` sin romper.
+
+  **Medición del 12-sep: 78 divergencias en 13 sandboxes** (todos en `sistema_c/`).
+  - **13 `ROMPE`** — las 13 son la misma: `ejecutor.ejecutar_operacion` sin `sl_pct`.
+  - **65 `SILENCIOSO`** — 5 × 13: `engine.enviar_aviso`, `gestor_billetera.registrar_tp`/`_sl`,
+    `memoria_propia.actualizar_memoria`, `memoria.memoria.registrar_evento`. Mocks permisivos a
+    propósito; van al baseline.
+  - **3 francotiradores pausados** detectados por el chequeo aparte (`lateral_avax`, `lateral_eth`,
+    `lateral_sol`): el otro mecanismo del ítem, el que arruinó la prueba 276.
+
+  **Lo que queda por hacer (no se hizo hoy, y no es trámite):** saldar las 13 `ROMPE`. Agregarle
+  `sl_pct=None` al mock e ignorarlo lo saca del rojo pero lo convierte en `SILENCIOSO` — el
+  chequeo lo va a marcar igual, a propósito. Modelarlo de verdad es replicar
+  `ejecutor._monto_minimo_viable()` en los mocks, y **eso cambia los resultados de los backtests**
+  (rechazaría operaciones que hoy el sandbox acepta), así que necesita su propia medición y OK
+  explícito. Hasta entonces el paso de CI es informativo; al llegar a 0 se promueve a BLOQUEA.
 
 - [ ] **0c · 🆕 Estudios irreproducibles porque el SCRIPT DE MEDICIÓN ya no existe** *(10-sep, sale
   del ítem 0)*

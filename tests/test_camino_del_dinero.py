@@ -15,12 +15,16 @@ test existe para que ese incidente no vuelva:
 
 No tocan red, ni claves, ni archivos: solo aritmetica.
 """
+import os
 import sys
 from decimal import Decimal
 
 import pytest
 
-sys.path.insert(0, "/home/ariel/bot-padre-v2")
+# La raiz sale de la ubicacion del propio test, NO de una ruta absoluta de la Dell:
+# el CI corre en /home/runner/work/ZBOT-V2/ZBOT-V2 y con la ruta fija el import de
+# ejecutor reventaba en la coleccion (exit 2, el CI en rojo desde el 10-sep).
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import ejecutor  # noqa: E402
 
 

@@ -44,8 +44,17 @@ def corre(nombre, tmpdir, env_extra=None, extra=None):
         return None, None
     return json.load(open(salida)), tmpdir
 
+def _sin_hora_huella(r):
+    """La huella de datos se compara entera MENOS generada_utc: es la hora de la
+    corrida, distinta por diseño. Sin esto L2 da rojo siempre desde la huella del
+    07-sep (falso rojo detectado el 12-sep), y un rojo real no se distinguiria."""
+    hu = r.get("_huella_datos")
+    if not isinstance(hu, dict): return r
+    return {**r, "_huella_datos": {k: v for k, v in hu.items() if k != "generada_utc"}}
+
 def compara(nom_a, a, dir_a, nom_b, b, dir_b):
     if a is None or b is None: return False
+    a, b = _sin_hora_huella(a), _sin_hora_huella(b)
     dif = [k for k in set(a) | set(b) if k not in IGNORAR and a.get(k) != b.get(k)]
     csv_a, csv_b = f"{dir_a}/auditoria.csv", f"{dir_b}/auditoria.csv"
     csv_igual = (os.path.exists(csv_a) and os.path.exists(csv_b)

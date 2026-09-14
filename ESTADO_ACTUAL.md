@@ -65,6 +65,40 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔴 C5 — la corrupción de los radares no es concurrencia, es el corte de luz (13-sep-2026)
+
+**Pregunta:** los archivos que los radares escriben con append aparecen corruptos. ¿Son escrituras
+concurrentes? ¿Hace falta `flock` o `fsync`?
+
+**Veredicto: NO_APLICAR.** No hay concurrencia: **187 de 187** eventos fechables coinciden con un
+arranque tras corte de luz o reset, y **0 de 6** apagados limpios dejaron corrupción. No hay evidencia
+que justifique `flock` en los radares.
+
+| | Resultado |
+|---|---|
+| Eventos (bytes NUL o fila rota) | 240 en 8 archivos |
+| Atribuibles a concurrencia | **0** |
+| Escritores por archivo | 1 (9 procesos de radar, 10 archivos) |
+| Cortes o resets desde el 08-jun | 122 en 97 días |
+| Apagados limpios con corrupción | **0 de 6** |
+| Costo por append | `flock` 0,061 ms · `fsync` 1,314 ms |
+
+**Por qué:** con un solo escritor y cada línea en un único `write(2)` con `O_APPEND`, las líneas no
+pueden entrelazarse. Lo que se pierde es la cola del archivo en un corte: el SSD tiene caché volátil
+y no hay `fsync`, así que quedan bytes NUL. Ningún archivo de radar alimenta decisiones de trading:
+efecto sobre el dinero **RD$0/mes**.
+
+**`auditoria.csv` está limpio** (0 NUL hoy y en 4 de 4 versiones de git) **sin ningún `fsync`**: se
+reescribe entero en cada ciclo con tmp + `os.replace`, así que tras un corte queda la versión vieja o
+la nueva, completa. Su `flock` protege otra cosa: que un append no se pierda durante esa reescritura.
+
+### Qué NO se hizo
+No se aplicó `flock` ni `fsync` a ningún radar, ni se tocó código, procesos o `historial_billetera.csv`.
+**No se cargó en `data/resultados.db`** por decisión de Ariel. Queda como investigación separada,
+pendiente de autorización, el `fsync` en `historial_billetera.csv` (perdió 1 fila en un corte el 28/29-ago).
+
+Detalle: `reports/2026-09-13_c5-corrupcion-append-radares.md`
+
 ## 🔴 No hay quinto francotirador: ninguno de los 9 LATERAL/BAJISTA califica (12-sep-2026)
 
 **Pregunta de Ariel:** de los francotiradores LATERAL/BAJISTA disponibles, ¿cuál sería el mejor

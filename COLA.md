@@ -1,6 +1,6 @@
 # Cola de trabajo — Z-Bot Padre v2
 
-**Última actualización: 2026-09-12 (Claude Code)**
+**Última actualización: 2026-09-14 (Claude Code)**
 
 > ⚠️ **FUENTE DE VERDAD ÚNICA.** Este archivo vive en el repo (`~/bot-padre-v2/COLA.md`), se
 > versiona en git y se sincroniza solo a Drive junto con `reports/`.
@@ -219,6 +219,30 @@ identificado y sin medir) y **5** (¿el cupo `MAX_OP_TOTAL` 1→2 depende de un 
   conservar el script que generó una fila del índice. Mientras eso siga así, el problema
   **se repite**.
   `reports/2026-09-10_item0-avance-auditoria-desfase-horario.md`
+
+- [ ] **13 · 🟠 PRIORIDAD ALTA — PRIMERO monitorear en REAL; después, monto como % del capital**
+  *(nuevo, 13-sep, decisión de Ariel)* — Va por delante de 4b–12 y de "Mantenimiento y deuda técnica".
+
+  **⛔ Ningún cambio de sizing hasta la revisión:** ni monto como %, ni subir o bajar `MONTO_FIJO`, ni
+  tocar `MAX_OP_TOTAL`.
+
+  **Fase A — monitoreo (arranca ya, pasivo): 4 semanas, revisión el 2026-10-11.**
+  Motivo: la auditoría del 13-sep dio **−3,54 % de la cuenta y WR 19,5 %**, pero 31 de los 41 cierres
+  fueron `FASE_CAMBIO` y la muestra limpia es de **10 trades**
+  (`reports/2026-09-13_auditoria-resultados-reales-z-bot-v2.md`). Componer una esperanza negativa
+  compone pérdidas: primero hay que saber si la esperanza real es positiva.
+  En la revisión: repetir la misma auditoría (fills de Binance, clave de lectura) y mirar trades sin
+  `FASE_CAMBIO` desde el 09-sep, WR, PF, resultado de la cuenta contra $37,11 y DD realizado.
+
+  **Fase B — sólo si la fase A lo justifica y después de la reejecución C2 (293/294):** investigar
+  el monto como % del capital para que las ganancias compongan.
+  - **No repetir:** prueba **306** (con monto fijo el capital extra no rinde; ×1,356 da +$47,17 con
+    el mismo DD de 14,31 %) y **304** (el monto es proporcional puro, sin ventaja gratis).
+  - **Medir:** monto fijo vs. % fijo sobre la prueba 294 (1.106 trades); dependencia del orden con
+    el barajado de L4; piso del minNotional después del truncado (con $35,79, el 19 % da $6,80 y el
+    27,1 % da $9,71; es el mismo bug de SOL/AVAX con `CAPITAL_MAX_POR_OP=2 %` del 24-ago);
+    interacción con el guardián y con `MAX_TRADES_MISMA_DIR=2`.
+  - Exige el análisis de efectos secundarios (`CLAUDE.md`, 30-ago) y OK explícito antes de producción.
 
 - [ ] **4b · Survivorship bias — identificado el 09-sep, NO medido** *(sale de la Prueba 3)*
   Las 5 monedas del bot se eligieron entre las que **hoy** están arriba, y nunca se testeó

@@ -65,6 +65,35 @@ sus números en `data/resultados.db`.
   (RSI/SL/EMA hardcodeados, distintos de lo que dice ese diccionario). ETH, SOL y AVAX ALCISTA sí
   leen RSI/EMA de ahí en vivo (el monto ya no, ver fix de sizing arriba).
 
+## 🔴 Resultados REALES: la cuenta en −3,54 % y un WR de 19,5 % (13-sep-2026)
+
+**Pregunta de Ariel:** ¿cómo va el bot con dinero real, comparado con el paper trading?
+
+**Veredicto: NO_CONCLUYENTE, con dirección negativa.** Va peor que el paper, pero la muestra limpia
+(sin cierres forzados) es de 10 trades.
+
+| | Resultado |
+|---|---|
+| Cuenta real (13-sep 17:59) | **$35,7947** contra **$37,11** aportados → **−$1,3153 (−3,54 %)** |
+| Trades del bot cerrados | 41 (+1 AVAX manual fuera del bot) en 28,9 días |
+| WR · PF · PnL | **19,51 %** · 0,457 · −$1,2398 |
+| Ganador / perdedor promedio | +$0,1305 (+2,35 %) / −$0,0692 (−1,01 %) |
+| DD realizado | $1,8835 (4,99 % del pico), con el fondo **hoy** |
+| Cierres `FASE_CAMBIO` | **31 de 41** (03 al 07-sep); sin ellos: 10 trades, WR 30 %, PF 0,426 |
+| Paper (simulador mar–abr) | 25 trades, WR 60 %, sin comisión. DD 8,14 % y $1017: **sin fuente** |
+
+**Lo que se aprendió de la medición:** `data/resultados.db` no guarda trades reales, así que el
+resultado sale de fills y Convert de Binance. Sin ajustar por el polvo de la comisión, BTC muestra un
+falso −8 % por trade; ajustado, la suma cuadra con la cuenta a $0,04. $5,04 del capital están en BNB.
+
+**Decisión de Ariel (13-sep): monitorear unas semanas más antes de cualquier cambio de sizing** (ver
+ítem 13 de `COLA.md`).
+
+### Qué NO se hizo
+No se tocó código, configuración ni procesos. Binance se consultó sólo con la clave de lectura.
+
+Detalle: `reports/2026-09-13_auditoria-resultados-reales-z-bot-v2.md`
+
 ## 🔴 C5 — la corrupción de los radares no es concurrencia, es el corte de luz (13-sep-2026)
 
 **Pregunta:** los archivos que los radares escriben con append aparecen corruptos. ¿Son escrituras

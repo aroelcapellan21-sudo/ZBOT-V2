@@ -135,6 +135,7 @@ la anomalía la fabricaba el PF bruto. El descarte queda respaldado por su propi
 
 | Moneda | Fase | Qué se probó | n | WR | PF | Sharpe | Resultado | Reporte fuente |
 |---|---|---|---|---|---|---|---|---|
+| Multi (4) | ALCISTA | Calendario: día de la semana, fin de semana y hora — mercado (velas 4h, 9 años) + estrategia (1.106 y 1.652 trades, sin trades en común) | 88 celdas | — | — | — | 🔴 Descartado — 3 celdas horarias pasan BH en mercado (AVAX vela 04:00 UTC +0.238%/4h) pero netas de comisión quedan positivas 1 de 10 años; 0 de 23 y 0 de 13 celdas pasan en los trades; "quitar lun+mar+jue" no cruza cero en la serie A y da −476.9 pp en la B | `2026-09-15_dia-semana-hora-patrones.md` |
 | Multi (5) | N/A | SL actual vs SL uniforme 3.0% (2021-2026) | 10067 vs 10388 | 55.3% vs 53.6% | — | — | SL actual (config vigente) mejor, no cambiar | `2026-07-13_backtest_sl_actual_vs_sl3.md` |
 | Multi (5) | N/A | TRAILING_DISTANCIA 1/1.5/2/3% (5.5 años) | ~10000 | — | — | — | 1% actual da mejor retorno y menor DD temprano | `2026-07-13_backtest_trailing_2021-2026.md`, `-drawdown_maximo_por_escenario.md` |
 | Multi (5) | ALC+LAT | Ranking frecuencia/expectancy 15 francotiradores (metodología antigua, 2021-2026 ~62 meses) | vario | — | 0.845-1.147 | — | **Superado por el Torneo `evaluar()`-literal del 24-ago — ver esa sección abajo** | `2026-08-16_ranking-frecuencia-expectancy-15-francotiradores.md` |
@@ -254,6 +255,13 @@ mismo criterio que el torneo.)*
 | 09-02 | MULTI | ALCISTA | Ensanchar TP/SL 2× (duplicado) en las 4 monedas activas | 769 | 48.6% | 1.392 | — | PROMETEDOR | Mejor PF del barrido (1.444 en BTC) y RD$66.78/mes, pero sin significancia (P(mejor)=83.0%) y **reduce el colchon del guardian de 8.8 a 5.0 stop-loss**. Duplica la duracion del trade (32-79 velas). | `reports/2026-09-02_backtest-sl-tp-ensanchado-y-montos.md` |
 | 09-02 | MULTI | ALCISTA | Ensanchar solo el TP ×2 / solo el SL ×2 (variantes asimetricas) | 1092 / 1249 | 34.2% / 61.0% | 1.313 / 1.253 | — | DESCARTADO | Ninguna de las dos mitades explica el efecto: subir solo el TP hunde el WR a 31-44%, subir solo el SL lo infla a 57-69%, y ambas rinden menos que ensanchar los dos a la vez. | `reports/2026-09-02_backtest-sl-tp-ensanchado-y-montos.md` |
 | 09-02 | MULTI | ALCISTA | Combinaciones de monto por moneda con el capital actual ($36.86) | — | — | — | — | DESCARTADO | Desbalancear por ratio ganancia/perdida (menos a ETH) da el PEOR de los 5 combos: el ratio no predice el rendimiento por dolar (ETH ratio 1.02 rinde RD$2.25/mes por $1, BTC ratio 1.57 rinde RD$1.03). Subir montos a ~$36 abre una zona muerta silenciosa entre $33.79 y $36 donde la 4a moneda no puede abrir. Dejar 10/7/7/7. | `reports/2026-09-02_backtest-sl-tp-ensanchado-y-montos.md` |
+
+## Deriv — opciones binarias (proyecto separado `~/deriv-test/`, no es V2)
+
+| Fecha | Qué se probó | n | WR | Resultado | Reporte fuente |
+|---|---|---|---|---|---|
+| 15-09 | EURUSD: tras ±X% en Y min, ¿el siguiente tramo sigue o revierte? Rejilla 5×4×3 sobre 1 año de velas de 1 min | 47 combinaciones, hasta n=809 | 55.62–56.91% revirtiendo | 🟡 Prometedor, NO accionable — 21 de 47 pasan BH y las 21 revierten; 0 de "seguir" llega a 52%. Sobrevive entrada demorada 1-2 min, precios `open` y quitar marzo. Prueba ciega 58.49% (n=53, p=0.27). Falta el pago: necesita 79.8% (H=15m) / 75.7% (H=30m) para empatar | `2026-09-15_eurusd-impulso-reversion.md` |
+| 15-09 | EURUSD Rise/Fall: % de acierto por hora del día (21 horas × 15m/30m/1h × CALL/PUT), 1 año de velas de 1 min | 37.910 ops sin solapar | 48.25–51.09% (mejor celda 56.76%) | 🔴 Descartado — 0 de 126 celdas pasan Benjamini-Hochberg; las que superan 52/53/55% son tantas como el azar (P 0.25–0.45). El sesgo a PUT es la caída del euro en el año (−1.89%), no la hora | `2026-09-15_deriv-wr-por-hora-eurusd.md` |
 
 ## Metodología del laboratorio — cómo se simula, no qué se opera
 

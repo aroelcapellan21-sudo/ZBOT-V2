@@ -260,7 +260,7 @@ mismo criterio que el torneo.)*
 
 | Fecha | Qué se probó | n | WR | Resultado | Reporte fuente |
 |---|---|---|---|---|---|
-| 15-09 | EURUSD: tras ±X% en Y min, ¿el siguiente tramo sigue o revierte? Rejilla 5×4×3 sobre 1 año de velas de 1 min | 47 combinaciones, hasta n=809 | 55.62–56.91% revirtiendo | 🟡 Prometedor, NO accionable — 21 de 47 pasan BH y las 21 revierten; 0 de "seguir" llega a 52%. Sobrevive entrada demorada 1-2 min, precios `open` y quitar marzo. Prueba ciega 58.49% (n=53, p=0.27). Falta el pago: necesita 79.8% (H=15m) / 75.7% (H=30m) para empatar | `2026-09-15_eurusd-impulso-reversion.md` |
+| 15-09 | EURUSD: tras ±X% en Y min, ¿el siguiente tramo sigue o revierte? Rejilla 5×4×3 sobre 1 año de velas de 1 min | 47 combinaciones, hasta n=809 | 55.62–56.91% revirtiendo | 🟡 Prometedor pero SIN MARGEN — 21 de 47 pasan BH y las 21 revierten; aguanta entrada demorada 1-2 min, precios `open` y prueba ciega. Con el pago real (16-sep 00:00 UTC, 75.3–78.6%): a 15m PIERDE (−$0.15/op), a 30m gana solo +0.9 pp sobre el equilibrio (+$0.161/op) con IC95% que cruza cero y 2ª mitad del año negativa (+0.391 → −0.139 USD/op). NO se opera | `2026-09-15_eurusd-impulso-reversion.md` |
 | 15-09 | EURUSD Rise/Fall: % de acierto por hora del día (21 horas × 15m/30m/1h × CALL/PUT), 1 año de velas de 1 min | 37.910 ops sin solapar | 48.25–51.09% (mejor celda 56.76%) | 🔴 Descartado — 0 de 126 celdas pasan Benjamini-Hochberg; las que superan 52/53/55% son tantas como el azar (P 0.25–0.45). El sesgo a PUT es la caída del euro en el año (−1.89%), no la hora | `2026-09-15_deriv-wr-por-hora-eurusd.md` |
 
 ## Metodología del laboratorio — cómo se simula, no qué se opera

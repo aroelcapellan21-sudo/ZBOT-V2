@@ -5,7 +5,10 @@ import re
 from collections import Counter
 from datetime import datetime
 
-SCREENS_ESPERADOS = [
+# Lista completa historica. NO se edita para apagar un screen: para eso esta
+# SCREENS_PAUSADOS de abajo, asi queda a la vista que el screen existe y esta
+# apagado a proposito, y revertir es vaciar una lista.
+SCREENS_TODOS = [
     "z_intel", "v2_main", "z_precision", "z_volumen",
     "z_fugas", "z_radar", "z_fuerza", "z_liquidez", "z_velas",
     "z_heatmap", "z_correlation", "z_squeeze", "z_macd", "z_rsi_adv",
@@ -16,6 +19,22 @@ SCREENS_ESPERADOS = [
     "z_webserver", "z_tunnel", "z_dashboard_v2",
     "z_diagnostico", "z_asistente"
 ]
+
+# Apagados a proposito el 2026-09-19 (20 radares + z_auditor) para liberar RAM y
+# peso de API durante la ventana de captura de order book. Sin esto, este monitor
+# los reportaria caidos cada 60 s y el asistente mostraria 21 caidos permanentes.
+# Ninguno alimenta a v2_main: ver reports/2026-09-19_paso1-inventario-radares.md
+# PARA REVERTIR: dejar SCREENS_PAUSADOS = [] y descomentar las lineas
+# correspondientes en iniciar_bots.sh.
+SCREENS_PAUSADOS = [
+    "z_velas", "z_volumen", "z_precision", "z_fugas", "z_fuerza",
+    "z_liquidez", "z_heatmap", "z_correlation", "z_radar", "z_intel",
+    "z_squeeze", "z_macd", "z_rsi_adv", "z_vol_engine", "z_sentiment",
+    "z_orderblocks", "z_timeframes", "z_ignition", "z_heatmap_radar",
+    "z_wicks", "z_auditor"
+]
+
+SCREENS_ESPERADOS = [s for s in SCREENS_TODOS if s not in SCREENS_PAUSADOS]
 
 REPORTE = os.path.expanduser("~/bot-padre-v2/estado_screens.json")
 

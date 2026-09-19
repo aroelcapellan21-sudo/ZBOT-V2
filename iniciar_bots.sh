@@ -161,34 +161,52 @@ echo " Z-Bot Padre v2 — Iniciando procesos"
 echo " $(date)"
 echo "================================================"
 
+# =========================================
+# RADARES PAUSADOS el 2026-09-19 por decision de Ariel
+# =========================================
+# Los 20 radares + z_auditor se apagaron para liberar RAM y peso de API durante
+# la ventana de captura de order book (BTC spot, 14-21 dias). Se verifico antes
+# que NINGUNO alimenta a v2_main: no aparecen en el grafo de imports de main.py,
+# ninguno de los 10 gates de entrada lee sus archivos, y lector_radares.py --el
+# unico modulo que dice usarlos-- no lo importa nadie.
+# Evidencia: reports/2026-09-19_paso1-inventario-radares.md
+#
+# z_auditor va apagado con ellos a proposito: avisa por Telegram
+# "<modulo> parece congelado" cuando sus JSON pasan de 5 min, con el token
+# compartido con V2.
+# z_webserver (panel, puerto 8765) SIGUE ACTIVO: no manda Telegram.
+#
+# PARA REVERTIR: quitar el "# " del inicio de las 21 lineas "iniciar z_..."
+# de abajo (las de este bloque), y vaciar SCREENS_PAUSADOS en monitor_screens.py.
+# =========================================
 # --- Módulos de datos e inteligencia ---
-iniciar z_velas      "$DIR" "python3 z_velas.py"
-iniciar z_volumen    "$DIR" "python3 volumen_real.py"
-iniciar z_precision  "$DIR" "python3 precision.py"
-iniciar z_fugas      "$DIR" "python3 picos_fuga.py"
-iniciar z_fuerza     "$DIR" "python3 fuerza_sector.py"
-iniciar z_liquidez   "$DIR" "python3 liquidez_libro.py"
-iniciar z_heatmap    "$DIR" "python3 heatmap.py"
-iniciar z_correlation "$DIR" "python3 correlation.py"
+# iniciar z_velas      "$DIR" "python3 z_velas.py"
+# iniciar z_volumen    "$DIR" "python3 volumen_real.py"
+# iniciar z_precision  "$DIR" "python3 precision.py"
+# iniciar z_fugas      "$DIR" "python3 picos_fuga.py"
+# iniciar z_fuerza     "$DIR" "python3 fuerza_sector.py"
+# iniciar z_liquidez   "$DIR" "python3 liquidez_libro.py"
+# iniciar z_heatmap    "$DIR" "python3 heatmap.py"
+# iniciar z_correlation "$DIR" "python3 correlation.py"
 
 # --- Inteligencia y análisis técnico (bot-padre-v2) ---
-iniciar z_radar      "$DIR" "python3 radar_noticias.py"
-iniciar z_intel      "$DIR" "python3 servidor_intel.py"
+# iniciar z_radar      "$DIR" "python3 radar_noticias.py"
+# iniciar z_intel      "$DIR" "python3 servidor_intel.py"
 
 # --- Motores de análisis (zbot/radar) ---
-iniciar z_squeeze      ~/zbot/radar "python3 squeeze_detector.py"
-iniciar z_macd         ~/zbot/radar "python3 macd_engine.py"
-iniciar z_rsi_adv      ~/zbot/radar "python3 rsi_advanced.py"
-iniciar z_vol_engine   ~/zbot/radar "python3 volumen_engine.py"
-iniciar z_sentiment    ~/zbot/radar "python3 z_sentiment.py"
-iniciar z_orderblocks  ~/zbot/radar "python3 orderblock_engine.py"
-iniciar z_timeframes   ~/zbot/radar "python3 timeframe_engine.py"
-iniciar z_ignition     ~/zbot/radar "python3 ignition.py"
-iniciar z_heatmap_radar ~/zbot/radar "python3 heatmap.py"
-iniciar z_wicks        ~/zbot/radar "python3 wick_analyzer.py"
+# iniciar z_squeeze      ~/zbot/radar "python3 squeeze_detector.py"
+# iniciar z_macd         ~/zbot/radar "python3 macd_engine.py"
+# iniciar z_rsi_adv      ~/zbot/radar "python3 rsi_advanced.py"
+# iniciar z_vol_engine   ~/zbot/radar "python3 volumen_engine.py"
+# iniciar z_sentiment    ~/zbot/radar "python3 z_sentiment.py"
+# iniciar z_orderblocks  ~/zbot/radar "python3 orderblock_engine.py"
+# iniciar z_timeframes   ~/zbot/radar "python3 timeframe_engine.py"
+# iniciar z_ignition     ~/zbot/radar "python3 ignition.py"
+# iniciar z_heatmap_radar ~/zbot/radar "python3 heatmap.py"
+# iniciar z_wicks        ~/zbot/radar "python3 wick_analyzer.py"
 
 # --- Radar (zbot) ---
-iniciar z_auditor    ~/zbot/radar "python3 auditor_supremo.py"
+# iniciar z_auditor    ~/zbot/radar "python3 auditor_supremo.py"
 iniciar z_webserver  ~/zbot/radar "python3 z_webserver.py"
 # z_executor DESACTIVADO el 2026-09-06 por decision de Ariel. Dos motivos:
 #   1. El score del radar no tiene valor predictivo (control pareado lo iguala,

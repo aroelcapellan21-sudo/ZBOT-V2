@@ -152,8 +152,9 @@ iniciar_claude() {
 
     # TERM explicito: bajo cron viene vacio y la TUI de Claude Code lo necesita.
     # --remote-control deja la sesion accesible desde el celular sin escanear QR.
-    screen -dmS "$nombre" bash -c "cd $directorio && export TERM=xterm-256color && exec '$bin' --remote-control $nombre"
-    echo "[OK]   $nombre iniciado ($bin, Remote Control activo)"
+    # --model fijo: tras un corte de luz la sesion vuelve con Opus 5.5, no con el default.
+    screen -dmS "$nombre" bash -c "cd $directorio && export TERM=xterm-256color && exec '$bin' --remote-control $nombre --model claude-opus-5-5"
+    echo "[OK]   $nombre iniciado ($bin, Remote Control activo, modelo claude-opus-5-5)"
 }
 
 echo "================================================"

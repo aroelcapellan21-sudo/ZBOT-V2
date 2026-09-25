@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(journalctl *)",
+      "Bash(findmnt *)",
+      "Bash(rclone lsl *)",
+      "Bash(rclone lsd *)",
+      "Bash(rclone lsf *)",
+      "Bash(rclone listremotes)",
+      "Bash(rclone check *)",
+      "Bash(rclone version)",
+      "Bash(lsblk *)",
+      "Bash(lsusb *)",
+      "Bash(systemctl status *)",
+      "Bash(systemctl --user status *)",
+      "Bash(systemctl is-active *)",
+      "Bash(systemctl is-enabled *)",
+      "Bash(systemctl list-units *)",
+      "Bash(mount)",
+      "Bash(ping *)"
+    ]
+  }
+}

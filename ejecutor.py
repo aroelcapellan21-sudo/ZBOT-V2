@@ -26,6 +26,20 @@ from datetime import datetime
 from decimal import Decimal, ROUND_DOWN
 from gestor_billetera import registrar_historial_billetera
 
+# Libro de ordenes. Import defensivo a proposito: si el libro falla al cargar,
+# el ejecutor tiene que seguir operando igual. Perder la anotacion es malo;
+# no poder operar es peor (mismo criterio que el import de engine, abajo).
+try:
+    from libro_ordenes import anotar_orden as _anotar_orden
+except Exception as _e_libro:
+    # El motivo se guarda en una variable NORMAL antes de definir la funcion:
+    # la del `except ... as` se borra al salir del bloque (F821, mismo caso que
+    # _motivo_sin_telegram mas abajo).
+    _motivo_sin_libro = str(_e_libro)
+
+    def _anotar_orden(*a, **k):
+        print(f"  [LIBRO] (sin libro de ordenes: {_motivo_sin_libro})")
+
 # Aviso por Telegram. Import defensivo: si engine falla, el ejecutor debe seguir
 # cargando igual — perder el aviso es malo, no poder operar es peor.
 try:
@@ -512,6 +526,12 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None, sl_pct=None):
             # En COMPRA se gasta el USDT bruto; la comision se descuenta de la cripto.
             usdt_gastado = float(respuesta.get("cummulativeQuoteQty") or monto)
 
+            # Se anota ANTES de tocar la billetera: si el guardado de abajo
+            # falla, la orden ya existe en Binance y el libro es el unico rastro.
+            _anotar_orden("APERTURA", moneda, "BUY", respuesta,
+                          "SIMULADOR" if simulador else "REAL",
+                          qty_neta=qty_neta, usdt_neto=usdt_neto)
+
             billetera["USDT"] = round(billetera.get("USDT", 0) - usdt_gastado, 4)
             billetera[moneda] = round(billetera.get(moneda, 0) + qty_neta, 8)
             fill      = {"qty": qty_neta, "usdt": usdt_gastado, "precio": precio_real}
@@ -541,6 +561,11 @@ def ejecutar_operacion(moneda, tipo, precio, monto=None, sl_pct=None):
                 respuesta, moneda, cantidad_a_vender, monto, precio)
             # En VENTA se entrega la cripto bruta; la comision se descuenta del USDT.
             qty_entregada = float(respuesta.get("executedQty") or cantidad_a_vender)
+
+            _anotar_orden("APERTURA", moneda, "SELL", respuesta,
+                          "SIMULADOR" if simulador else "REAL",
+                          qty_neta=qty_entregada, usdt_neto=usdt_neto,
+                          nota="venta suelta (no es cierre de posicion)")
 
             billetera[moneda] = round(billetera.get(moneda, 0) - qty_entregada, 8)
             billetera["USDT"] = round(billetera.get("USDT", 0) + usdt_neto, 4)
@@ -632,6 +657,13 @@ def cerrar_posicion(moneda, tipo_trade, precio_entrada, monto_op, qty=None):
         qty_neta, usdt_neto, precio_r = _extraer_fill(
             respuesta, moneda, cantidad, 0.0, precio_entrada)
         qty_ej = float(respuesta.get("executedQty") or cantidad)
+        # tipo_trade ES la fase (ALCISTA/LATERAL/BAJISTA). El motivo fino
+        # (TP/SL/BE/TRAILING/FASE_CAMBIO/MANUAL) lo decide el llamador DESPUES
+        # de esta orden, asi que aca no se conoce: lo aporta la contabilidad.
+        _anotar_orden("CIERRE", moneda, lado, respuesta,
+                      "SIMULADOR" if simulador else "REAL", qty_neta=qty_neta,
+                      usdt_neto=usdt_neto, fase=tipo_trade,
+                      precio_entrada=precio_entrada)
         # SELL: se entrega la cripto bruta y se recibe USDT neto de comision.
         # BUY (cierre de short): se recibe cripto neta y se paga USDT bruto.
         fill = {"qty": qty_neta if lado == "BUY" else qty_ej,
